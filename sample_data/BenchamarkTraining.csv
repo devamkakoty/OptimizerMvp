@@ -1,0 +1,2 @@
+,Model Name,Type,Latency,CPU Utilization (%),RAM Utilization (%),GPU Utilization (%),GPU Memory Utilization (%),Disk IO (IOPS),Network Bandwidth (Mbps),Throughput (tokens/sec),Peak VRAM (MB),Training FLOPs (GFLOPs)
+0,Microsoft Phi-2,Training,1294.72,6.0,15.6,11,7,290337,2172.92,29.11,7942.05,10.51

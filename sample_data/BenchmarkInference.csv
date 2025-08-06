@@ -1,0 +1,2 @@
+,Model Name,Type,Latency (ms),CPU Utilization (%),RAM Utilization (%),GPU Utilization (%),GPU Memory Utilization (%),Disk IO (IOPS),Network Bandwidth (Mbps),Throughput (tokens/sec),Peak VRAM (MB),Inference FLOPs (GFLOPs)
+0,Microsoft Phi-2,Inference,1414.21,15.0,10.0,10,10,293807,2437.01,262.51,5334.65,26.48
