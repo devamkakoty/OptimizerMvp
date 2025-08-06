@@ -1,0 +1,33 @@
+Model Name,Framework,Task Type,Total Parameters (Millions),Model Size (MB),Architecture type,Model Type,Embedding Vector Dimension (Hidden Size),Precision,Vocabulary Size,FFN (MLP) Dimension,Activation Function,FLOPs
+LLaMA 2 13B,PyTorch,Training,13015.86,49651.75,LlamaForCausalLM,llama,5120,FP16,32000,13824,silu,442.3824
+Qwen 1.5 -7B,PyTorch,Training,7721.32,29454.66,Qwen2ForCausalLM,qwen2,4096,BF16,151936,11008,silu,212.97
+Microsoft Phi-3 instruct,PyTorch,Training,3821.08,14576.34,Phi3ForCausalLM,phi3,5120,BF16,32064,17920,silu,413.88
+Mistral 7B,PyTorch,Training,7241.73,27625.13,MistralForCausalLM,mistral,4096,BF16,32000,14336,silu,298.65
+Gemma-2B,PyTorch,Training,2506.17,9560.35,GemmaForCausalLM,gemma,2048,BF16,256000,16384,gelu,90.21
+CodeGemma-7B,PyTorch,Training,8537.68,32568.77,GemmaForCausalLM,gemma,3072,BF16,256000,24576,gelu_pytorch_tanh,307.35
+Llama 2 7B,PyTorch,Training,6738.42,25705.15,LlamaForCausalLM,llama,4096,FP16,32000,11008,silu,237.84
+Microsoft Phi-2,PyTorch,Training,2779.68,10603.82,PhiForCausalLM,phi,2560,FP16,51200,10240,gelu_new,79.44
+Yi-6B,PyTorch,Training,6061.04,23121.13,LlamaForCausalLM,llama,4096,BF16,64000,11008,silu,173.97
+Yi-34B,PyTorch,Training,34388.92,131183.52,LlamaForCausalLM,llama,7168,BF16,64000,20480,silu,298.65
+Zephyr-7B,PyTorch,Training,7241.73,27625.13,MistralForCausalLM,mistral,4096,BF16,32000,14336,silu,298.65
+Yi-1.5-9B,PyTorch,Training,8829.41,33681.68,LlamaForCausalLM,llama,4096,BF16,64000,11008,silu,298.65
+OpenChat-3.5-1210,PyTorch,Training,7241.75,27625.19,MistralForCausalLM,mistral,4096,BF16,32002,14336,silu,298.65
+Hermes-2-Pro,PyTorch,Training,7241.99,27626.13,MistralForCausalLM,mistral,4096,BF16,32032,14336,silu,298.65
+Qwen2-7B-Instruct,PyTorch,Training,7615.62,29051.4,Qwen2ForCausalLM,qwen2,3584,BF16,152064,18944,silu,298.65
+GPT2,PyTorch,Training,0.115893602,265130.13,GPT2LMHeadModel,gpt2,,FP32,50257,,gelu_new,237.84
+LLAMA2-70B,PyTorch,Training,64.23950958,265130.13,LlamaForCausalLM,llama,8192,FP16,32000,28672,silu,2380.41
+LLAMA3.1-405B,PyTorch,Training,405000,772476.2,LlamaForCausalLM,llama,,BF16,128256,,silu,7290
+BERT,PyTorch,Training,109.51,840.09,BertForMaskedLM,bert,768,FP32,30522,3072,gelu,6.63
+ROBERTA,PyTorch,Training,124.7,951.42,RobertaForMaskedLM,roberta,768,FP32,50265,3072,gelu,6.12
+ALBERT,PyTorch,Training,11.22,90.36,AlbertForMaskedLM,albert,768,FP32,30000,3072,gelu_new,7.14
+DISTILBERT,PyTorch,Training,66.99,511.08,DistilBertForMaskedLM,distilbert,768,FP32,30522,3072,gelu,3.33
+RESNET18,PyTorch,Training,11.69,44.59,resnet18,resnet18,512,FP32,1000,512,relu,10.95
+RESNET34,PyTorch,Training,21.8,83.15,resnet34,resnet34,512,FP32,1000,512,relu,22.08
+RESNET50,PyTorch,Training,25.56,97.49,resnet50,resnet50,2048,FP32,1000,2048,relu,24.81
+VGG16,PyTorch,Training,138.36,527.79,vgg16,vgg16,512,FP32,1000,4096,relu,92.82
+VGG19,PyTorch,Training,143.67,548.05,vgg19,vgg19,512,FP32,1000,2048,relu,117.78
+INCEPTION_V3,PyTorch,Training,23.83,90.92,inception_v3,inception_v3,2048,FP32,1000,2048,relu,34.5
+EFFICIENTNET-B0,PyTorch,Training,5.29,20.17,efficientnet_b0,efficientnet_b0,1280,FP32,1000,1280,silu,2.49
+VIT-BASE-PATCH16-224,PyTorch,Training,86.57,660.5,ViTForImageClassification,vit,768,FP32,1000,3072,gelu,101.19
+DEIT-BASE-DISTILLED-PATCH16-224,PyTorch,Training,87.34,666.49,DeiTForImageClassificationWithTeacher,deit,768,FP32,1000,3072,gelu,101.7
+SWIN-BASE-PATCH4-WINDOW7-224,PyTorch,Training,87.77,1336.99,SwinForImageClassification,swin,1024,FP32,1000,4096,gelu,90.93
