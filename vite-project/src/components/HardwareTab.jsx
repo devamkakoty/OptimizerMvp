@@ -1,123 +1,125 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import apiClient from '../config/axios';
 
 const HardwareTab = () => {
   const [activeHardwareTab, setActiveHardwareTab] = useState('gpu');
+  const [hardwareData, setHardwareData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Static GPU data based on CSV structure
-  const gpuData = [
-    {
-      id: 1,
-      gpuCount: 1,
-      brand: 'NVIDIA',
-      model: 'NVIDIA GeForce GTX 1660 Ti',
-      version: '576.52',
-      totalMemory: 6144,
-      usedMemory: 178,
-      freeMemory: 5966,
-      currentLoad: 0,
+  // Fetch hardware data from API
+  useEffect(() => {
+    const fetchHardwareData = async () => {
+      try {
+        setLoading(true);
+        const response = await apiClient.get('/hardware/');
+        
+        if (response.data.status === 'success') {
+          setHardwareData(response.data.hardware_list || []);
+        } else {
+          setError('Failed to fetch hardware data');
+        }
+      } catch (err) {
+        console.error('Error fetching hardware data:', err);
+        setError('Failed to connect to server');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchHardwareData();
+  }, []);
+
+  // Helper function to extract GPU brand from GPU string
+  const getGpuBrand = (gpuString) => {
+    if (!gpuString) return 'Unknown';
+    if (gpuString.toLowerCase().includes('nvidia')) return 'NVIDIA';
+    if (gpuString.toLowerCase().includes('amd') || gpuString.toLowerCase().includes('radeon')) return 'AMD';
+    if (gpuString.toLowerCase().includes('intel')) return 'Intel';
+    return 'Unknown';
+  };
+
+  // Helper function to extract CPU brand from CPU string
+  const getCpuBrand = (cpuString) => {
+    if (!cpuString) return 'Unknown';
+    if (cpuString.toLowerCase().includes('intel')) return 'Intel';
+    if (cpuString.toLowerCase().includes('amd')) return 'AMD';
+    return 'Unknown';
+  };
+
+  // Filter hardware data for GPUs (has GPU field)
+  const gpuData = hardwareData
+    .filter(hw => hw.gpu && hw.gpu.trim() !== '')
+    .map(hw => ({
+      id: hw.id,
+      gpuCount: hw.num_gpu || 1,
+      brand: getGpuBrand(hw.gpu),
+      model: hw.gpu,
+      totalMemory: hw.gpu_memory_total_vram_mb || 0,
+      powerUsage: hw.gpu_power_consumption || 0,
+      graphicsClock: hw.gpu_graphics_clock || 0,
+      memoryClock: hw.gpu_memory_clock || 0,
+      smCores: hw.gpu_sm_cores || 0,
+      cudaCores: hw.gpu_cuda_cores || 0,
+      // Mock data for fields not available in API
+      version: 'N/A',
+      usedMemory: 0,
+      freeMemory: hw.gpu_memory_total_vram_mb || 0,
       utilization: 0,
       memoryUtilization: 0,
-      temperature: 48,
-      powerUsage: 24.4,
-      graphicsClock: 1455,
-      smClock: 1455,
-      memoryClock: 6000,
-      smCores: 'N/A',
-      cudaCores: 'N/A'
-    },
-    {
-      id: 2,
-      gpuCount: 1,
-      brand: 'NVIDIA',
-      model: 'NVIDIA GeForce RTX 3080',
-      version: '580.34',
-      totalMemory: 10240,
-      usedMemory: 2048,
-      freeMemory: 8192,
-      currentLoad: 45,
-      utilization: 67,
-      memoryUtilization: 20,
-      temperature: 68,
-      powerUsage: 275.0,
-      graphicsClock: 1710,
-      smClock: 1710,
-      memoryClock: 19000,
-      smCores: 68,
-      cudaCores: 8704
-    },
-    {
-      id: 3,
-      gpuCount: 1,
-      brand: 'AMD',
-      model: 'AMD Radeon RX 6800 XT',
-      version: '22.11.2',
-      totalMemory: 16384,
-      usedMemory: 1024,
-      freeMemory: 15360,
-      currentLoad: 15,
-      utilization: 23,
-      memoryUtilization: 6,
-      temperature: 55,
-      powerUsage: 180.5,
-      graphicsClock: 2250,
-      smClock: 2250,
-      memoryClock: 16000,
-      smCores: 72,
-      cudaCores: 'N/A'
-    }
-  ];
+      temperature: 25, // Default safe temp
+    }));
 
-  // Static CPU data based on CSV structure
-  const cpuData = [
-    {
-      id: 1,
-      brand: 'Intel',
-      model: 'Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz',
-      family: 6,
-      modelFamily: 158,
-      baseClock: '2.60GHz',
-      physicalCores: 6,
-      totalCores: 12,
-      maxFrequency: '2.6',
-      minFrequency: '0',
-      currentSpeed: '2.6',
-      threadsPerCore: 2,
-      coresPerSocket: 6,
-      sockets: 1
-    },
-    {
-      id: 2,
-      brand: 'AMD',
-      model: 'AMD Ryzen 9 5900X',
-      family: 25,
-      modelFamily: 33,
-      baseClock: '3.70GHz',
-      physicalCores: 12,
-      totalCores: 24,
-      maxFrequency: '4.8',
-      minFrequency: '2.2',
-      currentSpeed: '3.7',
-      threadsPerCore: 2,
-      coresPerSocket: 12,
-      sockets: 1
-    },
-    {
-      id: 3,
-      brand: 'Intel',
-      model: 'Intel(R) Core(TM) i9-12900K',
-      family: 6,
-      modelFamily: 167,
-      baseClock: '3.20GHz',
-      physicalCores: 16,
-      totalCores: 24,
-      maxFrequency: '5.2',
-      minFrequency: '0.8',
-      currentSpeed: '3.2',
-      threadsPerCore: 2,
-      coresPerSocket: 16,
-      sockets: 1
-    }
-  ];
+  // Process hardware data for CPUs
+  const cpuData = hardwareData.map(hw => ({
+    id: hw.id,
+    brand: getCpuBrand(hw.cpu),
+    model: hw.cpu,
+    physicalCores: hw.cpu_total_cores || 0,
+    totalCores: hw.cpu_total_cores || 0,
+    baseClock: hw.cpu_base_clock_ghz ? `${hw.cpu_base_clock_ghz}GHz` : 'N/A',
+    maxFrequency: hw.cpu_max_frequency_ghz || 0,
+    threadsPerCore: hw.cpu_threads_per_core || 1,
+    powerConsumption: hw.cpu_power_consumption || 0,
+    l1Cache: hw.l1_cache || 0,
+    // Mock data for fields not available
+    family: 0,
+    modelFamily: 0,
+    minFrequency: '0',
+    currentSpeed: hw.cpu_base_clock_ghz || 0,
+    coresPerSocket: hw.cpu_total_cores || 0,
+    sockets: 1
+  }));
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+        <div className="p-8 text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#01a982] mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-300">Loading hardware data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+        <div className="p-8 text-center">
+          <div className="text-red-500 text-xl mb-4">⚠️</div>
+          <p className="text-gray-600 dark:text-gray-300 mb-4">{error}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="px-4 py-2 bg-[#01a982] text-white rounded-lg hover:bg-[#019670] transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
@@ -176,16 +178,23 @@ const HardwareTab = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                  {gpuData.map((gpu) => (
+                  {gpuData.length === 0 ? (
+                    <tr>
+                      <td colSpan="8" className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+                        No GPU hardware found in database
+                      </td>
+                    </tr>
+                  ) : (
+                    gpuData.map((gpu) => (
                     <tr key={gpu.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                       <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{gpu.brand}</td>
                       <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-300">
                         <div className="max-w-xs truncate" title={gpu.model}>{gpu.model}</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">v{gpu.version}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">Count: {gpu.gpuCount}</div>
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-300">
-                        <div>{(gpu.totalMemory / 1024).toFixed(1)} GB</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">{gpu.usedMemory} MB used</div>
+                        <div>{gpu.totalMemory ? (gpu.totalMemory / 1024).toFixed(1) : 'N/A'} GB</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">{gpu.freeMemory} MB available</div>
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-300">
                         <div>{gpu.utilization}% GPU</div>
@@ -202,15 +211,16 @@ const HardwareTab = () => {
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-300">{gpu.powerUsage} W</td>
                       <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-300">
-                        <div>{gpu.cudaCores !== 'N/A' ? gpu.cudaCores : gpu.smCores} Cores</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">{gpu.graphicsClock} MHz</div>
+                        <div>{gpu.cudaCores || gpu.smCores || 'N/A'} Cores</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">{gpu.graphicsClock || 0} MHz</div>
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
                         <button className="text-[#01a982] hover:text-[#019670] mr-3">Edit</button>
                         <button className="text-red-600 hover:text-red-900">Delete</button>
                       </td>
                     </tr>
-                  ))}
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -242,12 +252,19 @@ const HardwareTab = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                  {cpuData.map((cpu) => (
+                  {cpuData.length === 0 ? (
+                    <tr>
+                      <td colSpan="6" className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+                        No CPU hardware found in database
+                      </td>
+                    </tr>
+                  ) : (
+                    cpuData.map((cpu) => (
                     <tr key={cpu.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                       <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{cpu.brand}</td>
                       <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-300">
-                        <div className="max-w-xs truncate" title={cpu.model}>{cpu.model.split(' @ ')[0]}</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">Family {cpu.family}</div>
+                        <div className="max-w-xs truncate" title={cpu.model}>{cpu.model ? cpu.model.split(' @ ')[0] : 'Unknown'}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">Power: {cpu.powerConsumption || 0}W</div>
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-300">
                         <div>{cpu.physicalCores} Physical</div>
@@ -266,7 +283,8 @@ const HardwareTab = () => {
                         <button className="text-red-600 hover:text-red-900">Delete</button>
                       </td>
                     </tr>
-                  ))}
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>

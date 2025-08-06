@@ -28,12 +28,20 @@ const OptimizeTab = () => {
   const [availableModelTypes, setAvailableModelTypes] = useState([]);
   const [availableTaskTypes, setAvailableTaskTypes] = useState([]);
 
-  // Post-deployment specific state
-  const [currentCpuUsage, setCurrentCpuUsage] = useState('');
-  const [currentGpuUsage, setCurrentGpuUsage] = useState('');
-  const [currentMemoryUsage, setCurrentMemoryUsage] = useState('');
-  const [currentCostPer1000, setCurrentCostPer1000] = useState('');
+  // Post-deployment specific state - using the specific fields provided
+  const [gpuMemoryUsage, setGpuMemoryUsage] = useState('');
+  const [cpuMemoryUsage, setCpuMemoryUsage] = useState('');
+  const [cpuUtilization, setCpuUtilization] = useState('');
+  const [gpuUtilization, setGpuUtilization] = useState('');
+  const [diskIops, setDiskIops] = useState('');
+  const [networkBandwidth, setNetworkBandwidth] = useState('');
+  const [currentHardwareId, setCurrentHardwareId] = useState('');
   const [optimizationPriority, setOptimizationPriority] = useState('balanced');
+
+  // Hardware data state
+  const [hardwareData, setHardwareData] = useState([]);
+  const [isOverrideEnabled, setIsOverrideEnabled] = useState(false);
+  const [isLoadingHardware, setIsLoadingHardware] = useState(false);
 
   // Loading and error states
   const [isLoading, setIsLoading] = useState(false);
@@ -44,21 +52,42 @@ const OptimizeTab = () => {
   const [optimizationResults, setOptimizationResults] = useState(null);
   const [isRunningOptimization, setIsRunningOptimization] = useState(false);
 
-  // Fetch dropdown options on component mount
+  // Helper function to create descriptive hardware names
+  const getHardwareName = (hardware) => {
+    if (hardware.gpu && hardware.cpu) {
+      // Both GPU and CPU available
+      const gpu = hardware.gpu.replace(/NVIDIA|AMD|Intel/g, '').trim();
+      const cpu = hardware.cpu.split(/\s+/).slice(0, 3).join(' '); // First 3 words of CPU
+      return `${gpu} + ${cpu}`;
+    } else if (hardware.gpu) {
+      // GPU only
+      return hardware.gpu.trim();
+    } else if (hardware.cpu) {
+      // CPU only
+      return hardware.cpu.split(/\s+/).slice(0, 4).join(' '); // First 4 words of CPU
+    } else {
+      // Fallback
+      return `Hardware Config ${hardware.id}`;
+    }
+  };
+
+  // Fetch dropdown options and hardware data on component mount
   useEffect(() => {
     const fetchDropdownOptions = async () => {
       setIsLoadingDropdowns(true);
       try {
         console.log('Fetching dropdown options for OptimizeTab...');
         
-        // Fetch model types and task types in parallel
-        const [modelTypesResponse, taskTypesResponse] = await Promise.all([
+        // Fetch model types, task types, and hardware data in parallel
+        const [modelTypesResponse, taskTypesResponse, hardwareResponse] = await Promise.all([
           apiClient.get('/model/types'),
-          apiClient.get('/model/task-types')
+          apiClient.get('/model/task-types'),
+          apiClient.get('/hardware/')
         ]);
 
         console.log('Model types response:', modelTypesResponse.data);
         console.log('Task types response:', taskTypesResponse.data);
+        console.log('Hardware response:', hardwareResponse.data);
 
         if (modelTypesResponse.data.status === 'success') {
           console.log('Setting model types:', modelTypesResponse.data.model_types);
@@ -73,6 +102,26 @@ const OptimizeTab = () => {
         } else {
           console.error('Task types response not successful:', taskTypesResponse.data);
         }
+
+        if (hardwareResponse.data.status === 'success') {
+          console.log('Setting hardware data:', hardwareResponse.data.hardware_list);
+          console.log('Hardware data length:', hardwareResponse.data.hardware_list?.length);
+          setHardwareData(hardwareResponse.data.hardware_list || []);
+          
+          // Set default values from first hardware if available and not in override mode
+          if (!isOverrideEnabled && hardwareResponse.data.hardware_list?.length > 0) {
+            const firstHardware = hardwareResponse.data.hardware_list[0];
+            console.log('First hardware:', firstHardware);
+            // Create a descriptive hardware name
+            const hardwareName = getHardwareName(firstHardware);
+            console.log('Generated hardware name:', hardwareName);
+            setCurrentHardwareId(hardwareName);
+            // Leave resource metrics empty - user must fill them in
+          }
+        } else {
+          console.error('Hardware response not successful:', hardwareResponse.data);
+          console.log('Full hardware response:', hardwareResponse.data);
+        }
       } catch (err) {
         console.error('Error fetching dropdown options:', err);
         console.error('Error details:', err.response?.data || err.message);
@@ -82,7 +131,24 @@ const OptimizeTab = () => {
         setAvailableModelTypes(['bert', 'gpt', 'resnet', 'llama', 't5']);
         setAvailableTaskTypes(['Inference']);
         
-        setError('Failed to load model and task type options from backend. Using default values.');
+        // Add fallback hardware data matching the actual database (3 items)
+        const fallbackHardware = [
+          { id: 1, cpu: 'Intel(R) Xeon', gpu: 'Tesla T4', gpu_memory_total_vram_mb: 16, gpu_cuda_cores: 320, cpu_total_cores: 12 },
+          { id: 2, cpu: 'Intel(R) Xeon', gpu: 'NVIDIA A100', gpu_memory_total_vram_mb: 40, gpu_cuda_cores: 432, cpu_total_cores: 12 },
+          { id: 3, cpu: 'Intel(R) Xeon', gpu: 'NVIDIA L4', gpu_memory_total_vram_mb: 24, gpu_cuda_cores: 240, cpu_total_cores: 12 }
+        ];
+        
+        console.log('Using fallback hardware data:', fallbackHardware);
+        setHardwareData(fallbackHardware);
+        
+        // Set default hardware
+        if (!isOverrideEnabled) {
+          const defaultHardware = getHardwareName(fallbackHardware[0]);
+          setCurrentHardwareId(defaultHardware);
+          // Leave resource metrics empty - user must fill them in
+        }
+        
+        setError('Failed to load data from backend. Using sample hardware data.');
       } finally {
         setIsLoadingDropdowns(false);
       }
@@ -110,11 +176,15 @@ const OptimizeTab = () => {
     setActivationFunction('');
     
     // Clear post-deployment specific fields
-    setCurrentCpuUsage('');
-    setCurrentGpuUsage('');
-    setCurrentMemoryUsage('');
-    setCurrentCostPer1000('');
+    setGpuMemoryUsage('');
+    setCpuMemoryUsage('');
+    setCpuUtilization('');
+    setGpuUtilization('');
+    setDiskIops('');
+    setNetworkBandwidth('');
+    setCurrentHardwareId('');
     setOptimizationPriority('balanced');
+    setIsOverrideEnabled(false);
     
     setError('');
     setOptimizationResults(null);
@@ -189,6 +259,26 @@ const OptimizeTab = () => {
       return;
     }
 
+    // Validate resource metrics for post-deployment mode
+    if (optimizationMode === 'post-deployment') {
+      const requiredFields = [
+        { value: gpuUtilization, name: 'GPU Utilization' },
+        { value: gpuMemoryUsage, name: 'GPU Memory Usage' },
+        { value: cpuUtilization, name: 'CPU Utilization' },
+        { value: cpuMemoryUsage, name: 'CPU Memory Usage' },
+        { value: diskIops, name: 'Disk IOPS' },
+        { value: networkBandwidth, name: 'Network Bandwidth' },
+        { value: currentHardwareId, name: 'Current Hardware' }
+      ];
+
+      const missingFields = requiredFields.filter(field => !field.value || field.value === '');
+      
+      if (missingFields.length > 0) {
+        setError(`Please fill in the following resource metrics: ${missingFields.map(f => f.name).join(', ')}. Click "Override" to enter values.`);
+        return;
+      }
+    }
+
     setIsRunningOptimization(true);
     setError('');
     setOptimizationResults(null);
@@ -227,14 +317,16 @@ const OptimizeTab = () => {
           target_fp16_performance: true,
           optimization_priority: optimizationPriority,
           
-          // Current resource metrics (from form input)
-          cpu_usage_percent: parseFloat(currentCpuUsage) || null,
-          gpu_usage_percent: parseFloat(currentGpuUsage) || null,
-          memory_usage_percent: parseFloat(currentMemoryUsage) || null,
-          current_latency_ms: parseFloat(latency) || null, // Use the existing latency field
-          current_throughput_qps: parseFloat(throughput) || null, // Use the existing throughput field
-          current_memory_gb: parseFloat(modelSize) / 1000 || null,
-          current_cost_per_1000: parseFloat(currentCostPer1000) || null
+          // Current resource metrics (from hardware API fields)
+          gpu_memory_usage: parseFloat(gpuMemoryUsage) || null,
+          cpu_memory_usage: parseFloat(cpuMemoryUsage) || null,
+          cpu_utilization: parseFloat(cpuUtilization) || null,
+          gpu_utilization: parseFloat(gpuUtilization) || null,
+          disk_iops: parseFloat(diskIops) || null,
+          network_bandwidth: parseFloat(networkBandwidth) || null,
+          current_hardware_id: currentHardwareId || null,
+          current_latency_ms: parseFloat(latency) || null,
+          current_throughput_qps: parseFloat(throughput) || null
         };
       }
 
@@ -406,16 +498,26 @@ const OptimizeTab = () => {
           <div className="flex items-center justify-between mb-6">
             <div>
               <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">Resource Metrics</h2>
-              <p className="text-gray-600 dark:text-gray-300">Real-time resource utilization metrics</p>
+              <p className="text-gray-600 dark:text-gray-300">Real-time resource utilization metrics from hardware API</p>
             </div>
             <div className="flex gap-4">
-              <button className="flex items-center gap-2 text-sm text-[#01a982] hover:text-[#019670]">
+              <button 
+                onClick={() => setIsOverrideEnabled(!isOverrideEnabled)}
+                className={`flex items-center gap-2 text-sm transition-colors ${
+                  isOverrideEnabled 
+                    ? 'text-orange-600 hover:text-orange-700' 
+                    : 'text-[#01a982] hover:text-[#019670]'
+                }`}
+              >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                 </svg>
-                Override
+                {isOverrideEnabled ? 'Exit Override' : 'Override'}
               </button>
-              <button className="flex items-center gap-2 text-sm text-[#01a982] hover:text-[#019670]">
+              <button 
+                onClick={() => window.location.reload()}
+                className="flex items-center gap-2 text-sm text-[#01a982] hover:text-[#019670]"
+              >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
@@ -424,27 +526,185 @@ const OptimizeTab = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            {[
-              { label: 'Gpu Utilization', value: '72%' },
-              { label: 'Gpu Memory Usage', value: '41%' },
-              { label: 'Cpu Utilization', value: '31%' },
-              { label: 'Ram Usage', value: '35%' },
-              { label: 'Disk I O P S', value: '168 IOPS' },
-              { label: 'Network Bandwidth', value: '92 MB/s' },
-              { label: 'Avg Latency', value: '48 ms' },
-              { label: 'Throughput', value: '100/sec' }
-            ].map((metric, index) => (
-              <div key={index}>
-                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  {metric.label}
-                  <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-                </label>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+            {/* GPU Utilization */}
+            <div>
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                GPU Utilization
+                <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+              </label>
+              {isOverrideEnabled ? (
+                <input
+                  type="number"
+                  value={gpuUtilization}
+                  onChange={(e) => setGpuUtilization(e.target.value)}
+                  className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-[#01a982]"
+                  placeholder="Enter %"
+                  min="0"
+                  max="100"
+                />
+              ) : (
                 <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                  <div className="text-2xl font-bold text-gray-900 dark:text-white">{metric.value}</div>
+                  <div className="text-2xl font-bold text-gray-500 dark:text-gray-400">
+                    {gpuUtilization || 'Click Override to set'}%
+                  </div>
                 </div>
-              </div>
-            ))}
+              )}
+            </div>
+
+            {/* GPU Memory Usage */}
+            <div>
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                GPU Memory Usage
+                <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+              </label>
+              {isOverrideEnabled ? (
+                <input
+                  type="number"
+                  value={gpuMemoryUsage}
+                  onChange={(e) => setGpuMemoryUsage(e.target.value)}
+                  className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-[#01a982]"
+                  placeholder="Enter %"
+                  min="0"
+                  max="100"
+                />
+              ) : (
+                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                  <div className="text-2xl font-bold text-gray-500 dark:text-gray-400">
+                    {gpuMemoryUsage || 'Click Override to set'}%
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* CPU Utilization */}
+            <div>
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                CPU Utilization
+                <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+              </label>
+              {isOverrideEnabled ? (
+                <input
+                  type="number"
+                  value={cpuUtilization}
+                  onChange={(e) => setCpuUtilization(e.target.value)}
+                  className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-[#01a982]"
+                  placeholder="Enter %"
+                  min="0"
+                  max="100"
+                />
+              ) : (
+                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                  <div className="text-2xl font-bold text-gray-500 dark:text-gray-400">
+                    {cpuUtilization || 'Click Override to set'}%
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* CPU Memory Usage */}
+            <div>
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                CPU Memory Usage
+                <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+              </label>
+              {isOverrideEnabled ? (
+                <input
+                  type="number"
+                  value={cpuMemoryUsage}
+                  onChange={(e) => setCpuMemoryUsage(e.target.value)}
+                  className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-[#01a982]"
+                  placeholder="Enter %"
+                  min="0"
+                  max="100"
+                />
+              ) : (
+                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                  <div className="text-2xl font-bold text-gray-500 dark:text-gray-400">
+                    {cpuMemoryUsage || 'Click Override to set'}%
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Disk IOPS */}
+            <div>
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Disk IOPS
+                <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+              </label>
+              {isOverrideEnabled ? (
+                <input
+                  type="number"
+                  value={diskIops}
+                  onChange={(e) => setDiskIops(e.target.value)}
+                  className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-[#01a982]"
+                  placeholder="Enter IOPS"
+                />
+              ) : (
+                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                  <div className="text-2xl font-bold text-gray-500 dark:text-gray-400">
+                    {diskIops ? `${diskIops} IOPS` : 'Click Override to set'}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Network Bandwidth */}
+            <div>
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Network Bandwidth
+                <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+              </label>
+              {isOverrideEnabled ? (
+                <input
+                  type="number"
+                  value={networkBandwidth}
+                  onChange={(e) => setNetworkBandwidth(e.target.value)}
+                  className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-[#01a982]"
+                  placeholder="Enter MB/s"
+                />
+              ) : (
+                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                  <div className="text-2xl font-bold text-gray-500 dark:text-gray-400">
+                    {networkBandwidth ? `${networkBandwidth} MB/s` : 'Click Override to set'}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Current Hardware ID */}
+            <div>
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Current Hardware
+                <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+              </label>
+              <select
+                value={currentHardwareId}
+                onChange={(e) => setCurrentHardwareId(e.target.value)}
+                disabled={!isOverrideEnabled}
+                className={`w-full px-3 py-2 border text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-[#01a982] ${
+                  isOverrideEnabled 
+                    ? 'bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600' 
+                    : 'bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600 cursor-not-allowed'
+                }`}
+              >
+                <option value="">Select hardware ({hardwareData.length} available)</option>
+                {hardwareData.length > 0 ? (
+                  hardwareData.map((hw) => {
+                    const hardwareName = getHardwareName(hw);
+                    return (
+                      <option key={hw.id} value={hardwareName}>
+                        {hardwareName}
+                      </option>
+                    );
+                  })
+                ) : (
+                  <option disabled>No hardware data loaded</option>
+                )}
+              </select>
+            </div>
+
           </div>
         </div>
       )}
@@ -781,133 +1041,6 @@ const OptimizeTab = () => {
           </div>
         </div>
 
-        {/* Post-Deployment Additional Metrics */}
-        {optimizationMode === 'post-deployment' && (
-          <div className="mt-6 p-6 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Additional Resource Metrics</h3>
-            <p className="text-sm text-blue-600 dark:text-blue-400 mb-4">
-              Enter additional system metrics to improve optimization accuracy.
-            </p>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Current CPU Usage */}
-              <div>
-                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Current CPU Usage (%)
-                  <div className="relative">
-                    <Info 
-                      className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" 
-                      onMouseEnter={() => setShowTooltip('currentCpuUsage')}
-                      onMouseLeave={() => setShowTooltip('')}
-                    />
-                    {showTooltip === 'currentCpuUsage' && (
-                      <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
-                        <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
-                        Current CPU utilization percentage (0-100)
-                      </div>
-                    )}
-                  </div>
-                </label>
-                <input
-                  type="number"
-                  value={currentCpuUsage}
-                  onChange={(e) => setCurrentCpuUsage(e.target.value)}
-                  placeholder="Optional - Enter current CPU usage %"
-                  min="0"
-                  max="100"
-                  className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-transparent transition-all"
-                />
-              </div>
-
-              {/* Current GPU Usage */}
-              <div>
-                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Current GPU Usage (%)
-                  <div className="relative">
-                    <Info 
-                      className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" 
-                      onMouseEnter={() => setShowTooltip('currentGpuUsage')}
-                      onMouseLeave={() => setShowTooltip('')}
-                    />
-                    {showTooltip === 'currentGpuUsage' && (
-                      <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
-                        <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
-                        Current GPU utilization percentage (0-100)
-                      </div>
-                    )}
-                  </div>
-                </label>
-                <input
-                  type="number"
-                  value={currentGpuUsage}
-                  onChange={(e) => setCurrentGpuUsage(e.target.value)}
-                  placeholder="Optional - Enter current GPU usage %"
-                  min="0"
-                  max="100"
-                  className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-transparent transition-all"
-                />
-              </div>
-
-              {/* Current Memory Usage */}
-              <div>
-                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Current Memory Usage (%)
-                  <div className="relative">
-                    <Info 
-                      className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" 
-                      onMouseEnter={() => setShowTooltip('currentMemoryUsage')}
-                      onMouseLeave={() => setShowTooltip('')}
-                    />
-                    {showTooltip === 'currentMemoryUsage' && (
-                      <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
-                        <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
-                        Current memory utilization percentage (0-100)
-                      </div>
-                    )}
-                  </div>
-                </label>
-                <input
-                  type="number"
-                  value={currentMemoryUsage}
-                  onChange={(e) => setCurrentMemoryUsage(e.target.value)}
-                  placeholder="Optional - Enter current memory usage %"
-                  min="0"
-                  max="100"
-                  className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-transparent transition-all"
-                />
-              </div>
-
-              {/* Current Cost */}
-              <div>
-                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Current Cost per 1000 Inferences ($)
-                  <div className="relative">
-                    <Info 
-                      className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" 
-                      onMouseEnter={() => setShowTooltip('currentCost')}
-                      onMouseLeave={() => setShowTooltip('')}
-                    />
-                    {showTooltip === 'currentCost' && (
-                      <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
-                        <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
-                        Current cost per 1000 inferences in USD
-                      </div>
-                    )}
-                  </div>
-                </label>
-                <input
-                  type="number"
-                  value={currentCostPer1000}
-                  onChange={(e) => setCurrentCostPer1000(e.target.value)}
-                  placeholder="Optional - Enter current cost per 1000 inferences"
-                  min="0"
-                  step="0.0001"
-                  className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-transparent transition-all"
-                />
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Load More Parameters Button */}
         {modelType && taskType && !showMoreParams && (
