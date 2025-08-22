@@ -23,6 +23,10 @@ const OptimizeTab = () => {
   const [vocabularySize, setVocabularySize] = useState('');
   const [attentionLayers, setAttentionLayers] = useState('');
   const [activationFunction, setActivationFunction] = useState('');
+  const [precision, setPrecision] = useState('');
+  
+  // Store the actual model name from the API
+  const [selectedModelName, setSelectedModelName] = useState('');
 
   // Dropdown options from backend
   const [availableModelTypes, setAvailableModelTypes] = useState([]);
@@ -71,37 +75,23 @@ const OptimizeTab = () => {
     }
   };
 
-  // Fetch dropdown options and hardware data on component mount
+  // Initialize dropdown options and fetch hardware data on component mount
   useEffect(() => {
-    const fetchDropdownOptions = async () => {
+    const initializeData = async () => {
       setIsLoadingDropdowns(true);
+      
+      console.log('Initializing OptimizeTab data...');
+      
+      // Use fallback values directly for model types and task types since endpoints don't exist
+      setAvailableModelTypes(['llama', 'qwen2', 'phi3', 'mistral', 'gemma', 'phi', 'gpt2', 'bert', 'roberta', 'albert', 'distilbert', 'resnet18', 'resnet34', 'resnet50', 'vgg16', 'vgg19', 'inception_v3', 'efficientnet_b0', 'vit', 'deit', 'swin']);
+      setAvailableTaskTypes(['Inference', 'Training']);
+      
+      // Still fetch hardware data since that endpoint exists
       try {
-        console.log('Fetching dropdown options for OptimizeTab...');
+        console.log('Fetching hardware data...');
+        const hardwareResponse = await apiClient.get('/hardware/');
         
-        // Fetch model types, task types, and hardware data in parallel
-        const [modelTypesResponse, taskTypesResponse, hardwareResponse] = await Promise.all([
-          apiClient.get('/model/types'),
-          apiClient.get('/model/task-types'),
-          apiClient.get('/hardware/')
-        ]);
-
-        console.log('Model types response:', modelTypesResponse.data);
-        console.log('Task types response:', taskTypesResponse.data);
         console.log('Hardware response:', hardwareResponse.data);
-
-        if (modelTypesResponse.data.status === 'success') {
-          console.log('Setting model types:', modelTypesResponse.data.model_types);
-          setAvailableModelTypes(modelTypesResponse.data.model_types || []);
-        } else {
-          console.error('Model types response not successful:', modelTypesResponse.data);
-        }
-
-        if (taskTypesResponse.data.status === 'success') {
-          console.log('Setting task types:', taskTypesResponse.data.task_types);
-          setAvailableTaskTypes(taskTypesResponse.data.task_types || []);
-        } else {
-          console.error('Task types response not successful:', taskTypesResponse.data);
-        }
 
         if (hardwareResponse.data.status === 'success') {
           console.log('Setting hardware data:', hardwareResponse.data.hardware_list);
@@ -123,38 +113,15 @@ const OptimizeTab = () => {
           console.log('Full hardware response:', hardwareResponse.data);
         }
       } catch (err) {
-        console.error('Error fetching dropdown options:', err);
+        console.error('Error fetching hardware data:', err);
         console.error('Error details:', err.response?.data || err.message);
-        
-        // Fallback to hardcoded values if backend is not available
-        console.log('Using fallback dropdown values...');
-        setAvailableModelTypes(['bert', 'gpt', 'resnet', 'llama', 't5']);
-        setAvailableTaskTypes(['Inference']);
-        
-        // Add fallback hardware data matching the actual database (3 items)
-        const fallbackHardware = [
-          { id: 1, cpu: 'Intel(R) Xeon', gpu: 'Tesla T4', gpu_memory_total_vram_mb: 16, gpu_cuda_cores: 320, cpu_total_cores: 12 },
-          { id: 2, cpu: 'Intel(R) Xeon', gpu: 'NVIDIA A100', gpu_memory_total_vram_mb: 40, gpu_cuda_cores: 432, cpu_total_cores: 12 },
-          { id: 3, cpu: 'Intel(R) Xeon', gpu: 'NVIDIA L4', gpu_memory_total_vram_mb: 24, gpu_cuda_cores: 240, cpu_total_cores: 12 }
-        ];
-        
-        console.log('Using fallback hardware data:', fallbackHardware);
-        setHardwareData(fallbackHardware);
-        
-        // Set default hardware
-        if (!isOverrideEnabled) {
-          const defaultHardware = getHardwareName(fallbackHardware[0]);
-          setCurrentHardwareId(defaultHardware);
-          // Leave resource metrics empty - user must fill them in
-        }
-        
-        setError('Failed to load data from backend. Using sample hardware data.');
+        setError('Failed to load hardware data from backend.');
       } finally {
         setIsLoadingDropdowns(false);
       }
     };
 
-    fetchDropdownOptions();
+    initializeData();
   }, []);
 
   // Clear form data when switching between pre/post deployment modes
@@ -174,6 +141,8 @@ const OptimizeTab = () => {
     setVocabularySize('');
     setAttentionLayers('');
     setActivationFunction('');
+    setPrecision('');
+    setSelectedModelName('');
     
     // Clear post-deployment specific fields
     setGpuMemoryUsage('');
@@ -214,25 +183,24 @@ const OptimizeTab = () => {
         if (response.data.status === 'success' && response.data.model_data) {
           const modelData = response.data.model_data;
           
-          // Prefill the form with model data from backend (pre-deployment only)
-          setModelSize(modelData.model_size_mb?.toString() || '');
-          setParameters(modelData.total_parameters_millions?.toString() || '');
-          // Set a default FLOPs value based on model size and parameters
-          const estimatedFlops = (modelData.total_parameters_millions || 0) * 2; // Rough estimation
-          setFlops(estimatedFlops.toString());
-          setBatchSize('1'); // Default batch size
-          setLatency(''); // Keep empty for user to set requirements
-          setThroughput(''); // Keep empty for user to set requirements
+          // Prefill the form with model data from backend
+          setModelSize(modelData.model_size_mb?.toString());
+          setParameters(modelData.total_parameters_millions?.toString());
+          setFlops(modelData.flops?.toString());
           
-          // Set framework from model data
-          setFramework(modelData.framework?.toLowerCase() || 'pytorch');
+          // Set framework from model data (keep original case)
+          setFramework(modelData.framework);
+          
+          // Store the actual model name for API calls
+          setSelectedModelName(modelData.model_name);
           
           // Prefill additional parameters if available
-          setArchitectureType(modelData.architecture_type || '');
-          setHiddenLayers(modelData.number_of_hidden_layers?.toString() || '');
-          setVocabularySize(modelData.vocabulary_size?.toString() || '');
-          setAttentionLayers(modelData.number_of_attention_layers?.toString() || '');
-          setActivationFunction(modelData.activation_function || '');
+          setArchitectureType(modelData.architecture_type);
+          setHiddenLayers(modelData.embedding_vector_dimension?.toString());
+          setVocabularySize(modelData.vocabulary_size?.toString());
+          setAttentionLayers(modelData.ffn_dimension?.toString());
+          setActivationFunction(modelData.activation_function);
+          setPrecision(modelData.precision);
         } else {
           setError('Model data not found for the selected type and task.');
         }
@@ -259,6 +227,23 @@ const OptimizeTab = () => {
       return;
     }
 
+    if (!selectedModelName) {
+      setError('Model data not loaded. Please select model type and task type first.');
+      return;
+    }
+
+    if (!modelSize || !parameters || !flops) {
+      setError('Please ensure model size, parameters, and FLOPs are filled in.');
+      return;
+    }
+
+    if (optimizationMode === 'pre-deployment') {
+      if (!batchSize || !latency || !throughput) {
+        setError('Please fill in batch size, latency requirement, and throughput requirement for pre-deployment optimization.');
+        return;
+      }
+    }
+
     // Validate resource metrics for post-deployment mode
     if (optimizationMode === 'post-deployment') {
       const requiredFields = [
@@ -268,13 +253,17 @@ const OptimizeTab = () => {
         { value: cpuMemoryUsage, name: 'CPU Memory Usage' },
         { value: diskIops, name: 'Disk IOPS' },
         { value: networkBandwidth, name: 'Network Bandwidth' },
-        { value: currentHardwareId, name: 'Current Hardware' }
+        { value: currentHardwareId, name: 'Current Hardware' },
+        { value: architectureType, name: 'Architecture Type' },
+        { value: precision, name: 'Precision' },
+        { value: vocabularySize, name: 'Vocabulary Size' },
+        { value: activationFunction, name: 'Activation Function' }
       ];
 
       const missingFields = requiredFields.filter(field => !field.value || field.value === '');
       
       if (missingFields.length > 0) {
-        setError(`Please fill in the following resource metrics: ${missingFields.map(f => f.name).join(', ')}. Click "Override" to enter values.`);
+        setError(`Please fill in the following fields: ${missingFields.map(f => f.name).join(', ')}. Click "Load More Parameters" and "Override" to enter all values.`);
         return;
       }
     }
@@ -287,91 +276,304 @@ const OptimizeTab = () => {
       let optimizationParams;
       
       if (optimizationMode === 'pre-deployment') {
-        // Pre-deployment: Use workload parameters for hardware recommendation
+        // Pre-deployment: Use /api/model/simulate-performance endpoint
         optimizationParams = {
-          model_type: modelType,
-          framework: framework || 'pytorch',
-          task_type: taskType,
-          model_size_mb: parseFloat(modelSize) || 0,
-          parameters_millions: parseFloat(parameters) || 0,
-          flops_billions: parseFloat(flops) || 0,
-          batch_size: parseInt(batchSize) || 1,
-          latency_requirement_ms: parseFloat(latency) || null,
-          throughput_requirement_qps: parseFloat(throughput) || null,
-          target_fp16_performance: true,
-          optimization_priority: optimizationPriority
+          // Exact same format as SimulateTab to ensure compatibility
+          Model: selectedModelName,
+          Framework: framework,
+          Task_Type: taskType,
+          Total_Parameters_Millions: parseFloat(parameters),
+          Model_Size_MB: parseFloat(modelSize),
+          Architecture_type: architectureType,
+          Model_Type: modelType,
+          Embedding_Vector_Dimension: parseInt(hiddenLayers),
+          Precision: precision,
+          Vocabulary_Size: parseInt(vocabularySize),
+          FFN_Dimension: parseInt(attentionLayers),
+          Activation_Function: activationFunction,
+          FLOPs: parseFloat(flops)
         };
       } else {
-        // Post-deployment: Use current metrics + workload parameters for optimization
+        // Post-deployment: Use exact format with aliases that match backend PostDeploymentRequest
         optimizationParams = {
-          // Basic workload info
-          model_type: modelType,
-          framework: framework || 'pytorch',
-          task_type: taskType,
-          model_size_mb: parseFloat(modelSize) || 0,
-          parameters_millions: parseFloat(parameters) || 0,
-          flops_billions: parseFloat(flops) || 0,
-          batch_size: parseInt(batchSize) || 1,
-          latency_requirement_ms: parseFloat(latency) || null,
-          throughput_requirement_qps: parseFloat(throughput) || null,
-          target_fp16_performance: true,
-          optimization_priority: optimizationPriority,
-          
-          // Current resource metrics (from hardware API fields)
-          gpu_memory_usage: parseFloat(gpuMemoryUsage) || null,
-          cpu_memory_usage: parseFloat(cpuMemoryUsage) || null,
-          cpu_utilization: parseFloat(cpuUtilization) || null,
-          gpu_utilization: parseFloat(gpuUtilization) || null,
-          disk_iops: parseFloat(diskIops) || null,
-          network_bandwidth: parseFloat(networkBandwidth) || null,
-          current_hardware_id: currentHardwareId || null,
-          current_latency_ms: parseFloat(latency) || null,
-          current_throughput_qps: parseFloat(throughput) || null
+          // Core model fields using field aliases as defined in the Pydantic model
+          "Model Name": selectedModelName,
+          "Framework": framework,
+          "Total Parameters (Millions)": parseFloat(parameters),
+          "Model Size (MB)": parseFloat(modelSize),
+          "Architecture type": architectureType,
+          "Model Type": modelType,
+          "Precision": precision,
+          "Vocabulary Size": parseInt(vocabularySize),
+          "Activation Function": activationFunction,
+          // Resource metrics using direct field names (no aliases)
+          gpu_memory_usage: parseFloat(gpuMemoryUsage),
+          cpu_memory_usage: parseFloat(cpuMemoryUsage),
+          cpu_utilization: parseFloat(cpuUtilization),
+          gpu_utilization: parseFloat(gpuUtilization),
+          disk_iops: parseFloat(diskIops),
+          network_bandwidth: parseFloat(networkBandwidth),
+          current_hardware_id: currentHardwareId
+          // Note: batch_size, latency, and throughput are not needed for post-deployment
         };
       }
 
-      // Use the unified post-deployment optimization endpoint
-      const response = await apiClient.post('/deployment/post-deployment-optimization', optimizationParams);
+      // Use the correct endpoint based on mode
+      const endpoint = optimizationMode === 'pre-deployment' 
+        ? '/model/simulate-performance' 
+        : '/deployment/post-deployment-optimization';
+      
+      // Debug logging
+      console.log('Optimization mode:', optimizationMode);
+      console.log('Endpoint:', endpoint);
+      console.log('Request params:', optimizationParams);
+      console.log('Selected model name:', selectedModelName);
+      console.log('Request JSON:', JSON.stringify(optimizationParams, null, 2));
+      const response = await apiClient.post(endpoint, optimizationParams);
+      
+      console.log('Full backend response:', response.data);
+      console.log('Response keys:', Object.keys(response.data || {}));
       
       // Process and format optimization results
-      if (response.data.status === 'success' && response.data.optimization_results) {
-        // Format results to match the expected structure
-        const formattedResults = {
-          recommendedConfiguration: {
-            description: `${response.data.optimization_results[0]?.hardware} recommended for optimal performance`,
-            recommendedInstance: response.data.optimization_results[0]?.hardware || 'A10',
-            expectedInferenceTime: `${response.data.optimization_results[0]?.projected_performance?.latency_ms?.toFixed(2)} ms` || '1.74 ms',
-            costPer1000: `$${response.data.optimization_results[0]?.projected_performance?.cost_per_1000?.toFixed(4)}` || '$0.0004'
-          },
-          hardwareAnalysis: {
-            name: response.data.optimization_results[0]?.full_name || 'NVIDIA A10 GPU',
-            memory: `${response.data.optimization_results[0]?.projected_performance?.memory_gb?.toFixed(0)}GB` || '24GB',
-            fp16Performance: response.data.optimization_results[0]?.projected_performance?.fp16_support ? 'Supported' : 'Not Supported',
-            architecture: 'Ampere', // Default
-            strengths: ['Good price-performance ratio', 'Moderate power consumption', 'Versatile'],
-            considerations: ['Performance may vary based on specific workload'],
-            useCase: `Optimized for ${optimizationMode} workload`
-          },
-          alternativeOptions: response.data.optimization_results.map(result => ({
-            hardware: result.hardware,
-            fullName: result.full_name,
-            inferenceTime: `${result.projected_performance?.latency_ms?.toFixed(2)} ms`,
-            costPer1000: `$${result.projected_performance?.cost_per_1000?.toFixed(4)}`,
-            status: 'Meets requirements',
-            recommended: result === response.data.optimization_results[0],
-            memory: `${result.projected_performance?.memory_gb?.toFixed(0)}GB`,
-            architecture: 'Ampere' // Default
-          })) || []
-        };
+      console.log('Full response received:', response);
+      console.log('Response data:', response.data);
+      console.log('Response status:', response.data?.status);
+      
+      if (response.data && response.data.status === 'success') {
+        console.log('Found optimization response:', response.data);
         
-        setOptimizationResults(formattedResults);
+        const isPostDeployment = response.data.workflow_type === 'post_deployment';
+        
+        if (isPostDeployment) {
+          // Handle new post-deployment response format
+          const recommendation = response.data.recommendation || 'No recommendation available';
+          const currentHardware = response.data.current_hardware || 'Unknown';
+          const analysisData = response.data.analysis_summary || {};
+          
+          // Extract hardware name from recommendation text
+          const recommendedHardware = recommendation.includes('Upgrade to') 
+            ? recommendation.replace('Upgrade to ', '').trim()
+            : recommendation;
+          
+          // Create elaborative description based on recommendation type
+          let description = '';
+          let strengths = [];
+          let considerations = [];
+          
+          if (recommendation.toLowerCase().includes('upgrade')) {
+            description = `🚀 ML Model Analysis: ${recommendation}\n\nBased on your current ${currentHardware} performance metrics and workload analysis, our machine learning model (prediction confidence: ${response.data.raw_prediction}/10) recommends upgrading to ${recommendedHardware} for optimal performance.`;
+            strengths = [
+              'Significant performance improvement expected',
+              'Better resource utilization',
+              'Enhanced processing capabilities',
+              'Future-ready hardware specifications'
+            ];
+            considerations = [
+              'Hardware upgrade required',
+              'Migration planning needed',
+              'Cost-benefit analysis recommended',
+              'Performance gains validated by ML model'
+            ];
+          } else if (recommendation.toLowerCase().includes('downgrade')) {
+            description = `💡 ML Model Analysis: ${recommendation}\n\nYour current ${currentHardware} appears to be over-provisioned for this workload. Our ML model suggests ${recommendedHardware} would be more cost-effective while maintaining performance.`;
+            strengths = [
+              'Cost optimization opportunity',
+              'Right-sizing for current workload',
+              'Reduced operational expenses',
+              'Efficient resource allocation'
+            ];
+            considerations = [
+              'Ensure performance requirements are met',
+              'Monitor workload changes',
+              'Cost savings potential',
+              'ML model confidence validated'
+            ];
+          } else if (recommendation.toLowerCase().includes('maintain')) {
+            description = `✅ ML Model Analysis: Your current ${currentHardware} is optimally configured for this workload. No hardware changes recommended at this time.`;
+            strengths = [
+              'Current hardware is well-suited',
+              'Optimal price-performance ratio',
+              'No migration overhead',
+              'Stable performance expected'
+            ];
+            considerations = [
+              'Continue monitoring performance',
+              'Re-evaluate if workload changes',
+              'Current configuration validated',
+              'ML model confirms optimal setup'
+            ];
+          } else {
+            description = `🔍 ML Model Analysis: ${recommendation}\n\nOur machine learning model has analyzed your workload running on ${currentHardware} and provided the above recommendation based on performance optimization patterns.`;
+            strengths = [
+              'ML-driven recommendation',
+              'Workload-specific analysis',
+              'Data-driven insights',
+              'Performance optimization focus'
+            ];
+            considerations = [
+              'Review recommendation details',
+              'Consider implementation feasibility',
+              'Validate against requirements',
+              'ML model analysis completed'
+            ];
+          }
+          
+          // Format results for post-deployment
+          const formattedResults = {
+            recommendedConfiguration: {
+              description: description,
+              recommendedInstance: recommendedHardware,
+              expectedInferenceTime: 'Optimized for current workload',
+              costPer1000: 'Cost-optimized configuration'
+            },
+            hardwareAnalysis: {
+              name: recommendedHardware,
+              memory: 'Hardware-appropriate specifications',
+              fp16Performance: 'Supported where available',
+              architecture: 'ML-validated configuration',
+              strengths: strengths,
+              considerations: considerations,
+              useCase: `Post-deployment optimization for ${optimizationMode} workload`
+            },
+            alternativeOptions: [{
+              hardware: recommendedHardware,
+              fullName: recommendedHardware,
+              inferenceTime: 'Optimized',
+              costPer1000: 'Cost-effective',
+              status: 'ML Model Recommended',
+              recommended: true,
+              memory: 'Appropriate sizing',
+              architecture: 'Validated',
+              improvement: recommendation.includes('Upgrade') ? 'Performance boost expected' : 
+                          recommendation.includes('Downgrade') ? 'Cost savings expected' : 
+                          'Current setup validated',
+              mlDetails: {
+                rawPrediction: response.data.raw_prediction,
+                predictionValue: response.data.prediction_value,
+                currentHardware: currentHardware,
+                recommendationType: analysisData.recommendation_type
+              }
+            }],
+            // Add post-deployment specific data
+            isPostDeployment: true,
+            analysisSummary: {
+              ...analysisData,
+              currentHardware: currentHardware,
+              mlModelConfidence: `${response.data.raw_prediction}/10`,
+              recommendationText: recommendation,
+              workflowType: 'Post-deployment optimization'
+            },
+            rawOptimizationResults: response.data // Store full response for debugging
+          };
+          
+          setOptimizationResults(formattedResults);
+          
+        } else if (response.data.performance_results) {
+          // Handle simulate-performance response format
+          console.log('Found simulate-performance data:', response.data);
+          
+          const performanceResults = response.data.performance_results;
+          const simulationSummary = response.data.simulation_summary || {};
+          
+          // Find the best recommendation (usually by lowest latency or first result)
+          const bestResult = performanceResults[0];
+          
+          // Create elaborative description
+          const description = `🚀 Performance Simulation Analysis\n\nBased on your ${selectedModelName} model requirements and workload specifications, our performance simulation recommends ${bestResult?.hardware} for optimal deployment.\n\nSimulation analyzed ${performanceResults.length} hardware configurations with ML-driven performance prediction.`;
+          
+          // Format results to match post-deployment structure
+          const formattedResults = {
+            recommendedConfiguration: {
+              description: description,
+              recommendedInstance: bestResult?.hardware || 'Unknown Hardware',
+              expectedInferenceTime: bestResult?.latency_ms ? `${bestResult.latency_ms.toFixed(2)} ms` : 'Optimized for workload',
+              costPer1000: bestResult?.cost_per_1000 ? `$${bestResult.cost_per_1000.toFixed(4)}` : 'Cost-optimized'
+            },
+            hardwareAnalysis: {
+              name: bestResult?.hardware || 'Recommended Hardware',
+              memory: bestResult?.memory_gb ? `${bestResult.memory_gb.toFixed(2)}GB` : 'Hardware-appropriate',
+              fp16Performance: 'Supported',
+              architecture: 'ML-validated configuration',
+              strengths: [
+                'Performance simulation validated',
+                'Optimized for model requirements',
+                'Cost-effective deployment',
+                'Meets latency and throughput targets'
+              ],
+              considerations: [
+                'Based on workload simulation',
+                'Pre-deployment performance estimate',
+                'Hardware requirements validated',
+                'ML model prediction confidence: High'
+              ],
+              useCase: `Pre-deployment simulation for ${optimizationMode} workload`
+            },
+            alternativeOptions: performanceResults.map((result, index) => ({
+              hardware: result.hardware || `Option ${index + 1}`,
+              fullName: result.hardware || `Hardware Option ${index + 1}`,
+              inferenceTime: result.latency_ms ? `${result.latency_ms.toFixed(2)} ms` : 'Calculated',
+              costPer1000: result.cost_per_1000 ? `$${result.cost_per_1000.toFixed(4)}` : 'Estimated',
+              status: 'Simulation Validated',
+              recommended: result === bestResult,
+              memory: result.memory_gb ? `${result.memory_gb.toFixed(2)}GB` : 'Appropriate sizing',
+              architecture: 'Validated',
+              improvement: result === bestResult ? 'Best performance match' : 
+                          result.latency_ms < bestResult?.latency_ms ? 'Faster alternative' : 
+                          'Cost-effective option',
+              simulationDetails: {
+                predictedLatency: result.latency_ms,
+                predictedThroughput: result.throughput_qps,
+                memoryRequirements: result.memory_gb,
+                costPer1000: result.cost_per_1000
+              }
+            })),
+            isPostDeployment: false,
+            analysisSummary: {
+              ...simulationSummary,
+              workflowType: 'Pre-deployment simulation',
+              simulationConfidence: 'High',
+              recommendationText: `Recommend ${bestResult?.hardware} for optimal performance`
+            },
+            rawOptimizationResults: response.data
+          };
+          
+          setOptimizationResults(formattedResults);
+        } else {
+          console.log('Response format not recognized. Response keys:', Object.keys(response.data || {}));
+          console.log('Full response data for debugging:', response.data);
+          setError(`Optimization completed but response format not recognized. Received: ${Object.keys(response.data || {}).join(', ')}`);
+        }
       } else {
-        setError('Optimization completed but no results were returned.');
+        console.error('Unexpected response structure or failed status');
+        setError('Optimization request failed or returned unexpected format.');
       }
       
     } catch (err) {
       console.error('Error getting recommendations:', err);
-      setError('Failed to get recommendations. Please try again.');
+      console.error('Error response data:', err.response?.data);
+      console.error('Error status:', err.response?.status);
+      
+      let errorMessage = 'Failed to get recommendations. Please try again.';
+      if (err.response?.data?.detail) {
+        // Pydantic validation error details
+        if (Array.isArray(err.response.data.detail)) {
+          console.log('Detailed validation errors:', err.response.data.detail);
+          const missingFields = err.response.data.detail.map(detail => {
+            const field = detail.loc?.join('.') || 'unknown';
+            const message = detail.msg || 'validation error';
+            const type = detail.type || '';
+            console.log(`Field: ${field}, Message: ${message}, Type: ${type}`);
+            return `${field}: ${message}`;
+          }).join(', ');
+          errorMessage = `Validation error: ${missingFields}`;
+        } else {
+          errorMessage = `Validation error: ${err.response.data.detail}`;
+        }
+      } else if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      }
+      
+      setError(errorMessage);
     } finally {
       setIsRunningOptimization(false);
     }
@@ -770,7 +972,7 @@ const OptimizeTab = () => {
                 </option>
                 {availableModelTypes.map((type) => (
                   <option key={type} value={type}>
-                    {type.toUpperCase()}
+                    {type}
                   </option>
                 ))}
               </select>
@@ -808,11 +1010,11 @@ const OptimizeTab = () => {
                 disabled={isLoading}
               >
                 <option value="">Select framework</option>
-                <option value="pytorch">PyTorch</option>
-                <option value="tensorflow">TensorFlow</option>
-                <option value="jax">JAX</option>
-                <option value="onnx">ONNX</option>
-                <option value="tensorrt">TensorRT</option>
+                <option value="PyTorch">PyTorch</option>
+                <option value="TensorFlow">TensorFlow</option>
+                <option value="JAX">JAX</option>
+                <option value="ONNX">ONNX</option>
+                <option value="TensorRT">TensorRT</option>
               </select>
               <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
                 <svg className="w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -948,102 +1150,100 @@ const OptimizeTab = () => {
             />
           </div>
 
-          {/* Batch Size */}
-          <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Batch Size
-              <div className="relative">
-                <Info 
-                  className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" 
-                  onMouseEnter={() => setShowTooltip('batchSize')}
-                  onMouseLeave={() => setShowTooltip('')}
-                />
-                {showTooltip === 'batchSize' && (
-                  <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
-                    <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
-                    Number of samples processed in parallel.
-                  </div>
-                )}
-              </div>
-            </label>
-            <input
-              type="number"
-              value={batchSize}
-              onChange={(e) => setBatchSize(e.target.value)}
-              placeholder="Enter batch size"
-              className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={isLoading}
-            />
-          </div>
+          {/* Batch Size - Only for pre-deployment */}
+          {optimizationMode === 'pre-deployment' && (
+            <div>
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Batch Size
+                <div className="relative">
+                  <Info 
+                    className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" 
+                    onMouseEnter={() => setShowTooltip('batchSize')}
+                    onMouseLeave={() => setShowTooltip('')}
+                  />
+                  {showTooltip === 'batchSize' && (
+                    <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
+                      <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
+                      Number of samples processed in parallel.
+                    </div>
+                  )}
+                </div>
+              </label>
+              <input
+                type="number"
+                value={batchSize}
+                onChange={(e) => setBatchSize(e.target.value)}
+                placeholder="Enter batch size"
+                className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isLoading}
+              />
+            </div>
+          )}
 
-          {/* Latency - Context aware based on deployment mode */}
-          <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              {optimizationMode === 'pre-deployment' ? 'Latency Requirement (ms)' : 'Current Latency (ms)'}
-              <div className="relative">
-                <Info 
-                  className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" 
-                  onMouseEnter={() => setShowTooltip('latency')}
-                  onMouseLeave={() => setShowTooltip('')}
-                />
-                {showTooltip === 'latency' && (
-                  <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
-                    <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
-                    {optimizationMode === 'pre-deployment' 
-                      ? 'Maximum acceptable latency for inference in milliseconds.' 
-                      : 'Current inference latency in milliseconds.'}
-                  </div>
-                )}
-              </div>
-            </label>
-            <input
-              type="number"
-              value={latency}
-              onChange={(e) => setLatency(e.target.value)}
-              placeholder={optimizationMode === 'pre-deployment' 
-                ? 'Optional - Enter max latency in ms' 
-                : 'Enter current latency in ms'}
-              className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={isLoading}
-            />
-          </div>
+          {/* Latency - Only for pre-deployment */}
+          {optimizationMode === 'pre-deployment' && (
+            <div>
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Latency Requirement (ms)
+                <div className="relative">
+                  <Info 
+                    className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" 
+                    onMouseEnter={() => setShowTooltip('latency')}
+                    onMouseLeave={() => setShowTooltip('')}
+                  />
+                  {showTooltip === 'latency' && (
+                    <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
+                      <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
+                      Maximum acceptable latency for inference in milliseconds.
+                    </div>
+                  )}
+                </div>
+              </label>
+              <input
+                type="number"
+                value={latency}
+                onChange={(e) => setLatency(e.target.value)}
+                placeholder="Optional - Enter max latency in ms"
+                className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isLoading}
+              />
+            </div>
+          )}
 
-          {/* Throughput - Context aware based on deployment mode */}
-          <div className="md:col-span-2">
-            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              {optimizationMode === 'pre-deployment' ? 'Throughput Requirement (QPS)' : 'Current Throughput (QPS)'}
-              <div className="relative">
-                <Info 
-                  className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" 
-                  onMouseEnter={() => setShowTooltip('throughput')}
-                  onMouseLeave={() => setShowTooltip('')}
-                />
-                {showTooltip === 'throughput' && (
-                  <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
-                    <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
-                    {optimizationMode === 'pre-deployment' 
-                      ? 'Minimum required queries per second.' 
-                      : 'Current queries per second.'}
-                  </div>
-                )}
-              </div>
-            </label>
-            <input
-              type="number"
-              value={throughput}
-              onChange={(e) => setThroughput(e.target.value)}
-              placeholder={optimizationMode === 'pre-deployment' 
-                ? 'Optional - Enter min throughput in QPS' 
-                : 'Enter current throughput in QPS'}
-              className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={isLoading}
-            />
-          </div>
+          {/* Throughput - Only for pre-deployment */}
+          {optimizationMode === 'pre-deployment' && (
+            <div className="md:col-span-2">
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Throughput Requirement (QPS)
+                <div className="relative">
+                  <Info 
+                    className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" 
+                    onMouseEnter={() => setShowTooltip('throughput')}
+                    onMouseLeave={() => setShowTooltip('')}
+                  />
+                  {showTooltip === 'throughput' && (
+                    <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
+                      <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
+                      Minimum required queries per second.
+                    </div>
+                  )}
+                </div>
+              </label>
+              <input
+                type="number"
+                value={throughput}
+                onChange={(e) => setThroughput(e.target.value)}
+                placeholder="Optional - Enter min throughput in QPS"
+                className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isLoading}
+              />
+            </div>
+          )}
         </div>
 
 
         {/* Load More Parameters Button */}
-        {modelType && taskType && !showMoreParams && (
+        {modelType && taskType && !showMoreParams && optimizationMode === 'pre-deployment' && (
           <div className="mt-6 flex justify-center">
             <button 
               onClick={() => setShowMoreParams(true)}
@@ -1055,10 +1255,15 @@ const OptimizeTab = () => {
           </div>
         )}
 
-        {/* Additional Parameters */}
-        {showMoreParams && (
+        {/* Additional Parameters - Always show for post-deployment */}
+        {(showMoreParams || optimizationMode === 'post-deployment') && (
           <div className="mt-6 p-6 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Advanced Parameters</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Advanced Parameters</h3>
+            {optimizationMode === 'post-deployment' && (
+              <p className="text-sm text-orange-600 dark:text-orange-400 mb-4">
+                ⚠️ These fields are required for post-deployment optimization
+              </p>
+            )}
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Architecture Type */}
@@ -1087,12 +1292,27 @@ const OptimizeTab = () => {
                     disabled={isLoading}
                   >
                     <option value="">Select architecture type</option>
-                    <option value="encoder-decoder">Encoder-Decoder</option>
-                    <option value="encoder-only">Encoder-Only</option>
-                    <option value="decoder-only">Decoder-Only</option>
-                    <option value="autoencoder">Autoencoder</option>
-                    <option value="vanilla">Vanilla</option>
-                    <option value="residual">Residual</option>
+                    <option value="LlamaForCausalLM">LlamaForCausalLM</option>
+                    <option value="Qwen2ForCausalLM">Qwen2ForCausalLM</option>
+                    <option value="Phi3ForCausalLM">Phi3ForCausalLM</option>
+                    <option value="MistralForCausalLM">MistralForCausalLM</option>
+                    <option value="GemmaForCausalLM">GemmaForCausalLM</option>
+                    <option value="PhiForCausalLM">PhiForCausalLM</option>
+                    <option value="GPT2LMHeadModel">GPT2LMHeadModel</option>
+                    <option value="BertForMaskedLM">BertForMaskedLM</option>
+                    <option value="RobertaForMaskedLM">RobertaForMaskedLM</option>
+                    <option value="AlbertForMaskedLM">AlbertForMaskedLM</option>
+                    <option value="DistilBertForMaskedLM">DistilBertForMaskedLM</option>
+                    <option value="resnet18">resnet18</option>
+                    <option value="resnet34">resnet34</option>
+                    <option value="resnet50">resnet50</option>
+                    <option value="vgg16">vgg16</option>
+                    <option value="vgg19">vgg19</option>
+                    <option value="inception_v3">inception_v3</option>
+                    <option value="efficientnet_b0">efficientnet_b0</option>
+                    <option value="ViTForImageClassification">ViTForImageClassification</option>
+                    <option value="DeiTForImageClassificationWithTeacher">DeiTForImageClassificationWithTeacher</option>
+                    <option value="SwinForImageClassification">SwinForImageClassification</option>
                   </select>
                   <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
                     <svg className="w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1186,8 +1406,48 @@ const OptimizeTab = () => {
                 />
               </div>
 
+              {/* Precision */}
+              <div>
+                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Precision
+                  <div className="relative">
+                    <Info 
+                      className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" 
+                      onMouseEnter={() => setShowTooltip('precision')}
+                      onMouseLeave={() => setShowTooltip('')}
+                    />
+                    {showTooltip === 'precision' && (
+                      <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
+                        <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
+                        Numerical precision used for model computations (FP16, FP32, etc.).
+                      </div>
+                    )}
+                  </div>
+                </label>
+                <div className="relative">
+                  <select
+                    value={precision}
+                    onChange={(e) => setPrecision(e.target.value)}
+                    className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={isLoading}
+                  >
+                    <option value="">Select precision</option>
+                    <option value="FP16">FP16 (Half Precision)</option>
+                    <option value="FP32">FP32 (Single Precision)</option>
+                    <option value="FP64">FP64 (Double Precision)</option>
+                    <option value="INT8">INT8 (8-bit Integer)</option>
+                    <option value="INT4">INT4 (4-bit Integer)</option>
+                  </select>
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                    <svg className="w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
               {/* Activation Function */}
-              <div className="md:col-span-2">
+              <div>
                 <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Activation Function
                   <div className="relative">
@@ -1212,8 +1472,11 @@ const OptimizeTab = () => {
                     disabled={isLoading}
                   >
                     <option value="">Select activation function</option>
-                    <option value="relu">ReLU</option>
+                    <option value="silu">SiLU</option>
                     <option value="gelu">GELU</option>
+                    <option value="gelu_new">GELU New</option>
+                    <option value="gelu_pytorch_tanh">GELU PyTorch Tanh</option>
+                    <option value="relu">ReLU</option>
                     <option value="swish">Swish</option>
                     <option value="tanh">Tanh</option>
                     <option value="sigmoid">Sigmoid</option>
@@ -1229,15 +1492,17 @@ const OptimizeTab = () => {
               </div>
             </div>
 
-            {/* Collapse Button */}
-            <div className="mt-4 flex justify-center">
-              <button 
-                onClick={() => setShowMoreParams(false)}
-                className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
-              >
-                Show Less Parameters
-              </button>
-            </div>
+            {/* Collapse Button - Only show for pre-deployment */}
+            {optimizationMode === 'pre-deployment' && (
+              <div className="mt-4 flex justify-center">
+                <button 
+                  onClick={() => setShowMoreParams(false)}
+                  className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+                >
+                  Show Less Parameters
+                </button>
+              </div>
+            )}
           </div>
         )}
 

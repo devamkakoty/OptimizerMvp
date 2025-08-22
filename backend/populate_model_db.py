@@ -57,8 +57,8 @@ def main():
     print("Starting model database population...\n")
     
     # Define CSV file paths
-    training_csv = "../sample data/Model_Info_Training.csv"
-    inference_csv = "../sample data/Model_Info_Inference.csv"
+    training_csv = "../sample_data/Model_Info_Training.csv"
+    inference_csv = "../sample_data/Model_Info_Inference.csv"
     
     # Check if files exist
     if not os.path.exists(training_csv):

@@ -72,42 +72,26 @@ def create_databases():
         print(f"[ERROR] Error creating databases: {e}")
         return False
 
-def update_database_schema():
-    """Update database schema to add missing columns"""
+def create_database_tables():
+    """Create database tables using SQLAlchemy models"""
     try:
-        print("Updating database schema...")
+        print("Creating database tables...")
         
         # Import here to avoid issues if dependencies aren't installed
-        from app.database import ModelSessionLocal
-        from sqlalchemy import text
+        from app.database import init_db
         
-        # Create database session
-        db = ModelSessionLocal()
+        # Initialize database tables
+        success = init_db()
         
-        try:
-            # Add the task_type column if it doesn't exist
-            db.execute(text("ALTER TABLE \"Model_table\" ADD COLUMN IF NOT EXISTS task_type VARCHAR(100)"))
-            db.commit()
-            print("[SUCCESS] task_type column added successfully")
-            
-            # Verify the column was added
-            result = db.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name = 'Model_table' AND column_name = 'task_type'"))
-            if result.fetchone():
-                print("[SUCCESS] task_type column verified in database")
-            else:
-                print("[ERROR] task_type column not found in database")
-                
-        except Exception as e:
-            db.rollback()
-            print(f"[ERROR] Error updating database schema: {e}")
+        if success:
+            print("[SUCCESS] Database tables created successfully")
+            return True
+        else:
+            print("[ERROR] Failed to create database tables")
             return False
-        finally:
-            db.close()
             
-        return True
-        
     except Exception as e:
-        print(f"[ERROR] Error updating database schema: {e}")
+        print(f"[ERROR] Error creating database tables: {e}")
         return False
 
 def install_dependencies():
@@ -193,10 +177,10 @@ def main():
     #     print("Please install dependencies manually: pip install -r requirements.txt")
     #     return
     
-    # Step 4: Update database schema
-    print("\n4. Updating database schema...")
-    if not update_database_schema():
-        print("Please update the database schema manually")
+    # Step 4: Create database tables
+    print("\n4. Creating database tables...")
+    if not create_database_tables():
+        print("Please create the database tables manually")
         return
     
     # Step 5: Populate database

@@ -64,15 +64,12 @@ class ModelController:
                 hardware_id = self._create_hardware_identifier(hardware)
                 full_name = self._create_hardware_full_name(hardware)
                 
-                # Prepare hardware type for inference
-                hardware_type = hardware.cpu_brand or hardware.gpu_brand or "Unknown"
-                
                 # Perform actual inference using the loaded models
                 inference_result = inference_controller.perform_inference(
                     db=db,
                     model_type=model.model_type,
                     task_type=task_type,
-                    hardware_type=hardware_type,
+                    hardware_info=hardware,
                     input_data=user_input
                 )
                 
@@ -206,7 +203,7 @@ class ModelController:
                 gpu_factor = 0.3  # Fast GPU
             elif "T4" in hardware.gpu:
                 gpu_factor = 0.5  # Medium GPU
-            elif "L4" in hardware.gpu:
+            elif "L40" in hardware.gpu:
                 gpu_factor = 0.4  # Good GPU
             else:
                 gpu_factor = 0.8  # Default GPU factor
@@ -231,7 +228,7 @@ class ModelController:
                 return base_throughput * 15.0  # High throughput
             elif "T4" in hardware.gpu:
                 return base_throughput * 8.0   # Medium throughput
-            elif "L4" in hardware.gpu:
+            elif "L40" in hardware.gpu:
                 return base_throughput * 10.0  # Good throughput
             else:
                 return base_throughput * 5.0   # Default GPU throughput
@@ -256,7 +253,7 @@ class ModelController:
                 return base_cost * size_factor * param_factor * 0.08  # Low cost
             elif "T4" in hardware.gpu:
                 return base_cost * size_factor * param_factor * 0.17  # Medium cost
-            elif "L4" in hardware.gpu:
+            elif "L40" in hardware.gpu:
                 return base_cost * size_factor * param_factor * 0.12  # Good cost
             else:
                 return base_cost * size_factor * param_factor * 0.15  # Default GPU cost
@@ -290,8 +287,8 @@ class ModelController:
                 return "A10"
             elif "T4" in hardware.gpu:
                 return "T4"
-            elif "L4" in hardware.gpu:
-                return "L4"
+            elif "L40" in hardware.gpu:
+                return "L40"
             elif "RTX" in hardware.gpu:
                 return "RTX_A5000"
             else:
@@ -313,8 +310,8 @@ class ModelController:
                 return "NVIDIA A10 GPU"
             elif "T4" in hardware.gpu:
                 return "NVIDIA Tesla T4 GPU"
-            elif "L4" in hardware.gpu:
-                return "NVIDIA L4 GPU"
+            elif "L40" in hardware.gpu:
+                return "NVIDIA L40 GPU"
             elif "RTX" in hardware.gpu:
                 return "NVIDIA RTX A5000"
             else:
@@ -519,9 +516,9 @@ class ModelController:
     
     def _post_deployment_optimization(self, db: Session, request_data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Post-deployment workflow for hardware optimization.
+        Post-deployment workflow for hardware optimization using ML models.
         
-        Analyzes current resource metrics and runtime parameters,
+        Analyzes current resource metrics and runtime parameters using trained ML models,
         then returns top 3 hardware configurations optimized for:
         - Memory usage
         - Latency performance
@@ -538,26 +535,58 @@ class ModelController:
             if not hardware_list:
                 return {"error": "No hardware configurations found in database"}
             
-            # Calculate optimization scores for each hardware configuration
-            optimization_results = []
+            # Import the inference controller for ML model predictions
+            from controllers.model_inference_controller import ModelInferenceController
+            inference_controller = ModelInferenceController()
             
-            for hardware in hardware_list:
-                # Calculate optimization scores based on current metrics
-                memory_score = self._calculate_memory_optimization_score(
-                    hardware, resource_metrics, runtime_parameters
-                )
-                latency_score = self._calculate_latency_optimization_score(
-                    hardware, resource_metrics, runtime_parameters
-                )
-                fp16_score = self._calculate_fp16_optimization_score(
-                    hardware, resource_metrics, runtime_parameters
-                )
+            # Extract data from the direct request (now contains exact pickle model format)
+            # Since the API request body now matches pickle model format exactly, use it directly
+            optimization_input = {
+                'Model Name': request_data.get('model_name', 'Microsoft Phi-2'),
+                'Framework': request_data.get('framework', 'PyTorch'),
+                'Total Parameters (Millions)': float(request_data.get('parameters_millions', 2779.68)),
+                'Model Size (MB)': float(request_data.get('model_size_mb', 10603.82)),
+                'Architecture type': request_data.get('architecture_type', 'PhiForCausalLM'),
+                'Model Type': request_data.get('model_type', 'phi'),
+                'Precision': request_data.get('precision', 'FP16'),
+                'Vocabulary Size': int(request_data.get('vocabulary_size', 51200)),
+                'Activation Function': request_data.get('activation_function', 'gelu_new'),
+                'gpu_memory_usage': float(request_data.get('gpu_memory_usage', 90)),
+                'cpu_memory_usage': float(request_data.get('cpu_memory_usage', 90)),
+                'cpu_utilization': float(request_data.get('cpu_utilization', 90)),
+                'gpu_utilization': float(request_data.get('gpu_utilization', 90)),
+                'disk_iops': float(request_data.get('disk_iops', 90)),
+                'network_bandwidth': float(request_data.get('network_bandwidth', 90)),
+                'current_hardware_id': request_data.get('current_hardware_id', 'NVIDIA L4')
+            }
+            
+            # Use ML model to get hardware recommendation based on current hardware and metrics
+            # The current_hardware_id in the request represents the hardware being analyzed
+            ml_result = inference_controller.get_post_deployment_optimization(
+                db=db,
+                optimization_input=optimization_input
+            )
+            
+            if "error" in ml_result:
+                # Return error if ML model fails - no fallbacks
+                return {"error": f"ML model prediction failed: {ml_result['error']}"}
+            else:
+                # Use ML model prediction - single hardware recommendation
+                hardware_recommendation = ml_result.get("recommendation", "")
                 
-                # Calculate overall optimization score
-                optimization_priority = runtime_parameters.get("optimization_priority", "balanced")
-                overall_score = self._calculate_overall_optimization_score(
-                    memory_score, latency_score, fp16_score, optimization_priority
-                )
+                # Return the single recommendation
+                return {
+                    "status": "success",
+                    "workflow_type": "post_deployment",
+                    "recommendation": hardware_recommendation,
+                    "raw_prediction": ml_result.get("raw_prediction"),
+                    "prediction_value": ml_result.get("prediction_value"),
+                    "current_hardware": optimization_input['current_hardware_id'],
+                    "analysis_summary": {
+                        "ml_model_used": True,
+                        "recommendation_type": "hardware_upgrade"
+                    }
+                }
                 
                 # Create hardware identifier and full name
                 hardware_id = self._create_hardware_identifier(hardware)
@@ -610,12 +639,13 @@ class ModelController:
                 "optimization_results": top_3_hardware,
                 "analysis_summary": {
                     "total_hardware_evaluated": len(hardware_list),
-                    "optimization_priority": optimization_priority,
+                    "optimization_priority": runtime_parameters.get("optimization_priority", "balanced"),
                     "current_performance_baseline": {
                         "latency_ms": runtime_parameters.get("current_latency_ms"),
                         "memory_gb": runtime_parameters.get("current_memory_gb"),
                         "cost_per_1000": runtime_parameters.get("current_cost_per_1000")
-                    }
+                    },
+                    "ml_model_used": True
                 }
             }
             
@@ -650,7 +680,7 @@ class ModelController:
                 return 8.0
             elif "T4" in hardware.gpu:
                 return 6.0
-            elif "L4" in hardware.gpu:
+            elif "L40" in hardware.gpu:
                 return 7.0
             elif "RTX" in hardware.gpu:
                 return 8.5
@@ -675,7 +705,7 @@ class ModelController:
                 return 9.0
             elif "T4" in hardware.gpu:
                 return 7.0
-            elif "L4" in hardware.gpu:
+            elif "L40" in hardware.gpu:
                 return 8.0
             elif "RTX" in hardware.gpu:
                 return 8.5
@@ -707,7 +737,7 @@ class ModelController:
                 return current_latency * 0.5
             elif "T4" in hardware.gpu:
                 return current_latency * 0.8
-            elif "L4" in hardware.gpu:
+            elif "L40" in hardware.gpu:
                 return current_latency * 0.6
             elif "RTX" in hardware.gpu:
                 return current_latency * 0.4
@@ -739,7 +769,7 @@ class ModelController:
                 return current_cost * 0.6
             elif "T4" in hardware.gpu:
                 return current_cost * 0.8
-            elif "L4" in hardware.gpu:
+            elif "L40" in hardware.gpu:
                 return current_cost * 0.7
             elif "RTX" in hardware.gpu:
                 return current_cost * 0.5
@@ -793,7 +823,7 @@ class ModelController:
                 base_score = 8.0
             elif "T4" in hardware.gpu:
                 base_score = 6.0
-            elif "L4" in hardware.gpu:
+            elif "L40" in hardware.gpu:
                 base_score = 7.0
             elif "RTX" in hardware.gpu:
                 base_score = 8.5
@@ -825,7 +855,7 @@ class ModelController:
                 return 9.0
             elif "T4" in hardware.gpu:
                 return 7.0
-            elif "L4" in hardware.gpu:
+            elif "L40" in hardware.gpu:
                 return 8.0
             elif "RTX" in hardware.gpu:
                 return 8.5
@@ -844,7 +874,7 @@ class ModelController:
                 return 9.0  # Good balance
             elif "T4" in hardware.gpu:
                 return 7.0  # Cost-effective
-            elif "L4" in hardware.gpu:
+            elif "L40" in hardware.gpu:
                 return 8.5
             elif "RTX" in hardware.gpu:
                 return 8.0
@@ -882,7 +912,7 @@ class ModelController:
                 return base_latency * 0.5 / batch_size
             elif "T4" in hardware.gpu:
                 return base_latency * 0.8 / batch_size
-            elif "L4" in hardware.gpu:
+            elif "L40" in hardware.gpu:
                 return base_latency * 0.6 / batch_size
             elif "RTX" in hardware.gpu:
                 return base_latency * 0.4 / batch_size
@@ -924,7 +954,7 @@ class ModelController:
                 return base_cost * 0.6
             elif "T4" in hardware.gpu:
                 return base_cost * 0.8
-            elif "L4" in hardware.gpu:
+            elif "L40" in hardware.gpu:
                 return base_cost * 0.7
             elif "RTX" in hardware.gpu:
                 return base_cost * 0.5

@@ -1,0 +1,399 @@
+version: '3.8'
+
+x-airflow-common:
+  &airflow-common
+  build:
+    context: ./airflow
+    dockerfile: Dockerfile
+  environment:
+    &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres/airflow
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
+    AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
+    AIRFLOW__WEBSERVER__EXPOSE_CONFIG: 'true'
+    AIRFLOW__WEBSERVER__RBAC: 'false'
+    AIRFLOW_FERNET_KEY: ${AIRFLOW_FERNET_KEY:-YlCImzjge_TeZc5FUOUuTFCN3mRBWZr3SaVXSTKXnKQ=}
+    
+    # GreenMatrix Database Connections
+    AIRFLOW_CONN_GREENMATRIX_DB: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@postgres:5432/greenmatrix
+    AIRFLOW_CONN_MODEL_DB: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@postgres:5432/Model_Recommendation_DB
+    AIRFLOW_CONN_METRICS_DB: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@postgres:5432/Metrics_db
+    
+    # Additional environment variables
+    GREENMATRIX_API_BASE_URL: http://backend:8000
+    MONITORING_EMAIL: ${MONITORING_EMAIL:-admin@greenmatrix.com}
+    
+  volumes:
+    - ./airflow/dags:/opt/airflow/dags
+    - ./airflow/logs:/opt/airflow/logs
+    - ./airflow/plugins:/opt/airflow/plugins
+    - /var/run/docker.sock:/var/run/docker.sock
+  user: "${AIRFLOW_UID:-50000}:0"
+  depends_on:
+    &airflow-common-depends-on
+    airflow-postgres:
+      condition: service_healthy
+  networks:
+    - greenmatrix-network
+
+services:
+  # PostgreSQL Database for GreenMatrix
+  postgres:
+    image: postgres:15-alpine
+    container_name: greenmatrix-postgres
+    environment:
+      POSTGRES_DB: greenmatrix
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_MULTIPLE_DATABASES: Model_Recommendation_DB,Metrics_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./scripts/create-multiple-postgresql-databases.sh:/docker-entrypoint-initdb.d/02-create-multiple-databases.sh:ro
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - greenmatrix-network
+
+  # PostgreSQL Database for Airflow
+  airflow-postgres:
+    image: postgres:15-alpine
+    container_name: greenmatrix-airflow-postgres
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - airflow_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 10s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - greenmatrix-network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: greenmatrix-redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - greenmatrix-network
+
+  # TimescaleDB for VM Metrics Time-Series Data
+  timescaledb:
+    image: timescale/timescaledb:latest-pg15
+    container_name: greenmatrix-timescaledb
+    environment:
+      POSTGRES_DB: vm_metrics_ts
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_MULTIPLE_DATABASES: vm_process_metrics
+    volumes:
+      - timescaledb_data:/var/lib/postgresql/data
+      - ./backend/vm_metrics_init.sql:/docker-entrypoint-initdb.d/01-vm-metrics-init.sql:ro
+    ports:
+      - "${TIMESCALEDB_PORT:-5433}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - greenmatrix-network
+
+  # FastAPI Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: greenmatrix-backend
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@postgres:5432/greenmatrix
+      - MODEL_DB_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@postgres:5432/Model_Recommendation_DB
+      - METRICS_DB_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@postgres:5432/Metrics_db
+      - TIMESCALEDB_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@timescaledb:5432/vm_metrics_ts
+      - REDIS_URL=redis://redis:6379
+      - PYTHONPATH=/app
+      - ENVIRONMENT=production
+      - API_REQUEST_TIMEOUT=30
+      - COLLECTION_INTERVAL_MINUTES=60
+      - HARDWARE_SPEC_INTERVAL_DAYS=1
+      - COST_PER_KWH=0.12
+      - CURRENCY_SYMBOL=$$
+      - CPU_TDP_WATTS=125
+      - CURRENT_REGION=US
+    volumes:
+      - ./Pickel Models:/app/models:ro
+      - ./sample_data:/app/sample_data:ro
+      - ./config.ini:/app/config.ini:ro
+      - backend_logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      timescaledb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - greenmatrix-network
+
+  # React Frontend with Nginx
+  frontend:
+    build:
+      context: ./vite-project
+      dockerfile: Dockerfile
+    container_name: greenmatrix-frontend
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - greenmatrix-network
+
+  # Data Collection Service
+  data-collector:
+    build:
+      context: .
+      dockerfile: Dockerfile.collector
+    container_name: greenmatrix-data-collector
+    environment:
+      - BACKEND_API_URL=http://backend:8000
+      - API_REQUEST_TIMEOUT=30
+      - COLLECTION_INTERVAL_MINUTES=${COLLECTION_INTERVAL_MINUTES:-5}
+      - COST_PER_KWH=0.12
+      - CPU_TDP_WATTS=125
+      - CURRENT_REGION=US
+    volumes:
+      - ./config.ini:/app/config.ini:ro
+      - collector_logs:/app/logs
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - greenmatrix-network
+    # Run with host network mode to access system resources
+    pid: host
+    privileged: true
+    
+  # Database Setup and Seeding Service (runs once)
+  db-setup:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: greenmatrix-db-setup
+    environment:
+      - MODEL_DB_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@postgres:5432/Model_Recommendation_DB
+      - METRICS_DB_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@postgres:5432/Metrics_db
+      - PYTHONPATH=/app
+    volumes:
+      - ./Pickel Models:/app/models:ro
+      - ./sample_data:/app/sample_data:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: >
+      sh -c "
+        echo 'Setting up database schema...' &&
+        python -c 'from app.database import init_db; init_db()' &&
+        echo 'Seeding cost models...' &&
+        python seed_cost_models.py &&
+        echo 'Database setup completed successfully!'
+      "
+    restart: "no"
+    networks:
+      - greenmatrix-network
+
+  # === AIRFLOW MONITORING SERVICES ===
+  
+  # Airflow Webserver
+  airflow-webserver:
+    <<: *airflow-common
+    command: webserver
+    container_name: greenmatrix-airflow-webserver
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+
+  # Airflow Scheduler
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    container_name: greenmatrix-airflow-scheduler
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8974/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+
+  # Airflow Triggerer
+  airflow-triggerer:
+    <<: *airflow-common
+    command: triggerer
+    container_name: greenmatrix-airflow-triggerer
+    healthcheck:
+      test: ["CMD-SHELL", 'airflow jobs check --job-type TriggererJob --hostname "$${HOSTNAME}"']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  # Airflow Initialization
+  airflow-init:
+    <<: *airflow-common
+    entrypoint: /bin/bash
+    container_name: greenmatrix-airflow-init
+    command:
+      - -c
+      - |
+        function ver() {
+          printf "%04d%04d%04d%04d" $${1//./ }
+        }
+        airflow_version=$$(AIRFLOW__LOGGING__LOGGING_LEVEL=INFO && airflow version)
+        airflow_version_comparable=$$(ver $${airflow_version})
+        min_airflow_version=2.2.0
+        min_airflow_version_comparable=$$(ver $${min_airflow_version})
+        if (( airflow_version_comparable < min_airflow_version_comparable )); then
+          echo
+          echo -e "\033[1;31mERROR!!!: Too old Airflow version $${airflow_version}!\e[0m"
+          echo "The minimum Airflow version supported: $${min_airflow_version}. Only use this or higher!"
+          echo
+          exit 1
+        fi
+        if [[ -z "$${AIRFLOW_UID}" ]]; then
+          echo
+          echo -e "\033[1;33mWARNING!!!: AIRFLOW_UID not set!\e[0m"
+          echo "Using default UID 50000"
+          echo
+        fi
+        one_meg=1048576
+        mem_available=$$(($$(getconf _PHYS_PAGES) * $$(getconf PAGE_SIZE) / one_meg))
+        cpus_available=$$(grep -cE 'cpu[0-9]+' /proc/stat)
+        warning_resources="false"
+        if (( mem_available < 4000 )) ; then
+          echo
+          echo -e "\033[1;33mWARNING!!!: Not enough memory available for Docker.\e[0m"
+          echo "At least 4GB of memory required. You have $$(numfmt --to iec $$((mem_available * one_meg)))"
+          echo
+          warning_resources="true"
+        fi
+        if (( cpus_available < 2 )); then
+          echo
+          echo -e "\033[1;33mWARNING!!!: Not enough CPUS available for Docker.\e[0m"
+          echo "At least 2 CPUs recommended. You have $${cpus_available}"
+          echo
+          warning_resources="true"
+        fi
+        if [[ $${warning_resources} == "true" ]]; then
+          echo
+          echo -e "\033[1;33mWARNING!!!: You have not enough resources to run Airflow (see above)!\e[0m"
+          echo "Please consider increasing Docker resources if you experience issues."
+          echo
+        fi
+        mkdir -p /sources/logs /sources/dags /sources/plugins
+        chown -R "$${AIRFLOW_UID}:0" /sources/{logs,dags,plugins}
+        echo "Initializing Airflow database..."
+        airflow db init
+        airflow users create \
+          --username airflow \
+          --firstname Airflow \
+          --lastname Admin \
+          --role Admin \
+          --email admin@greenmatrix.com \
+          --password airflow
+        echo "Airflow initialization completed!"
+    environment:
+      <<: *airflow-common-env
+      _AIRFLOW_DB_UPGRADE: 'true'
+      _AIRFLOW_WWW_USER_CREATE: 'true'
+      _AIRFLOW_WWW_USER_USERNAME: ${_AIRFLOW_WWW_USER_USERNAME:-airflow}
+      _AIRFLOW_WWW_USER_PASSWORD: ${_AIRFLOW_WWW_USER_PASSWORD:-airflow}
+      _PIP_ADDITIONAL_REQUIREMENTS: ''
+    user: "0:0"
+    volumes:
+      - ${AIRFLOW_PROJ_DIR:-.}/airflow:/sources
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+    restart: "no"
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  timescaledb_data:
+    driver: local
+  backend_logs:
+    driver: local
+  collector_logs:
+    driver: local
+  airflow_postgres_data:
+    driver: local
+  airflow_logs:
+    driver: local
+
+networks:
+  greenmatrix-network:
+    driver: bridge

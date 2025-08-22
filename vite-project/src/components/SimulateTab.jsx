@@ -22,10 +22,14 @@ const SimulateTab = () => {
   const [vocabularySize, setVocabularySize] = useState('');
   const [attentionLayers, setAttentionLayers] = useState('');
   const [activationFunction, setActivationFunction] = useState('');
+  const [precision, setPrecision] = useState('');
   
   // Dropdown options from backend
   const [availableModelTypes, setAvailableModelTypes] = useState([]);
   const [availableTaskTypes, setAvailableTaskTypes] = useState([]);
+  
+  // Store the actual model name from the API
+  const [selectedModelName, setSelectedModelName] = useState('');
   
   // Loading and error states
   const [isLoading, setIsLoading] = useState(false);
@@ -36,45 +40,21 @@ const SimulateTab = () => {
   const [simulationResults, setSimulationResults] = useState(null);
   const [isRunningSimulation, setIsRunningSimulation] = useState(false);
 
-  // Fetch dropdown options on component mount
+  // Initialize dropdown options with fallback values
   useEffect(() => {
-    const fetchDropdownOptions = async () => {
+    const initializeDropdownOptions = () => {
       setIsLoadingDropdowns(true);
-      try {
-        console.log('Fetching dropdown options...');
-        
-        // Fetch model types and task types in parallel
-        const [modelTypesResponse, taskTypesResponse] = await Promise.all([
-          apiClient.get('/model/types'),
-          apiClient.get('/model/task-types')
-        ]);
-
-        console.log('Model types response:', modelTypesResponse.data);
-        console.log('Task types response:', taskTypesResponse.data);
-
-        if (modelTypesResponse.data.status === 'success') {
-          setAvailableModelTypes(modelTypesResponse.data.model_types || []);
-        }
-
-        if (taskTypesResponse.data.status === 'success') {
-          setAvailableTaskTypes(taskTypesResponse.data.task_types || []);
-        }
-      } catch (err) {
-        console.error('Error fetching dropdown options:', err);
-        console.error('Error details:', err.response?.data || err.message);
-        
-        // Fallback to hardcoded values if backend is not available
-        console.log('Using fallback dropdown values...');
-        setAvailableModelTypes(['bert', 'gpt', 'resnet', 'llama', 't5']);
-        setAvailableTaskTypes(['Inference']);
-        
-        setError('Failed to load model and task type options from backend. Using default values.');
-      } finally {
-        setIsLoadingDropdowns(false);
-      }
+      
+      console.log('Initializing dropdown options with fallback values...');
+      
+      // Use fallback values directly since backend endpoints don't exist
+      setAvailableModelTypes(['llama', 'qwen2', 'phi3', 'mistral', 'gemma', 'phi', 'gpt2', 'bert', 'roberta', 'albert', 'distilbert', 'resnet18', 'resnet34', 'resnet50', 'vgg16', 'vgg19', 'inception_v3', 'efficientnet_b0', 'vit', 'deit', 'swin']);
+      setAvailableTaskTypes(['Inference', 'Training']);
+      
+      setIsLoadingDropdowns(false);
     };
 
-    fetchDropdownOptions();
+    initializeDropdownOptions();
   }, []);
 
   // Fetch and prefill parameters when both model type and task type are selected
@@ -99,24 +79,24 @@ const SimulateTab = () => {
           const modelData = response.data.model_data;
           
           // Prefill the form with model data from backend
-          setModelSize(modelData.model_size_mb?.toString() || '');
-          setParameters(modelData.total_parameters_millions?.toString() || '');
-          // Set a default FLOPs value based on model size and parameters
-          const estimatedFlops = (modelData.total_parameters_millions || 0) * 2; // Rough estimation
-          setFlops(estimatedFlops.toString());
-          setBatchSize('1'); // Default batch size
-          setLatency(''); // Keep empty for user to set requirements
-          setThroughput(''); // Keep empty for user to set requirements
+          setModelSize(modelData.model_size_mb?.toString());
+          setParameters(modelData.total_parameters_millions?.toString());
+          setFlops(modelData.flops?.toString());
+          // Keep batch size, latency, and throughput empty for user input
           
           // Set framework from model data
-          setFramework(modelData.framework?.toLowerCase() || 'pytorch');
+          setFramework(modelData.framework?.toLowerCase());
+          
+          // Store the actual model name for simulation
+          setSelectedModelName(modelData.model_name);
           
           // Prefill additional parameters if available
-          setArchitectureType(modelData.architecture_type || '');
-          setHiddenLayers(modelData.number_of_hidden_layers?.toString() || '');
-          setVocabularySize(modelData.vocabulary_size?.toString() || '');
-          setAttentionLayers(modelData.number_of_attention_layers?.toString() || '');
-          setActivationFunction(modelData.activation_function || '');
+          setArchitectureType(modelData.architecture_type);
+          setHiddenLayers(modelData.embedding_vector_dimension?.toString());
+          setVocabularySize(modelData.vocabulary_size?.toString());
+          setAttentionLayers(modelData.ffn_dimension?.toString());
+          setActivationFunction(modelData.activation_function);
+          setPrecision(modelData.precision);
         } else {
           setError('Model data not found for the selected type and task.');
         }
@@ -143,6 +123,11 @@ const SimulateTab = () => {
       return;
     }
 
+    if (!selectedModelName) {
+      setError('Model data not loaded. Please select model type and task type first.');
+      return;
+    }
+
     if (!modelSize || !parameters || !flops) {
       setError('Please ensure model size, parameters, and FLOPs are filled in.');
       return;
@@ -155,37 +140,57 @@ const SimulateTab = () => {
     try {
       // Prepare simulation parameters according to backend API format
       const simulationParams = {
-        Model: `${modelType.toUpperCase()}`, // Convert to uppercase for backend
-        Framework: framework || 'PyTorch',
-        Total_Parameters_Millions: parseFloat(parameters) || 0,
-        Model_Size_MB: parseFloat(modelSize) || 0,
-        Architecture_type: architectureType || `${modelType}ForMaskedLM`,
+        Model: selectedModelName,
+        Framework: framework,
+        Task_Type: taskType,
+        Total_Parameters_Millions: parseFloat(parameters),
+        Model_Size_MB: parseFloat(modelSize),
+        Architecture_type: architectureType,
         Model_Type: modelType,
-        Number_of_hidden_Layers: parseInt(hiddenLayers) || 12,
-        Precision: 'FP32', // Default precision
-        Vocabulary_Size: parseInt(vocabularySize) || 30522,
-        Number_of_Attention_Layers: parseInt(attentionLayers) || parseInt(hiddenLayers) || 12,
-        Activation_Function: activationFunction || 'gelu',
-        FLOPs: parseFloat(flops) || 0
+        Embedding_Vector_Dimension: parseInt(hiddenLayers),
+        Precision: precision,
+        Vocabulary_Size: parseInt(vocabularySize),
+        FFN_Dimension: parseInt(attentionLayers),
+        Activation_Function: activationFunction,
+        FLOPs: parseFloat(flops)
       };
+      
+      console.log('Simulation request payload:', simulationParams);
 
       // Make API call to run simulation
       const response = await apiClient.post('/model/simulate-performance', simulationParams);
       
       // Process and format simulation results
       if (response.data.status === 'success' && response.data.performance_results) {
+        console.log('Raw API Response:', response.data.performance_results);
+        
         // Format results to match the expected structure
         const formattedResults = {
-          hardwareComparison: response.data.performance_results.map(result => ({
-            name: result.hardware,
-            fullName: result.full_name,
-            latency: `${result.latency_ms.toFixed(2)} ms`,
-            throughput: `${result.throughput_qps.toFixed(2)} QPS`,
-            costPer1000: `$${result.cost_per_1000.toFixed(4)}`,
-            memory: `${result.memory_gb.toFixed(1)} GB`,
-            hardwareId: result.hardware_id
-          }))
+          hardwareComparison: response.data.performance_results.map(result => {
+            console.log(`Processing hardware result:`, {
+              hardware: result.hardware,
+              latency_ms: result.latency_ms,
+              throughput_qps: result.throughput_qps,
+              cost_per_1000: result.cost_per_1000,
+              memory_gb: result.memory_gb
+            });
+            
+            return {
+              name: result.hardware,
+              fullName: result.full_name,
+              latency: `${result.latency_ms?.toFixed(2) || 0} ms`,
+              throughput: `${result.throughput_qps?.toFixed(2) || 0} QPS`,
+              costPer1000: `$${result.cost_per_1000?.toFixed(4) || 0}`,
+              memory: `${result.memory_gb?.toFixed(1) || 0} GB`,
+              hardwareId: result.hardware_id,
+              // Add additional details from your API
+              modelConfidence: result.model_confidence || 0,
+              inferenceUsed: result.inference_used || false
+            };
+          })
         };
+        
+        console.log('Formatted results:', formattedResults);
         
         setSimulationResults(formattedResults);
       } else {
@@ -194,12 +199,16 @@ const SimulateTab = () => {
       
     } catch (err) {
       console.error('Error running simulation:', err);
+      console.error('Error response:', err.response?.data);
+      
       if (err.response?.status === 400) {
-        setError(err.response.data?.detail || 'Invalid simulation parameters.');
+        const errorDetail = err.response.data?.detail || 'Invalid simulation parameters.';
+        console.error('400 Error detail:', errorDetail);
+        setError(`Simulation failed: ${errorDetail}`);
       } else if (err.response?.status === 404) {
         setError('Model not found in database. Please try a different model type.');
       } else {
-        setError('Failed to run simulation. Please check your parameters and try again.');
+        setError(`Failed to run simulation: ${err.response?.data?.detail || err.message}`);
       }
     } finally {
       setIsRunningSimulation(false);
@@ -389,7 +398,7 @@ const SimulateTab = () => {
               </option>
               {availableModelTypes.map((type) => (
                 <option key={type} value={type}>
-                  {type.toUpperCase()}
+                  {type}
                 </option>
               ))}
             </select>
@@ -568,7 +577,7 @@ const SimulateTab = () => {
         </div>
 
         {/* Batch Size */}
-        <div>
+        {/* <div>
           <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             Batch Size
             <div className="relative">
@@ -593,10 +602,10 @@ const SimulateTab = () => {
             className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             disabled={isLoading}
           />
-        </div>
+        </div> */}
 
         {/* Latency Requirement */}
-        <div>
+        {/* <div>
           <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             Latency Requirement (ms)
             <div className="relative">
@@ -621,10 +630,10 @@ const SimulateTab = () => {
             className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             disabled={isLoading}
           />
-        </div>
+        </div> */}
 
         {/* Throughput Requirement */}
-        <div className="md:col-span-2">
+        {/* <div className="md:col-span-2">
           <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             Throughput Requirement (QPS)
             <div className="relative">
@@ -649,7 +658,7 @@ const SimulateTab = () => {
             className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             disabled={isLoading}
           />
-        </div>
+        </div> */}
       </div>
 
       {/* Load More Parameters Button */}
@@ -697,12 +706,27 @@ const SimulateTab = () => {
                   disabled={isLoading}
                 >
                   <option value="">Select architecture type</option>
-                  <option value="encoder-decoder">Encoder-Decoder</option>
-                  <option value="encoder-only">Encoder-Only</option>
-                  <option value="decoder-only">Decoder-Only</option>
-                  <option value="autoencoder">Autoencoder</option>
-                  <option value="vanilla">Vanilla</option>
-                  <option value="residual">Residual</option>
+                  <option value="LlamaForCausalLM">LlamaForCausalLM</option>
+                  <option value="Qwen2ForCausalLM">Qwen2ForCausalLM</option>
+                  <option value="Phi3ForCausalLM">Phi3ForCausalLM</option>
+                  <option value="MistralForCausalLM">MistralForCausalLM</option>
+                  <option value="GemmaForCausalLM">GemmaForCausalLM</option>
+                  <option value="PhiForCausalLM">PhiForCausalLM</option>
+                  <option value="GPT2LMHeadModel">GPT2LMHeadModel</option>
+                  <option value="BertForMaskedLM">BertForMaskedLM</option>
+                  <option value="RobertaForMaskedLM">RobertaForMaskedLM</option>
+                  <option value="AlbertForMaskedLM">AlbertForMaskedLM</option>
+                  <option value="DistilBertForMaskedLM">DistilBertForMaskedLM</option>
+                  <option value="resnet18">resnet18</option>
+                  <option value="resnet34">resnet34</option>
+                  <option value="resnet50">resnet50</option>
+                  <option value="vgg16">vgg16</option>
+                  <option value="vgg19">vgg19</option>
+                  <option value="inception_v3">inception_v3</option>
+                  <option value="efficientnet_b0">efficientnet_b0</option>
+                  <option value="ViTForImageClassification">ViTForImageClassification</option>
+                  <option value="DeiTForImageClassificationWithTeacher">DeiTForImageClassificationWithTeacher</option>
+                  <option value="SwinForImageClassification">SwinForImageClassification</option>
                 </select>
                 <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
                   <svg className="w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -796,8 +820,48 @@ const SimulateTab = () => {
               />
             </div>
 
+            {/* Precision */}
+            <div>
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Precision
+                <div className="relative">
+                  <Info 
+                    className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" 
+                    onMouseEnter={() => setShowTooltip('precision')}
+                    onMouseLeave={() => setShowTooltip('')}
+                  />
+                  {showTooltip === 'precision' && (
+                    <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
+                      <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
+                      Numerical precision used for model computations (FP16, FP32, etc.).
+                    </div>
+                  )}
+                </div>
+              </label>
+              <div className="relative">
+                <select
+                  value={precision}
+                  onChange={(e) => setPrecision(e.target.value)}
+                  className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={isLoading}
+                >
+                  <option value="">Select precision</option>
+                  <option value="FP16">FP16 (Half Precision)</option>
+                  <option value="FP32">FP32 (Single Precision)</option>
+                  <option value="FP64">FP64 (Double Precision)</option>
+                  <option value="INT8">INT8 (8-bit Integer)</option>
+                  <option value="INT4">INT4 (4-bit Integer)</option>
+                </select>
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                  <svg className="w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
             {/* Activation Function */}
-            <div className="md:col-span-2">
+            <div>
               <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Activation Function
                 <div className="relative">
@@ -822,8 +886,11 @@ const SimulateTab = () => {
                   disabled={isLoading}
                 >
                   <option value="">Select activation function</option>
-                  <option value="relu">ReLU</option>
+                  <option value="silu">SiLU</option>
                   <option value="gelu">GELU</option>
+                  <option value="gelu_new">GELU New</option>
+                  <option value="gelu_pytorch_tanh">GELU PyTorch Tanh</option>
+                  <option value="relu">ReLU</option>
                   <option value="swish">Swish</option>
                   <option value="tanh">Tanh</option>
                   <option value="sigmoid">Sigmoid</option>

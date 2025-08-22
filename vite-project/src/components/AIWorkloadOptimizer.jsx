@@ -71,7 +71,7 @@ const AIWorkloadOptimizer = () => {
           </div>
 
           {/* Hero Section */}
-          <div className="bg-gradient-to-b from-green-50 to-white dark:from-[#0e2b1a] dark:to-gray-900">
+          {/* <div className="bg-gradient-to-b from-green-50 to-white dark:from-[#0e2b1a] dark:to-gray-900">
             <div className="max-w-6xl mx-auto px-6 py-12 text-center">
               <h1 className="text-4xl font-bold bg-gradient-to-r from-[#01a982] to-[#00d4aa] bg-clip-text text-transparent mb-4">
                 Green Matrix
@@ -86,7 +86,7 @@ const AIWorkloadOptimizer = () => {
                   : 'AI workload optimization and hardware recommendations.'}
               </p>
             </div>
-          </div>
+          </div> */}
 
           {/* Tabs */}
           <div className="max-w-6xl mx-auto px-6 mt-6">

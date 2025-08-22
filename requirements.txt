@@ -1,0 +1,8 @@
+# requirements.txt
+psutil
+psycopg2-binary
+pandas
+pynvml
+requests
+py-cpuinfo
+wmi

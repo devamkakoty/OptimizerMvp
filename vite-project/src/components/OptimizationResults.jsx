@@ -8,7 +8,15 @@ const OptimizationResults = ({ results, mode }) => {
     return null;
   }
 
-  const { recommendedConfiguration, hardwareAnalysis, alternativeOptions } = results;
+  const { 
+    recommendedConfiguration, 
+    hardwareAnalysis, 
+    alternativeOptions,
+    isPostDeployment,
+    analysisSummary,
+    currentBaseline,
+    rawOptimizationResults
+  } = results;
 
   const exportData = (format) => {
     if (format === 'json') {
@@ -358,11 +366,45 @@ const OptimizationResults = ({ results, mode }) => {
         )}
       </div>
       
+      {/* Post-deployment improvements */}
+      {hardware.currentVsProjected && (
+        <div className="mt-4 pt-4 border-t border-purple-400">
+          <div className="text-xs text-purple-200 mb-2">Improvements vs Current</div>
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div>
+              <div className="text-green-300 font-bold">
+                {hardware.currentVsProjected.latency_improvement_percent.toFixed(0)}%
+              </div>
+              <div className="text-xs text-purple-200">Latency</div>
+            </div>
+            <div>
+              <div className="text-green-300 font-bold">
+                {hardware.currentVsProjected.memory_improvement_percent.toFixed(0)}%
+              </div>
+              <div className="text-xs text-purple-200">Memory</div>
+            </div>
+            <div>
+              <div className="text-green-300 font-bold">
+                {hardware.currentVsProjected.cost_improvement_percent.toFixed(0)}%
+              </div>
+              <div className="text-xs text-purple-200">Cost</div>
+            </div>
+          </div>
+        </div>
+      )}
+      
       <div className="mt-4 pt-4 border-t border-purple-400">
         <div className="flex items-center gap-2">
           <CheckCircle className="w-4 h-4 text-green-300" />
           <span className="text-sm text-green-300">{hardware.status}</span>
         </div>
+        
+        {/* Optimization scores */}
+        {hardware.optimizationScores && (
+          <div className="mt-2 text-xs text-purple-200">
+            Overall Score: {hardware.optimizationScores.overall_score.toFixed(1)}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -440,6 +482,79 @@ const OptimizationResults = ({ results, mode }) => {
           </div>
         </div>
       </div>
+
+      {/* Post-Deployment Analysis Summary */}
+      {isPostDeployment && analysisSummary && (
+        <div className="mb-8 bg-blue-50 dark:bg-blue-900/20 rounded-xl p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <Database className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+            <h3 className="text-lg font-semibold text-blue-800 dark:text-blue-300">
+              Analysis Summary
+            </h3>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-blue-500">📊</span>
+                <span className="font-medium text-gray-700 dark:text-gray-300">Hardware Evaluated</span>
+              </div>
+              <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                {analysisSummary.total_hardware_evaluated}
+              </p>
+            </div>
+            
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-green-500">🎯</span>
+                <span className="font-medium text-gray-700 dark:text-gray-300">Priority</span>
+              </div>
+              <p className="text-lg font-semibold text-green-600 dark:text-green-400 capitalize">
+                {analysisSummary.optimization_priority}
+              </p>
+            </div>
+            
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-purple-500">⚙️</span>
+                <span className="font-medium text-gray-700 dark:text-gray-300">Workflow</span>
+              </div>
+              <p className="text-lg font-semibold text-purple-600 dark:text-purple-400">
+                Post-Deployment
+              </p>
+            </div>
+          </div>
+
+          {/* Current Performance Baseline */}
+          {currentBaseline && (
+            <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-4">
+              <h4 className="font-semibold text-gray-800 dark:text-gray-200 mb-3">
+                Current Performance Baseline
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Current Latency:</span>
+                  <span className="font-semibold text-gray-800 dark:text-gray-200">
+                    {currentBaseline.latency_ms}ms
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Current Memory:</span>
+                  <span className="font-semibold text-gray-800 dark:text-gray-200">
+                    {currentBaseline.memory_gb}GB
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Current Cost:</span>
+                  <span className="font-semibold text-gray-800 dark:text-gray-200">
+                    ${currentBaseline.cost_per_1000}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Hardware Analysis */}
       <div className="mb-8 bg-gray-50 dark:bg-gray-700 rounded-xl p-6">

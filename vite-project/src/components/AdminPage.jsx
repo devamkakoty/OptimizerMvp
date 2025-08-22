@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Hpe, Moon, Sun } from 'grommet-icons';
 import { Link } from 'react-router-dom';
 import DatePicker from 'react-datepicker';
 import { useDarkMode } from '../contexts/DarkModeContext';
 import AdminDashboard from './AdminDashboard';
 import HardwareTab from './HardwareTab';
+import CostManagementTab from './CostManagementTab';
+import PerformanceTab from './PerformanceTab';
 import Sidebar from './Sidebar';
 import Breadcrumb from './Breadcrumb';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -18,74 +20,105 @@ const AdminPage = () => {
   const [activeSection, setActiveSection] = useState('administration');
   const [isCollapsed, setIsCollapsed] = useState(false);
 
-  // Generate two weeks of dummy data
-  const generateTwoWeeksData = () => {
-    const data = {};
-    const baseDate = new Date('2025-07-16'); // Starting from July 16, 2025
-    
-    const processTemplates = [
-      { name: 'Code.exe', baseCpu: 9, baseMemory: 1200, baseIOPS: 25, files: 20, pid: 20452 },
-      { name: 'pythonw.exe', baseCpu: 1, baseMemory: 580, baseIOPS: 3, files: 6, pid: 19092 },
-      { name: 'chrome.exe', baseCpu: 2, baseMemory: 490, baseIOPS: 35, files: 28, pid: 6872 },
-      { name: 'firefox.exe', baseCpu: 5, baseMemory: 350, baseIOPS: 45, files: 15, pid: 12345 },
-      { name: 'node.exe', baseCpu: 3, baseMemory: 300, baseIOPS: 22, files: 12, pid: 11111 },
-      { name: 'teams.exe', baseCpu: 3, baseMemory: 270, baseIOPS: 38, files: 18, pid: 22222 },
-      { name: 'outlook.exe', baseCpu: 2, baseMemory: 235, baseIOPS: 15, files: 8, pid: 33333 },
-      { name: 'discord.exe', baseCpu: 4, baseMemory: 190, baseIOPS: 27, files: 14, pid: 44444 },
-      { name: 'spotify.exe', baseCpu: 1, baseMemory: 157, baseIOPS: 12, files: 6, pid: 55555 },
-      { name: 'notepad.exe', baseCpu: 0.5, baseMemory: 125, baseIOPS: 5, files: 3, pid: 66666 },
-      { name: 'calculator.exe', baseCpu: 0.2, baseMemory: 98, baseIOPS: 8, files: 2, pid: 77777 },
-      { name: 'explorer.exe', baseCpu: 2, baseMemory: 88, baseIOPS: 18, files: 25, pid: 88888 },
-      { name: 'winrar.exe', baseCpu: 6, baseMemory: 76, baseIOPS: 42, files: 4, pid: 99999 },
-      { name: 'vlc.exe', baseCpu: 3, baseMemory: 65, baseIOPS: 20, files: 7, pid: 10001 },
-      { name: 'steam.exe', baseCpu: 4, baseMemory: 55, baseIOPS: 30, files: 12, pid: 10002 }
-    ];
+  // State for API data
+  const [apiData, setApiData] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-    for (let day = 0; day < 14; day++) {
-      const currentDate = new Date(baseDate);
-      currentDate.setDate(baseDate.getDate() + day);
-      const dateKey = currentDate.toISOString().split('T')[0];
+  // Fetch host process metrics from API
+  const fetchHostMetrics = async (filters = {}) => {
+    try {
+      setLoading(true);
+      let url = 'http://localhost:8000/api/host-process-metrics';
       
-      // Create variation factors for each day
-      const dayVariation = 0.8 + (Math.sin(day * 0.5) * 0.3) + (Math.random() * 0.4);
-      const weekendFactor = currentDate.getDay() === 0 || currentDate.getDay() === 6 ? 0.7 : 1.0;
+      // Add query parameters if filters are provided
+      const params = new URLSearchParams();
+      if (filters.start_date) params.append('start_date', filters.start_date);
+      if (filters.end_date) params.append('end_date', filters.end_date);
+      if (filters.limit) params.append('limit', filters.limit.toString());
       
-      data[dateKey] = processTemplates.map((template, index) => {
-        const processVariation = 0.7 + (Math.random() * 0.6);
-        const timeOfDay = 8 + (Math.random() * 8); // 8 AM to 4 PM
-        
-        const cpuUsage = Math.max(0.1, (template.baseCpu * dayVariation * weekendFactor * processVariation));
-        const memoryUsage = template.baseMemory * (0.9 + Math.random() * 0.2);
-        const iops = Math.max(1, template.baseIOPS * dayVariation * processVariation);
-        
-        return {
-          'Process Name': template.name,
-          'Process ID': template.pid + day,
-          'Username': 'MSI\\USER',
-          'Status': Math.random() > 0.05 ? 'running' : 'sleeping',
-          'Start Time': `${dateKey} ${Math.floor(timeOfDay).toString().padStart(2, '0')}:${Math.floor((timeOfDay % 1) * 60).toString().padStart(2, '0')}:${Math.floor(Math.random() * 60).toString().padStart(2, '0')}`,
-          'CPU Usage (%)': parseFloat(cpuUsage.toFixed(1)),
-          'Memory Usage (MB)': parseFloat(memoryUsage.toFixed(2)),
-          'Memory Usage (%)': parseFloat((memoryUsage / 16000 * 100).toFixed(2)),
-          'Read Bytes': Math.floor(Math.random() * 1000000000),
-          'Write Bytes': Math.floor(Math.random() * 500000000),
-          'Open Files': template.files + Math.floor(Math.random() * 10),
-          'GPU Memory Usage (MB)': template.name.includes('chrome') || template.name.includes('steam') ? Math.floor(Math.random() * 100) : 0,
-          'GPU Utilization (%)': template.name.includes('chrome') || template.name.includes('steam') ? Math.floor(Math.random() * 20) : 0,
-          'IOPS': parseFloat(iops.toFixed(1))
-        };
-      });
+      if (params.toString()) {
+        url += `?${params.toString()}`;
+      }
+      
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      return data;
+    } catch (err) {
+      console.error('Error fetching host metrics:', err);
+      setError(err.message);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Transform API data to match expected format
+  const transformApiData = (apiResponse) => {
+    if (!apiResponse || !apiResponse.data || !Array.isArray(apiResponse.data)) {
+      return {};
     }
     
-    return data;
+    const transformedData = {};
+    
+    apiResponse.data.forEach(item => {
+      const date = new Date(item.timestamp).toISOString().split('T')[0];
+      
+      if (!transformedData[date]) {
+        transformedData[date] = [];
+      }
+      
+      transformedData[date].push({
+        'Process Name': item.process_name || 'Unknown',
+        'Process ID': item.process_id || 0,
+        'Username': item.username || 'Unknown',
+        'Status': item.status || 'running',
+        'Start Time': item.timestamp,
+        'CPU Usage (%)': parseFloat(item.cpu_usage_percent || 0),
+        'Memory Usage (MB)': parseFloat(item.memory_usage_mb || 0),
+        'Memory Usage (%)': parseFloat(item.memory_usage_percent || 0),
+        'Read Bytes': parseInt(item.read_bytes || 0),
+        'Write Bytes': parseInt(item.write_bytes || 0),
+        'Open Files': parseInt(item.open_files || 0),
+        'GPU Memory Usage (MB)': parseFloat(item.gpu_memory_usage_mb || 0),
+        'GPU Utilization (%)': parseFloat(item.gpu_utilization_percent || 0),
+        'IOPS': parseFloat(item.iops || 0)
+      });
+    });
+    
+    return transformedData;
   };
+
+  // Fetch data on component mount and set up auto-refresh
+  useEffect(() => {
+    const loadData = async () => {
+      const response = await fetchHostMetrics({ limit: 1000 });
+      if (response) {
+        const transformed = transformApiData(response);
+        setApiData(transformed);
+      }
+    };
+    
+    // Load data immediately
+    loadData();
+    
+    // Set up auto-refresh every 5 seconds
+    const interval = setInterval(loadData, 5000);
+    
+    // Cleanup interval on component unmount
+    return () => clearInterval(interval);
+  }, []);
 
   const [selectedDate, setSelectedDate] = useState('today');
   const [selectedCalendarDate, setSelectedCalendarDate] = useState(new Date());
   const [selectedWeek, setSelectedWeek] = useState(null);
   const [viewMode, setViewMode] = useState('day'); // 'day' or 'week'
   
-  const twoWeeksData = generateTwoWeeksData();
+  const twoWeeksData = apiData;
   const availableDates = Object.keys(twoWeeksData).sort();
 
   // Helper function to handle calendar date change
@@ -107,7 +140,16 @@ const AdminPage = () => {
   
   // Get current process data based on selection
   const getCurrentProcessData = () => {
-    if (viewMode === 'week' && selectedWeek) {
+    if (loading) {
+      return [];
+    }
+    
+    if (error) {
+      console.error('Error loading process data:', error);
+      return [];
+    }
+    
+    if (viewMode === 'week' && selectedWeek !== null) {
       // Aggregate week data
       const weekDates = availableDates.slice(selectedWeek * 7, (selectedWeek + 1) * 7);
       const aggregatedData = {};
@@ -186,16 +228,16 @@ const AdminPage = () => {
           <div className="px-6 py-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <span className="text-xl font-semibold text-gray-900 pt-2 pb-2 pl-2">
-                <Hpe color="#01a982" />
+                <Hpe color="#16a34a" />
               </span>
               <span className="text-xl font-semibold text-gray-900 dark:text-white pt-1">
-                HPE Admin Panel
+                HPE Panel
               </span>
             </div>
             <div className="flex items-center gap-2">
               <Link 
                 to="/workload" 
-                className="px-4 py-2 text-sm font-medium text-[#01a982] border border-[#01a982] rounded-lg hover:bg-[#01a982] hover:text-white transition-colors"
+                className="px-4 py-2 text-sm font-medium text-green-600 border border-green-600 rounded-lg hover:bg-green-600 hover:text-white transition-colors"
               >
                 Back to GreenMatrix
               </Link>
@@ -224,27 +266,30 @@ const AdminPage = () => {
           </div>
 
           {/* Hero Section */}
-          {activeSection === 'administration' && (
+          {/* {activeSection === 'administration' && (
             <div className="bg-gradient-to-b from-green-50 to-white dark:from-[#0e2b1a] dark:to-gray-900">
               <div className="max-w-6xl mx-auto px-6 py-12 text-center">
-                <h1 className="text-4xl font-bold bg-gradient-to-r from-[#01a982] to-[#00d4aa] bg-clip-text text-transparent mb-4">
-                  {activeAdminTab === 'dashboard' ? 'Admin Dashboard' : 'Hardware Management'}
+                <h1 className="text-4xl font-bold bg-gradient-to-r from-green-600 to-green-700 bg-clip-text text-transparent mb-4">
+                  {activeAdminTab === 'dashboard' ? 'Dashboard' : 
+                   activeAdminTab === 'hardware' ? 'Hardware Management' : 'Cost Management'}
                 </h1>
                 <p className="text-lg text-gray-600 dark:text-gray-300">
                   {activeAdminTab === 'dashboard' 
                     ? 'Monitor AI workload optimization and system performance metrics.'
-                    : 'Manage and configure system hardware components.'
+                    : activeAdminTab === 'hardware'
+                    ? 'Manage and configure system hardware components.'
+                    : 'Manage regional pricing models for FinOps and cost optimization analysis.'
                   }
                 </p>
               </div>
             </div>
-          )}
+          )} */}
 
           {/* Default Welcome for other sections */}
           {activeSection !== 'administration' && (
-            <div className="bg-gradient-to-b from-blue-50 to-white dark:from-[#0e1b2b] dark:to-gray-900">
+            <div className="bg-gradient-to-b from-gray-50 to-white dark:from-gray-800 dark:to-gray-900">
               <div className="max-w-6xl mx-auto px-6 py-12 text-center">
-                <h1 className="text-4xl font-bold bg-gradient-to-r from-[#01a982] to-[#00d4aa] bg-clip-text text-transparent mb-4">
+                <h1 className="text-4xl font-bold bg-gradient-to-r from-green-600 to-green-700 bg-clip-text text-transparent mb-4">
                   Welcome to HPE Analytics
                 </h1>
                 <p className="text-lg text-gray-600 dark:text-gray-300">
@@ -257,8 +302,32 @@ const AdminPage = () => {
           {/* Content based on active section */}
           {activeSection === 'administration' && (
             <>
+              {/* Loading indicator */}
+              {loading && (
+                <div className="max-w-6xl mx-auto px-6 mt-6">
+                  <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 text-center">
+                    <div className="text-gray-600 dark:text-gray-300">Loading process metrics data...</div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Error indicator */}
+              {error && (
+                <div className="max-w-6xl mx-auto px-6 mt-6">
+                  <div className="bg-red-50 dark:bg-red-900 rounded-xl shadow-sm border border-red-200 dark:border-red-700 p-6 text-center">
+                    <div className="text-red-600 dark:text-red-300">Error loading data: {error}</div>
+                    <button 
+                      onClick={() => window.location.reload()}
+                      className="mt-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Date/Week Selection Controls - Only show for dashboard tab */}
-              {activeAdminTab === 'dashboard' && (
+              {activeAdminTab === 'dashboard' && !loading && !error && (
                 <div className="max-w-6xl mx-auto px-6 mt-6">
                   <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                     <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -274,7 +343,7 @@ const AdminPage = () => {
                             }}
                             className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
                               viewMode === 'day'
-                                ? 'bg-[#01a982] text-white shadow-sm'
+                                ? 'bg-green-600 text-white shadow-sm'
                                 : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
                             }`}
                           >
@@ -288,7 +357,7 @@ const AdminPage = () => {
                             }}
                             className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
                               viewMode === 'week'
-                                ? 'bg-[#01a982] text-white shadow-sm'
+                                ? 'bg-green-600 text-white shadow-sm'
                                 : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
                             }`}
                           >
@@ -309,8 +378,8 @@ const AdminPage = () => {
                               }}
                               className={`px-4 py-2 text-sm font-medium rounded-lg border transition-all ${
                                 selectedDate === 'today'
-                                  ? 'bg-[#01a982] text-white border-[#01a982]'
-                                  : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-[#01a982]'
+                                  ? 'bg-green-600 text-white border-green-600'
+                                  : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-green-600'
                               }`}
                             >
                               Latest
@@ -324,17 +393,17 @@ const AdminPage = () => {
                                 includeDates={availableDateObjects}
                                 dateFormat="MMM dd, yyyy"
                                 placeholderText="Choose a date..."
-                                className="px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] w-full sm:w-auto"
+                                className="px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-green-600 focus:border-green-600 w-full sm:w-auto"
                                 calendarClassName="dark:bg-gray-800 dark:border-gray-600"
                                 dayClassName={(date) => 
                                   availableDates.includes(date.toISOString().split('T')[0])
-                                    ? "hover:bg-[#01a982] hover:text-white cursor-pointer"
+                                    ? "hover:bg-green-600 hover:text-white cursor-pointer"
                                     : "text-gray-300 cursor-not-allowed"
                                 }
                                 customInput={
                                   <div className="relative cursor-pointer">
                                     <input
-                                      className="px-4 py-2 pl-10 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] w-full sm:w-auto cursor-pointer"
+                                      className="px-4 py-2 pl-10 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-green-600 focus:border-green-600 w-full sm:w-auto cursor-pointer"
                                       readOnly
                                     />
                                     <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -354,8 +423,8 @@ const AdminPage = () => {
                               onClick={() => setSelectedWeek(0)}
                               className={`px-4 py-2 text-sm font-medium rounded-lg border transition-all ${
                                 selectedWeek === 0
-                                  ? 'bg-[#01a982] text-white border-[#01a982]'
-                                  : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-[#01a982]'
+                                  ? 'bg-green-600 text-white border-green-600'
+                                  : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-green-600'
                               }`}
                             >
                               Week 1 (Jul 16-22)
@@ -364,8 +433,8 @@ const AdminPage = () => {
                               onClick={() => setSelectedWeek(1)}
                               className={`px-4 py-2 text-sm font-medium rounded-lg border transition-all ${
                                 selectedWeek === 1
-                                  ? 'bg-[#01a982] text-white border-[#01a982]'
-                                  : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-[#01a982]'
+                                  ? 'bg-green-600 text-white border-green-600'
+                                  : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-green-600'
                               }`}
                             >
                               Week 2 (Jul 23-29)
@@ -402,8 +471,16 @@ const AdminPage = () => {
                   />
                 )}
 
+                {activeAdminTab === 'performance' && (
+                  <PerformanceTab />
+                )}
+
                 {activeAdminTab === 'hardware' && (
                   <HardwareTab />
+                )}
+
+                {activeAdminTab === 'costs' && (
+                  <CostManagementTab />
                 )}
               </div>
             </>

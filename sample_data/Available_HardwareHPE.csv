@@ -1,0 +1,4 @@
+CPU,GPU,# of GPU,GPU Memory Total - VRAM (MB),GPU Graphics clock,GPU Memory clock,GPU SM Cores,GPU CUDA Cores,CPU Total cores (Including Logical cores),CPU Threads per Core,CPU Base clock(GHz),CPU Max Frequency(GHz),L1 Cache,CPU Power Consumption,GPUPower Consumption
+Intel(R) Xeon,NVIDIA A100,1,80,1.4,1.512,108,432,12,24,2,3.9,80,350,300
+Intel(R) Xeon,NVIDIA L40,1,24,2.4,2.2,142,568,12,24,2,3.9,80,350,300
+Intel(R) Xeon,NVIDIA H100,1,80,1.8,1.5,114,456,12,24,2,3.9,80,350,350

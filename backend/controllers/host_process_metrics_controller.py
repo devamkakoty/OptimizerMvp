@@ -14,14 +14,21 @@ class HostProcessMetricsController:
         try:
             host_process_metric = HostProcessMetric(
                 timestamp=host_process_metrics_data.get('timestamp', datetime.utcnow()),
-                process_name=host_process_metrics_data.get('process_name'),
                 process_id=host_process_metrics_data['process_id'],
+                process_name=host_process_metrics_data.get('process_name'),
                 username=host_process_metrics_data.get('username'),
                 status=host_process_metrics_data.get('status'),
-                cpu_usage_percent=host_process_metrics_data['cpu_usage_percent'],
-                memory_usage_mb=host_process_metrics_data['memory_usage_mb'],
-                gpu_memory_usage_mb=host_process_metrics_data['gpu_memory_usage_mb'],
-                gpu_utilization_percent=host_process_metrics_data['gpu_utilization_percent']
+                start_time=host_process_metrics_data.get('start_time'),
+                cpu_usage_percent=host_process_metrics_data.get('cpu_usage_percent'),
+                memory_usage_mb=host_process_metrics_data.get('memory_usage_mb'),
+                memory_usage_percent=host_process_metrics_data.get('memory_usage_percent'),
+                read_bytes=host_process_metrics_data.get('read_bytes'),
+                write_bytes=host_process_metrics_data.get('write_bytes'),
+                iops=host_process_metrics_data.get('iops'),
+                open_files=host_process_metrics_data.get('open_files'),
+                gpu_memory_usage_mb=host_process_metrics_data.get('gpu_memory_usage_mb'),
+                gpu_utilization_percent=host_process_metrics_data.get('gpu_utilization_percent'),
+                estimated_power_watts=host_process_metrics_data.get('estimated_power_watts')
             )
             
             db.add(host_process_metric)
@@ -32,7 +39,6 @@ class HostProcessMetricsController:
                 "success": True,
                 "message": "Host process metrics data pushed successfully",
                 "data": {
-                    "id": host_process_metric.id,
                     "process_name": host_process_metric.process_name,
                     "process_id": host_process_metric.process_id,
                     "timestamp": host_process_metric.timestamp.isoformat()
@@ -52,14 +58,21 @@ class HostProcessMetricsController:
             for metrics_data in host_process_metrics_batch:
                 host_process_metric = HostProcessMetric(
                     timestamp=metrics_data.get('timestamp', datetime.utcnow()),
-                    process_name=metrics_data.get('process_name'),
                     process_id=metrics_data['process_id'],
+                    process_name=metrics_data.get('process_name'),
                     username=metrics_data.get('username'),
                     status=metrics_data.get('status'),
-                    cpu_usage_percent=metrics_data['cpu_usage_percent'],
-                    memory_usage_mb=metrics_data['memory_usage_mb'],
-                    gpu_memory_usage_mb=metrics_data['gpu_memory_usage_mb'],
-                    gpu_utilization_percent=metrics_data['gpu_utilization_percent']
+                    start_time=metrics_data.get('start_time'),
+                    cpu_usage_percent=metrics_data.get('cpu_usage_percent'),
+                    memory_usage_mb=metrics_data.get('memory_usage_mb'),
+                    memory_usage_percent=metrics_data.get('memory_usage_percent'),
+                    read_bytes=metrics_data.get('read_bytes'),
+                    write_bytes=metrics_data.get('write_bytes'),
+                    iops=metrics_data.get('iops'),
+                    open_files=metrics_data.get('open_files'),
+                    gpu_memory_usage_mb=metrics_data.get('gpu_memory_usage_mb'),
+                    gpu_utilization_percent=metrics_data.get('gpu_utilization_percent'),
+                    estimated_power_watts=metrics_data.get('estimated_power_watts')
                 )
                 host_process_metrics.append(host_process_metric)
             
@@ -225,4 +238,26 @@ class HostProcessMetricsController:
     
     def get_date_range_options(self) -> Dict[str, Any]:
         """Get predefined date range options for UI calendar"""
-        return TimeFilterUtils.get_date_range_options() 
+        return TimeFilterUtils.get_date_range_options()
+    
+    def cleanup_invalid_cpu_data(self, db: Session, cpu_threshold: float = 100.0) -> Dict[str, Any]:
+        """Clean up process metrics with invalid CPU usage values (> threshold)"""
+        try:
+            # Delete records where CPU usage is unrealistically high
+            deleted_count = db.query(HostProcessMetric).filter(
+                HostProcessMetric.cpu_usage_percent > cpu_threshold
+            ).delete()
+            
+            db.commit()
+            
+            return {
+                "success": True,
+                "message": f"Deleted {deleted_count} records with CPU usage > {cpu_threshold}%",
+                "deleted_count": deleted_count
+            }
+        except Exception as e:
+            db.rollback()
+            return {
+                "success": False,
+                "message": f"Failed to cleanup invalid CPU data: {str(e)}"
+            } 

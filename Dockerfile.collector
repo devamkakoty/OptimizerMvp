@@ -1,0 +1,66 @@
+# Dockerfile for GreenMatrix Data Collector Service
+FROM python:3.11-slim-bullseye
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Install system dependencies for GPU monitoring and system access
+RUN apt-get update && apt-get install -y \
+    curl \
+    procps \
+    lsof \
+    nvidia-ml-py3 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user for security
+RUN groupadd -r collector && useradd -r -g collector collector
+
+# Set working directory
+WORKDIR /app
+
+# Copy requirements first for better caching
+COPY requirements.txt ./
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY collect_all_metrics.py ./
+COPY collect_hardware_specs.py ./
+COPY config.ini ./
+
+# Create logs directory
+RUN mkdir -p logs && chown -R collector:collector logs
+
+# Create entrypoint script
+RUN cat > /app/entrypoint.sh << 'EOF'
+#!/bin/bash
+set -e
+
+# Wait for backend to be ready
+echo "Waiting for backend service..."
+while ! curl -f "${BACKEND_API_URL:-http://backend:8000}/health" > /dev/null 2>&1; do
+    echo "Backend not ready, waiting 5 seconds..."
+    sleep 5
+done
+
+echo "Backend is ready, starting data collection..."
+
+# Run data collection script
+python collect_all_metrics.py
+EOF
+
+RUN chmod +x /app/entrypoint.sh && chown collector:collector /app/entrypoint.sh
+
+# Switch to non-root user
+USER collector
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD pgrep -f collect_all_metrics.py || exit 1
+
+# Run the entrypoint script
+CMD ["/app/entrypoint.sh"]

@@ -37,6 +37,9 @@ class HardwareSpecs(Base):
     gpu_driver_version = Column(String(100), nullable=True)
     gpu_vram_total_mb = Column(Float, nullable=True)
     
+    # Region Information
+    region = Column(String(100), nullable=True, default='US')
+    
     # Timestamp
     timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
     
@@ -66,5 +69,6 @@ class HardwareSpecs(Base):
             "gpu_model": self.gpu_model,
             "gpu_driver_version": self.gpu_driver_version,
             "gpu_vram_total_mb": self.gpu_vram_total_mb,
+            "region": self.region,
             "timestamp": self.timestamp.isoformat() if self.timestamp else None
         } 

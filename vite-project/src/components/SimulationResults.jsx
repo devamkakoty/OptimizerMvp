@@ -289,83 +289,83 @@ const SimulationResults = ({ results }) => {
     }
   };
 
-  const HardwareCard = ({ hardware }) => (
-    <div className="bg-gradient-to-r from-purple-500 to-blue-500 rounded-xl p-6 text-white">
-      <h3 className="text-xl font-bold mb-1">{hardware.name}</h3>
-      <p className="text-purple-100 text-sm mb-4">{hardware.fullName}</p>
-      
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-4 h-4 border border-white rounded-full flex items-center justify-center">
-              <div className="w-2 h-2 bg-white rounded-full"></div>
+  const HardwareCard = ({ hardware }) => {
+    // Debug logging
+    console.log('HardwareCard rendering:', hardware);
+    
+    return (
+      <div className="bg-gradient-to-r from-purple-500 to-blue-500 rounded-xl p-6 text-white">
+        <h3 className="text-xl font-bold mb-1">{hardware.name}</h3>
+        <p className="text-purple-100 text-sm mb-4">{hardware.fullName}</p>
+        
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-4 h-4 border border-white rounded-full flex items-center justify-center">
+                <div className="w-2 h-2 bg-white rounded-full"></div>
+              </div>
+              <span className="text-sm text-purple-100">Latency</span>
             </div>
-            <span className="text-sm text-purple-100">Latency</span>
+            <p className="text-lg font-semibold">{hardware.latency}</p>
           </div>
-          <p className="text-lg font-semibold">{hardware.latency}</p>
+          
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-4 h-4 border border-white rounded flex items-center justify-center">
+                <div className="w-2 h-2 bg-white"></div>
+              </div>
+              <span className="text-sm text-purple-100">Throughput</span>
+            </div>
+            <p className="text-lg font-semibold">{hardware.throughput}</p>
+          </div>
+          
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-green-300 text-lg">$</span>
+              <span className="text-sm text-purple-100">Cost per 1000</span>
+            </div>
+            <p className="text-lg font-semibold text-green-300">{hardware.costPer1000}</p>
+          </div>
+          
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-4 h-4 border border-white rounded flex items-center justify-center">
+                <div className="w-2 h-2 bg-purple-300"></div>
+              </div>
+              <span className="text-sm text-purple-100">Memory</span>
+            </div>
+            <p className="text-lg font-semibold text-purple-300">{hardware.memory}</p>
+          </div>
         </div>
         
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-4 h-4 border border-white rounded flex items-center justify-center">
-              <div className="w-2 h-2 bg-white"></div>
+        {/* Additional API Details */}
+        {(hardware.modelConfidence !== undefined || hardware.inferenceUsed !== undefined) && (
+          <div className="mt-4 pt-4 border-t border-purple-400">
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              {hardware.modelConfidence !== undefined && (
+                <div>
+                  <span className="text-purple-200">🎯 Confidence: </span>
+                  <span>{hardware.modelConfidence.toFixed(2)}</span>
+                </div>
+              )}
+              {hardware.inferenceUsed !== undefined && (
+                <div>
+                  <span className="text-purple-200">🔬 Model Type: </span>
+                  <span>{hardware.inferenceUsed ? 'Inference' : 'Training'}</span>
+                </div>
+              )}
+              {/* {hardware.hardwareId && (
+                <div>
+                  <span className="text-purple-200">🆔 HW ID: </span>
+                  <span>{hardware.hardwareId}</span>
+                </div>
+              )} */}
             </div>
-            <span className="text-sm text-purple-100">Throughput</span>
           </div>
-          <p className="text-lg font-semibold">{hardware.throughput}</p>
-        </div>
-        
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-green-300 text-lg">$</span>
-            <span className="text-sm text-purple-100">Cost per 1000</span>
-          </div>
-          <p className="text-lg font-semibold text-green-300">{hardware.costPer1000}</p>
-        </div>
-        
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-4 h-4 border border-white rounded flex items-center justify-center">
-              <div className="w-2 h-2 bg-purple-300"></div>
-            </div>
-            <span className="text-sm text-purple-100">Memory</span>
-          </div>
-          <p className="text-lg font-semibold text-purple-300">{hardware.memory}</p>
-        </div>
+        )}
       </div>
-      
-      {hardware.additionalInfo && (
-        <div className="mt-4 pt-4 border-t border-purple-400">
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            {hardware.additionalInfo.arch && (
-              <div>
-                <span className="text-purple-200">🏗 Arch: </span>
-                <span>{hardware.additionalInfo.arch}</span>
-              </div>
-            )}
-            {hardware.additionalInfo.memory && (
-              <div>
-                <span className="text-purple-200">📊 Mem: </span>
-                <span>{hardware.additionalInfo.memory}</span>
-              </div>
-            )}
-            {hardware.additionalInfo.flops && (
-              <div>
-                <span className="text-purple-200">⚡ FP16: </span>
-                <span>{hardware.additionalInfo.flops}</span>
-              </div>
-            )}
-            {hardware.additionalInfo.power && (
-              <div>
-                <span className="text-purple-200">Power: </span>
-                <span>{hardware.additionalInfo.power}</span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="mt-8 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-8">
@@ -470,6 +470,12 @@ const SimulationResults = ({ results }) => {
                   <th className="border border-gray-200 dark:border-gray-600 px-4 py-3 text-center text-sm font-medium text-purple-700 dark:text-purple-300">
                     Memory<br />(GB)
                   </th>
+                  <th className="border border-gray-200 dark:border-gray-600 px-4 py-3 text-center text-sm font-medium text-purple-700 dark:text-purple-300">
+                    Confidence
+                  </th>
+                  <th className="border border-gray-200 dark:border-gray-600 px-4 py-3 text-center text-sm font-medium text-purple-700 dark:text-purple-300">
+                    HW ID
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -492,6 +498,12 @@ const SimulationResults = ({ results }) => {
                     </td>
                     <td className="border border-gray-200 dark:border-gray-600 px-4 py-3 text-center text-gray-900 dark:text-white">
                       {hardware.memory}
+                    </td>
+                    <td className="border border-gray-200 dark:border-gray-600 px-4 py-3 text-center text-gray-900 dark:text-white">
+                      {hardware.modelConfidence !== undefined ? hardware.modelConfidence.toFixed(2) : 'N/A'}
+                    </td>
+                    <td className="border border-gray-200 dark:border-gray-600 px-4 py-3 text-center text-gray-900 dark:text-white">
+                      {hardware.hardwareId || 'N/A'}
                     </td>
                   </tr>
                 ))}

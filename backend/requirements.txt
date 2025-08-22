@@ -1,26 +1,48 @@
+# FastAPI and Web Framework
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
+
+# Database and ORM
 sqlalchemy==2.0.23
 psycopg2-binary==2.9.9
+alembic==1.12.1
+
+# Data Validation and Settings
 pydantic==2.5.0
 pydantic-settings==2.1.0
 python-dotenv==1.0.0
-kafka-python==2.0.2
+
+# Data Processing and ML - Updated for model compatibility
+scikit-learn>=1.6.1
+numpy>=1.26.0
+pandas>=2.1.0
+joblib>=1.3.2
+
+# System Monitoring and Hardware
+psutil==5.9.8
+pynvml==12.0.0
+py-cpuinfo==9.0.0
+
+# HTTP Client and API Communication
+requests==2.31.0
+
+# Caching and Message Queue
 redis==5.0.1
-scikit-learn==1.3.2
-numpy==1.24.3
-pandas==2.0.3
-joblib==1.3.2
-# alembic==1.12.1
+kafka-python==2.0.2
+
+# Utilities and Configuration
+python-dateutil==2.8.2
+python-multipart==0.0.6
+configparser==6.0.0
+
+# Security and Authentication
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+
+# Development and Testing (commented for production)
 # pytest==7.4.3
 # black==23.11.0
 # flake8==6.1.0
-# orjson==3.9.10
-# python-multipart==0.0.6
-# celery==5.3.4
-# python-dateutil==2.8.2
-# email-validator==2.1.0
-# python-jose[cryptography]==3.3.0
-# passlib[bcrypt]==1.7.4
-# asyncio-mqtt==0.16.1
-# timescaledb==0.0.1 
+
+# Additional utilities
+orjson==3.9.10

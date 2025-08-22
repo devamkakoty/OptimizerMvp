@@ -22,6 +22,10 @@ const ModelTab = () => {
   const [vocabularySize, setVocabularySize] = useState('');
   const [attentionLayers, setAttentionLayers] = useState('');
   const [activationFunction, setActivationFunction] = useState('');
+  const [precision, setPrecision] = useState('');
+  
+  // Store the actual model name from the API
+  const [selectedModelName, setSelectedModelName] = useState('');
   
   // Loading and error states
   const [isLoading, setIsLoading] = useState(false);
@@ -35,26 +39,13 @@ const ModelTab = () => {
   const [optimizationResults, setOptimizationResults] = useState(null);
   const [isRunningOptimization, setIsRunningOptimization] = useState(false);
 
-  // Fetch dropdown options on component mount
+  // Initialize dropdown options with fallback values
   useEffect(() => {
-    const fetchDropdownOptions = async () => {
-      try {
-        const [modelTypesResponse, taskTypesResponse] = await Promise.all([
-          apiClient.get('/model/types'),
-          apiClient.get('/model/task-types')
-        ]);
-        
-        setModelTypes(modelTypesResponse.data.model_types || []);
-        setTaskTypes(taskTypesResponse.data.task_types || []);
-      } catch (err) {
-        console.error('Error fetching dropdown options:', err);
-        // Set fallback values if API fails
-        setModelTypes(['transformer', 'cnn', 'rnn', 'gan', 'diffusion']);
-        setTaskTypes(['inference', 'training']);
-      }
-    };
-
-    fetchDropdownOptions();
+    console.log('Initializing Model Optimizer dropdown options with fallback values...');
+    
+    // Use fallback values directly since backend endpoints don't exist
+    setModelTypes(['llama', 'qwen2', 'phi3', 'mistral', 'gemma', 'phi', 'gpt2', 'bert', 'roberta', 'albert', 'distilbert', 'resnet18', 'resnet34', 'resnet50', 'vgg16', 'vgg19', 'inception_v3', 'efficientnet_b0', 'vit', 'deit', 'swin']);
+    setTaskTypes(['Inference', 'Training']);
   }, []);
 
   // Fetch and prefill parameters when both model type and task type are selected
@@ -79,25 +70,25 @@ const ModelTab = () => {
           
           console.log('Model data received:', modelData);
           
+          // Store the actual model name for API calls
+          setSelectedModelName(modelData.model_name);
+          
           // Prefill the form with model data from backend
-          const frameworkValue = modelData.framework ? modelData.framework.toLowerCase() : '';
-          console.log('Setting framework to:', frameworkValue);
-          setFramework(frameworkValue);
+          setFramework(modelData.framework || '');
           setModelSize(modelData.model_size_mb?.toString() || '');
           setParameters(modelData.total_parameters_millions?.toString() || '');
-          // Set a default FLOPs value based on model size and parameters
-          const estimatedFlops = (modelData.total_parameters_millions || 0) * 2; // Rough estimation
-          setFlops(estimatedFlops.toString());
+          setFlops(modelData.flops?.toString() || ''); // Use actual FLOPs from database
           setBatchSize('1'); // Default batch size
           setLatency(''); // Keep empty for user to set requirements
           setThroughput(''); // Keep empty for user to set requirements
           
-          // Advanced parameters - use fallback values if not available
+          // Advanced parameters - use actual database values
           setArchitectureType(modelData.architecture_type || '');
-          setHiddenLayers(modelData.number_of_hidden_layers?.toString() || '');
+          setHiddenLayers(modelData.embedding_vector_dimension?.toString() || ''); // This is correct for hidden layers
           setVocabularySize(modelData.vocabulary_size?.toString() || '');
-          setAttentionLayers(modelData.number_of_attention_layers?.toString() || '');
+          setAttentionLayers(modelData.ffn_dimension?.toString() || ''); // FFN dimension for attention layers
           setActivationFunction(modelData.activation_function || '');
+          setPrecision(modelData.precision || 'FP32');
         }
       } catch (err) {
         console.error('Error fetching model data:', err);
@@ -117,29 +108,37 @@ const ModelTab = () => {
       return;
     }
 
+    if (!selectedModelName) {
+      setError('Model data not loaded. Please select model type and task type first.');
+      return;
+    }
+
     setIsRunningOptimization(true);
     setError('');
     setOptimizationResults(null);
 
     try {
-      // Prepare optimization parameters
+      // Prepare optimization parameters in the correct format for the API
       const optimizationParams = {
-        Model: modelType,
+        Model_Name: selectedModelName,
         Framework: framework,
         Total_Parameters_Millions: parseFloat(parameters) || 0,
         Model_Size_MB: parseFloat(modelSize) || 0,
         Architecture_type: architectureType,
         Model_Type: modelType,
         Number_of_hidden_Layers: parseInt(hiddenLayers) || 0,
-        Precision: 'FP32', // default precision
+        Precision: precision || 'FP32',
         Vocabulary_Size: parseInt(vocabularySize) || 0,
         Number_of_Attention_Layers: parseInt(attentionLayers) || 0,
-        Activation_Function: activationFunction,
-        FLOPs: parseFloat(flops) || 0
+        Activation_Function: activationFunction
       };
 
-      // Make API call to optimize model
-      const response = await apiClient.post('/model/simulate-performance', optimizationParams);
+      console.log('Sending optimization request:', optimizationParams);
+
+      // Make API call to model optimization endpoint
+      const response = await apiClient.post('/model/optimization-recommendation', optimizationParams);
+      
+      console.log('Optimization response:', response.data);
       
       // Set optimization results
       setOptimizationResults(response.data);
@@ -289,11 +288,11 @@ const ModelTab = () => {
               className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-transparent transition-all"
             >
               <option value="">Select framework</option>
-              <option value="pytorch">PyTorch</option>
-              <option value="tensorflow">TensorFlow</option>
-              <option value="jax">JAX</option>
-              <option value="onnx">ONNX</option>
-              <option value="tensorrt">TensorRT</option>
+              <option value="PyTorch">PyTorch</option>
+              <option value="TensorFlow">TensorFlow</option>
+              <option value="JAX">JAX</option>
+              <option value="ONNX">ONNX</option>
+              <option value="TensorRT">TensorRT</option>
             </select>
             <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
               <svg className="w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -549,12 +548,24 @@ const ModelTab = () => {
                   disabled={isLoading}
                 >
                   <option value="">Select architecture type</option>
-                  <option value="encoder-decoder">Encoder-Decoder</option>
-                  <option value="encoder-only">Encoder-Only</option>
-                  <option value="decoder-only">Decoder-Only</option>
-                  <option value="autoencoder">Autoencoder</option>
-                  <option value="vanilla">Vanilla</option>
-                  <option value="residual">Residual</option>
+                  <option value="LlamaForCausalLM">LlamaForCausalLM</option>
+                  <option value="Qwen2ForCausalLM">Qwen2ForCausalLM</option>
+                  <option value="Phi3ForCausalLM">Phi3ForCausalLM</option>
+                  <option value="MistralForCausalLM">MistralForCausalLM</option>
+                  <option value="GemmaForCausalLM">GemmaForCausalLM</option>
+                  <option value="PhiForCausalLM">PhiForCausalLM</option>
+                  <option value="BertForMaskedLM">BertForMaskedLM</option>
+                  <option value="BertForSequenceClassification">BertForSequenceClassification</option>
+                  <option value="RobertaForMaskedLM">RobertaForMaskedLM</option>
+                  <option value="AlbertForMaskedLM">AlbertForMaskedLM</option>
+                  <option value="DistilBertForMaskedLM">DistilBertForMaskedLM</option>
+                  <option value="ResNet">ResNet</option>
+                  <option value="VGG">VGG</option>
+                  <option value="InceptionV3">InceptionV3</option>
+                  <option value="EfficientNet">EfficientNet</option>
+                  <option value="ViTForImageClassification">ViTForImageClassification</option>
+                  <option value="DeiTForImageClassification">DeiTForImageClassification</option>
+                  <option value="SwinForImageClassification">SwinForImageClassification</option>
                 </select>
                 <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
                   <svg className="w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -649,7 +660,7 @@ const ModelTab = () => {
             </div>
 
             {/* Activation Function */}
-            <div className="md:col-span-2">
+            <div>
               <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Activation Function
                 <div className="relative">
@@ -674,13 +685,56 @@ const ModelTab = () => {
                   disabled={isLoading}
                 >
                   <option value="">Select activation function</option>
-                  <option value="relu">ReLU</option>
+                  <option value="silu">SiLU</option>
                   <option value="gelu">GELU</option>
+                  <option value="gelu_new">GELU New</option>
+                  <option value="gelu_pytorch_tanh">GELU PyTorch Tanh</option>
+                  <option value="relu">ReLU</option>
                   <option value="swish">Swish</option>
                   <option value="tanh">Tanh</option>
                   <option value="sigmoid">Sigmoid</option>
                   <option value="leaky_relu">Leaky ReLU</option>
                   <option value="elu">ELU</option>
+                </select>
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                  <svg className="w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            {/* Precision */}
+            <div>
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Precision
+                <div className="relative">
+                  <Info 
+                    className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" 
+                    onMouseEnter={() => setShowTooltip('precision')}
+                    onMouseLeave={() => setShowTooltip('')}
+                  />
+                  {showTooltip === 'precision' && (
+                    <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
+                      <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
+                      Numerical precision used for model weights and computations.
+                    </div>
+                  )}
+                </div>
+              </label>
+              <div className="relative">
+                <select
+                  value={precision}
+                  onChange={(e) => setPrecision(e.target.value)}
+                  className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={isLoading}
+                >
+                  <option value="">Select precision</option>
+                  <option value="FP32">FP32 (Float32)</option>
+                  <option value="FP16">FP16 (Half Precision)</option>
+                  <option value="BF16">BF16 (BFloat16)</option>
+                  <option value="INT8">INT8 (8-bit Integer)</option>
+                  <option value="INT4">INT4 (4-bit Integer)</option>
                 </select>
                 <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
                   <svg className="w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">

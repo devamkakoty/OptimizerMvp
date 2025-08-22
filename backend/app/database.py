@@ -10,6 +10,7 @@ load_dotenv()
 # Database configuration
 MODEL_DB_URL = os.getenv("MODEL_DB_URL", "postgresql://postgres:@localhost:5432/Model_Recommendation_DB")
 METRICS_DB_URL = os.getenv("METRICS_DB_URL", "postgresql://postgres:@localhost:5432/Metrics_db")
+TIMESCALEDB_URL = os.getenv("TIMESCALEDB_URL", "postgresql://postgres:@localhost:5433/vm_metrics_ts")
 
 # Create engines
 model_engine = create_engine(
@@ -26,9 +27,17 @@ metrics_engine = create_engine(
     echo=False
 )
 
+timescaledb_engine = create_engine(
+    TIMESCALEDB_URL,
+    poolclass=StaticPool,
+    pool_pre_ping=True,
+    echo=False
+)
+
 # Create session factories
 ModelSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=model_engine)
 MetricsSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=metrics_engine)
+TimescaleDBSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=timescaledb_engine)
 
 # Legacy engine for backward compatibility
 engine = model_engine
@@ -53,6 +62,14 @@ def get_metrics_db():
     finally:
         db.close()
 
+def get_timescaledb():
+    """Dependency to get TimescaleDB session for VM metrics"""
+    db = TimescaleDBSessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
 def init_db():
     """Initialize the database with all tables"""
     try:
@@ -62,18 +79,25 @@ def init_db():
         HardwareInfo.__table__.create(bind=model_engine, checkfirst=True)
         
         # Create tables in Metrics_db
-        from app.models import HardwareMonitoring, VMMetric, HostProcessMetric, HardwareSpecs
+        from app.models import HardwareMonitoring, VMMetric, HostProcessMetric, HostOverallMetric, HardwareSpecs, CostModel
         HardwareMonitoring.__table__.create(bind=metrics_engine, checkfirst=True)
         VMMetric.__table__.create(bind=metrics_engine, checkfirst=True)
         HostProcessMetric.__table__.create(bind=metrics_engine, checkfirst=True)
+        HostOverallMetric.__table__.create(bind=metrics_engine, checkfirst=True)
         HardwareSpecs.__table__.create(bind=metrics_engine, checkfirst=True)
+        CostModel.__table__.create(bind=metrics_engine, checkfirst=True)
+        
+        # Create tables in TimescaleDB (VM Process Metrics)
+        from app.models.vm_process_metrics import VMProcessMetric
+        VMProcessMetric.__table__.create(bind=timescaledb_engine, checkfirst=True)
         
         # Create TimescaleDB hypertable for hardware monitoring
         try:
             with metrics_engine.connect() as conn:
                 conn.execute(text("SELECT create_hypertable('hardware_monitoring_table', 'timestamp', if_not_exists => TRUE);"))
                 conn.execute(text("SELECT create_hypertable('vm_metrics_table', 'timestamp', if_not_exists => TRUE);"))
-                conn.execute(text("SELECT create_hypertable('host_process_metrics_table', 'timestamp', if_not_exists => TRUE);"))
+                conn.execute(text("SELECT create_hypertable('host_process_metrics', 'timestamp', if_not_exists => TRUE);"))
+                conn.execute(text("SELECT create_hypertable('host_overall_metrics', 'timestamp', if_not_exists => TRUE);"))
                 conn.commit()
                 print("✓ TimescaleDB hypertables created successfully")
         except Exception as e:
@@ -122,6 +146,10 @@ def check_db_connection():
         
         # Check metrics database
         with metrics_engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        
+        # Check TimescaleDB database
+        with timescaledb_engine.connect() as conn:
             conn.execute(text("SELECT 1"))
         
         return True
