@@ -639,7 +639,7 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode }
 <body>
     <div class="report-container">
         <header class="report-header">
-            <h1>🌿 HPE GreenMatrix</h1>
+            <h1>HPE GreenMatrix</h1>
             <div class="subtitle">System Insights & Optimization Report</div>
             <div class="report-meta">
                 <div class="meta-item">
@@ -779,7 +779,7 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode }
         </div>
         <button
           onClick={handleDownloadReport}
-          className="flex items-center gap-2 px-4 py-2 bg-[#01a982] text-white rounded-lg hover:bg-[#019670] transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-900 text-white rounded-lg transition-colors"
         >
           <Download className="w-4 h-4" />
           Get Recommendations

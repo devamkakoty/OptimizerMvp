@@ -240,6 +240,35 @@ class HostProcessMetricsController:
         """Get predefined date range options for UI calendar"""
         return TimeFilterUtils.get_date_range_options()
     
+    def get_available_dates(self, db: Session, days_back: int = 30) -> Dict[str, Any]:
+        """Get dates that have data entries in the host process metrics table"""
+        try:
+            # Get distinct dates with data from the last N days
+            cutoff_date = datetime.utcnow() - timedelta(days=days_back)
+            
+            dates_query = db.query(
+                func.date(HostProcessMetric.timestamp).label('date')
+            ).filter(
+                HostProcessMetric.timestamp >= cutoff_date
+            ).distinct().order_by(
+                func.date(HostProcessMetric.timestamp).desc()
+            )
+            
+            dates = dates_query.all()
+            available_dates = [date[0].strftime('%Y-%m-%d') for date in dates]
+            
+            return {
+                "success": True,
+                "available_dates": available_dates,
+                "count": len(available_dates)
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Failed to get available dates: {str(e)}",
+                "available_dates": []
+            }
+    
     def cleanup_invalid_cpu_data(self, db: Session, cpu_threshold: float = 100.0) -> Dict[str, Any]:
         """Clean up process metrics with invalid CPU usage values (> threshold)"""
         try:

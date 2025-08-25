@@ -907,6 +907,14 @@ def get_host_process_metrics_summary(
         start_date=start_date, end_date=end_date, start_time_str=start_time_str, end_time_str=end_time_str
     )
 
+@app.get("/api/host-process-metrics/available-dates")
+def get_host_process_metrics_available_dates(
+    days_back: int = 30,
+    db: Session = Depends(get_metrics_db)
+):
+    """Get dates that have data entries in the host process metrics table"""
+    return host_process_metrics_controller.get_available_dates(db, days_back=days_back)
+
 # Time-filtered aggregated endpoints
 @app.get("/api/monitoring/metrics-by-time-filter")
 async def get_metrics_by_time_filter(
@@ -1387,6 +1395,8 @@ async def get_cross_region_recommendations(
     username: Optional[str] = None,
     time_range_days: int = 7,
     projection_days: int = 30,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
     db: Session = Depends(get_metrics_db)
 ):
     """Get cross-region cost optimization recommendations for workloads"""
@@ -1402,7 +1412,7 @@ async def get_cross_region_recommendations(
         workload_filter = None
     
     result = recommendation_engine.generate_migration_recommendations(
-        db, workload_filter, time_range_days, projection_days
+        db, workload_filter, time_range_days, projection_days, start_date, end_date
     )
     
     if not result['success']:
@@ -1414,10 +1424,12 @@ async def get_cross_region_recommendations(
 async def get_top_energy_processes(
     time_range_days: int = 7,
     limit: int = 10,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
     db: Session = Depends(get_metrics_db)
 ):
     """Get top energy-consuming processes for optimization recommendations"""
-    result = recommendation_engine.get_top_energy_consuming_processes(db, time_range_days, limit)
+    result = recommendation_engine.get_top_energy_consuming_processes(db, time_range_days, limit, start_date, end_date)
     
     if not result['success']:
         raise HTTPException(status_code=500, detail=result['error'])
@@ -1429,6 +1441,8 @@ async def analyze_workload(
     process_name: Optional[str] = None,
     username: Optional[str] = None,
     time_range_days: int = 7,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
     db: Session = Depends(get_metrics_db)
 ):
     """Analyze resource consumption patterns for a specific workload"""
@@ -1443,7 +1457,7 @@ async def analyze_workload(
         raise HTTPException(status_code=400, detail="Must specify either process_name or username")
     
     result = recommendation_engine.analyze_workload_resource_consumption(
-        db, workload_filter, time_range_days
+        db, workload_filter, time_range_days, start_date, end_date
     )
     
     if not result['success']:
@@ -1466,6 +1480,52 @@ async def get_regional_pricing(
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get regional pricing: {str(e)}")
+
+# VM-SPECIFIC RECOMMENDATION ENDPOINTS
+
+@app.get("/api/recommendations/vm/{vm_name}", response_model=Dict[str, Any])
+async def get_vm_recommendations(
+    vm_name: str,
+    time_range_days: int = 7,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    db: Session = Depends(get_metrics_db)
+):
+    """Get performance and cost optimization recommendations for a specific VM"""
+    try:
+        result = recommendation_engine.generate_vm_recommendations(db, vm_name, time_range_days, start_date, end_date)
+        
+        if not result['success']:
+            raise HTTPException(status_code=400, detail=result['error'])
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate VM recommendations: {str(e)}")
+
+@app.get("/api/recommendations/vm/{vm_name}/analysis", response_model=Dict[str, Any])
+async def get_vm_analysis(
+    vm_name: str,
+    time_range_days: int = 7,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    db: Session = Depends(get_metrics_db)
+):
+    """Get detailed resource consumption analysis for a specific VM"""
+    try:
+        result = recommendation_engine.analyze_vm_resource_consumption(db, vm_name, time_range_days, start_date, end_date)
+        
+        if not result['success']:
+            raise HTTPException(status_code=400, detail=result['error'])
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to analyze VM: {str(e)}")
 
 # =============================================================================
 # VM MONITORING API ENDPOINTS

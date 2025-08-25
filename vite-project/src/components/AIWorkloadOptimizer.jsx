@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Hpe, Moon, Sun } from 'grommet-icons';
 import { Link } from 'react-router-dom';
+import logo from '../assets/logo.png';
 import { useDarkMode } from '../contexts/DarkModeContext';
 import SimulateTab from './SimulateTab';
 import OptimizeTab from './OptimizeTab';
@@ -33,23 +34,15 @@ const AIWorkloadOptimizer = () => {
         isCollapsed ? 'lg:ml-16' : 'lg:ml-64'
       }`}>
         {/* Header */}
-        <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+        <header className="bg-white dark:bg-gray-800">
           <div className="px-6 py-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <span className="text-xl font-semibold text-gray-900 pt-2 pb-2 pl-2">
-                <Hpe color="#01a982" />
-              </span>
+              <img src={logo} alt="GreenMatrix Logo" className="w-12" />
               <span className="text-xl font-semibold text-gray-900 dark:text-white pt-1">
-                HPE GreenMatrix
+                GreenMatrix
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <Link 
-                to="/" 
-                className="px-4 py-2 text-sm font-medium text-[#01a982] border border-[#01a982] rounded-lg hover:bg-[#01a982] hover:text-white transition-colors"
-              >
-                Admin Dashboard
-              </Link>
               <button 
                 onClick={toggleDarkMode}
                 className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
@@ -63,7 +56,7 @@ const AIWorkloadOptimizer = () => {
         {/* Content Area */}
         <div className="flex-1 overflow-auto">
           {/* Breadcrumb */}
-          <div className="px-6 py-4 bg-white dark:bg-gray-800">
+          <div className="px-6 py-2 bg-white dark:bg-gray-800">
             <Breadcrumb 
               activeSection={activeSection}
               activeTab={activeTab}

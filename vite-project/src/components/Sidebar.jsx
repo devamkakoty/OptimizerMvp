@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDarkMode } from '../contexts/DarkModeContext';
 import { Hpe, Hp } from 'grommet-icons';
+import logo from '../assets/logo.png';
 import { 
   Home, 
   Activity, 
@@ -122,9 +123,9 @@ const Sidebar = ({ activeSection, setActiveSection, activeTab, setActiveTab, isC
               {/* <div className="w-8 h-8 bg-gradient-to-r from-green-600 to-green-700 rounded flex items-center justify-center">
                 <span className="text-white font-bold text-sm">H</span>
               </div> */}
-              <Hp color='plain' size='medium' /> 
+              <img src={logo} alt="GreenMatrix Logo" className="w-10" /> 
               {!isCollapsed && (
-                <span className="text-xl font-semibold">HPE Analytics</span>
+                <span className="text-xl font-semibold">GreenMatrix</span>
               )}
             </div>
             {/* Desktop Collapse Button in Header */}

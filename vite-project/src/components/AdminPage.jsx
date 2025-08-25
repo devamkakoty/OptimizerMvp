@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Hpe, Moon, Sun } from 'grommet-icons';
 import { Link } from 'react-router-dom';
+import logo from '../assets/logo.png';
 import DatePicker from 'react-datepicker';
 import { useDarkMode } from '../contexts/DarkModeContext';
 import AdminDashboard from './AdminDashboard';
@@ -22,8 +23,25 @@ const AdminPage = () => {
 
   // State for API data
   const [apiData, setApiData] = useState({});
+  const [availableDates, setAvailableDates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [noDataError, setNoDataError] = useState(null);
+
+  // Fetch available dates from API
+  const fetchAvailableDates = async () => {
+    try {
+      const response = await fetch('http://localhost:8000/api/host-process-metrics/available-dates?days_back=30');
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      return data.success ? data.available_dates : [];
+    } catch (err) {
+      console.error('Error fetching available dates:', err);
+      return [];
+    }
+  };
 
   // Fetch host process metrics from API
   const fetchHostMetrics = async (filters = {}) => {
@@ -93,10 +111,28 @@ const AdminPage = () => {
     return transformedData;
   };
 
+  // Fetch available dates once on mount
+  useEffect(() => {
+    const loadAvailableDates = async () => {
+      const dates = await fetchAvailableDates();
+      setAvailableDates(dates);
+      
+      // Set the latest date as default selection
+      if (dates.length > 0) {
+        const latestDate = dates[0]; // dates are sorted in descending order
+        setSelectedDate(latestDate);
+        setSelectedCalendarDate(new Date(latestDate));
+      }
+    };
+    
+    loadAvailableDates();
+  }, []);
+
   // Fetch data on component mount and set up auto-refresh
   useEffect(() => {
-    const loadData = async () => {
-      const response = await fetchHostMetrics({ limit: 1000 });
+    const loadData = async (dateFilters = {}) => {
+      const filters = { limit: 1000, ...dateFilters };
+      const response = await fetchHostMetrics(filters);
       if (response) {
         const transformed = transformApiData(response);
         setApiData(transformed);
@@ -117,9 +153,38 @@ const AdminPage = () => {
   const [selectedCalendarDate, setSelectedCalendarDate] = useState(new Date());
   const [selectedWeek, setSelectedWeek] = useState(null);
   const [viewMode, setViewMode] = useState('day'); // 'day' or 'week'
+
+  // Separate useEffect to handle date-specific data loading
+  useEffect(() => {
+    const loadDateSpecificData = async () => {
+      if (selectedDate !== 'today') {
+        setNoDataError(null);
+        // For specific dates, fetch data for that day
+        const startDate = selectedDate;
+        const endDate = selectedDate;
+        
+        const response = await fetchHostMetrics({ 
+          start_date: startDate, 
+          end_date: endDate, 
+          limit: 1000 
+        });
+        
+        if (response && response.success && response.data && response.data.length > 0) {
+          const transformed = transformApiData(response);
+          setApiData(transformed);
+        } else {
+          // No data for selected date
+          setApiData({});
+          setNoDataError(`No data available for ${new Date(selectedDate).toLocaleDateString()}. Please select a different date.`);
+        }
+      }
+      // For 'today', the main useEffect with interval will handle the loading
+    };
+
+    loadDateSpecificData();
+  }, [selectedDate]);
   
   const twoWeeksData = apiData;
-  const availableDates = Object.keys(twoWeeksData).sort();
 
   // Helper function to handle calendar date change
   const handleCalendarDateChange = (date) => {
@@ -220,27 +285,19 @@ const AdminPage = () => {
       />
 
       {/* Main Content */}
-      <div className={`flex-1 flex flex-col transition-all duration-300 ${
+      <div className={`flex-1 flex flex-col transition-all duration-300 overflow-hidden ${
         isCollapsed ? 'lg:ml-16' : 'lg:ml-64'
       }`}>
         {/* Header */}
-        <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+        <header className="bg-white dark:bg-gray-800">
           <div className="px-6 py-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <span className="text-xl font-semibold text-gray-900 pt-2 pb-2 pl-2">
-                <Hpe color="#16a34a" />
-              </span>
+              <img src={logo} alt="GreenMatrix Logo" className="w-12" />
               <span className="text-xl font-semibold text-gray-900 dark:text-white pt-1">
-                HPE Panel
+                GreenMatrix Panel
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <Link 
-                to="/workload" 
-                className="px-4 py-2 text-sm font-medium text-green-600 border border-green-600 rounded-lg hover:bg-green-600 hover:text-white transition-colors"
-              >
-                Back to GreenMatrix
-              </Link>
               <button 
                 onClick={toggleDarkMode}
                 className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
@@ -311,152 +368,7 @@ const AdminPage = () => {
                 </div>
               )}
               
-              {/* Error indicator */}
-              {error && (
-                <div className="max-w-6xl mx-auto px-6 mt-6">
-                  <div className="bg-red-50 dark:bg-red-900 rounded-xl shadow-sm border border-red-200 dark:border-red-700 p-6 text-center">
-                    <div className="text-red-600 dark:text-red-300">Error loading data: {error}</div>
-                    <button 
-                      onClick={() => window.location.reload()}
-                      className="mt-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                    >
-                      Retry
-                    </button>
-                  </div>
-                </div>
-              )}
 
-              {/* Date/Week Selection Controls - Only show for dashboard tab */}
-              {activeAdminTab === 'dashboard' && !loading && !error && (
-                <div className="max-w-6xl mx-auto px-6 mt-6">
-                  <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-                    <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                      
-                      {/* View Mode Toggle */}
-                      <div className="flex items-center gap-2">
-                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">View Mode:</label>
-                        <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
-                          <button
-                            onClick={() => {
-                              setViewMode('day');
-                              setSelectedWeek(null);
-                            }}
-                            className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
-                              viewMode === 'day'
-                                ? 'bg-green-600 text-white shadow-sm'
-                                : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-                            }`}
-                          >
-                            Daily View
-                          </button>
-                          <button
-                            onClick={() => {
-                              setViewMode('week');
-                              setSelectedWeek(0);
-                              setSelectedDate('today');
-                            }}
-                            className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
-                              viewMode === 'week'
-                                ? 'bg-green-600 text-white shadow-sm'
-                                : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-                            }`}
-                          >
-                            Weekly View
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Date/Week Selection */}
-                      {viewMode === 'day' ? (
-                        <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-                          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Select Date:</label>
-                          <div className="flex flex-col sm:flex-row gap-2">
-                            <button
-                              onClick={() => {
-                                setSelectedDate('today');
-                                setSelectedCalendarDate(maxDate);
-                              }}
-                              className={`px-4 py-2 text-sm font-medium rounded-lg border transition-all ${
-                                selectedDate === 'today'
-                                  ? 'bg-green-600 text-white border-green-600'
-                                  : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-green-600'
-                              }`}
-                            >
-                              Latest
-                            </button>
-                            <div className="relative">
-                              <DatePicker
-                                selected={selectedCalendarDate}
-                                onChange={handleCalendarDateChange}
-                                minDate={minDate}
-                                maxDate={maxDate}
-                                includeDates={availableDateObjects}
-                                dateFormat="MMM dd, yyyy"
-                                placeholderText="Choose a date..."
-                                className="px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-green-600 focus:border-green-600 w-full sm:w-auto"
-                                calendarClassName="dark:bg-gray-800 dark:border-gray-600"
-                                dayClassName={(date) => 
-                                  availableDates.includes(date.toISOString().split('T')[0])
-                                    ? "hover:bg-green-600 hover:text-white cursor-pointer"
-                                    : "text-gray-300 cursor-not-allowed"
-                                }
-                                customInput={
-                                  <div className="relative cursor-pointer">
-                                    <input
-                                      className="px-4 py-2 pl-10 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-green-600 focus:border-green-600 w-full sm:w-auto cursor-pointer"
-                                      readOnly
-                                    />
-                                    <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                    </svg>
-                                  </div>
-                                }
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-4">
-                          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Select Week:</label>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => setSelectedWeek(0)}
-                              className={`px-4 py-2 text-sm font-medium rounded-lg border transition-all ${
-                                selectedWeek === 0
-                                  ? 'bg-green-600 text-white border-green-600'
-                                  : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-green-600'
-                              }`}
-                            >
-                              Week 1 (Jul 16-22)
-                            </button>
-                            <button
-                              onClick={() => setSelectedWeek(1)}
-                              className={`px-4 py-2 text-sm font-medium rounded-lg border transition-all ${
-                                selectedWeek === 1
-                                  ? 'bg-green-600 text-white border-green-600'
-                                  : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-green-600'
-                              }`}
-                            >
-                              Week 2 (Jul 23-29)
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Current Selection Display */}
-                      <div className="text-sm text-gray-600 dark:text-gray-400">
-                        {viewMode === 'day' ? (
-                          selectedDate === 'today' ? 
-                            `Showing: Latest Data (${new Date(availableDates[availableDates.length - 1]).toLocaleDateString()})` :
-                            `Showing: ${new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}`
-                        ) : (
-                          `Showing: Week ${(selectedWeek || 0) + 1} Average (${selectedWeek === 0 ? '7 days' : '7 days'})`
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {/* Admin Content */}
               <div className="max-w-6xl mx-auto px-6 mt-8 mb-8 flex-1">
@@ -468,6 +380,16 @@ const AdminPage = () => {
                     selectedDate={selectedDate}
                     selectedWeek={selectedWeek}
                     availableDates={availableDates}
+                    setViewMode={setViewMode}
+                    setSelectedDate={setSelectedDate}
+                    setSelectedWeek={setSelectedWeek}
+                    selectedCalendarDate={selectedCalendarDate}
+                    setSelectedCalendarDate={setSelectedCalendarDate}
+                    handleCalendarDateChange={handleCalendarDateChange}
+                    minDate={minDate}
+                    maxDate={maxDate}
+                    availableDateObjects={availableDateObjects}
+                    noDataError={noDataError}
                   />
                 )}
 
@@ -478,6 +400,7 @@ const AdminPage = () => {
                 {activeAdminTab === 'hardware' && (
                   <HardwareTab />
                 )}
+
 
                 {activeAdminTab === 'costs' && (
                   <CostManagementTab />

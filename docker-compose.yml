@@ -53,6 +53,10 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./backend/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
       - ./scripts/create-multiple-postgresql-databases.sh:/docker-entrypoint-initdb.d/02-create-multiple-databases.sh:ro
+      - ./docker-init-data/03-seed-hardware-table.sql:/docker-entrypoint-initdb.d/03-seed-hardware-table.sql:ro
+      - ./docker-init-data/04-seed-model-table.sql:/docker-entrypoint-initdb.d/04-seed-model-table.sql:ro
+      - ./docker-init-data/05-seed-cost-models.sql:/docker-entrypoint-initdb.d/05-seed-cost-models.sql:ro
+      - ./docker-init-data/06-create-empty-tables.sql:/docker-entrypoint-initdb.d/06-create-empty-tables.sql:ro
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     healthcheck:
@@ -232,8 +236,6 @@ services:
       sh -c "
         echo 'Setting up database schema...' &&
         python -c 'from app.database import init_db; init_db()' &&
-        echo 'Seeding cost models...' &&
-        python seed_cost_models.py &&
         echo 'Database setup completed successfully!'
       "
     restart: "no"
