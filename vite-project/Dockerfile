@@ -7,14 +7,17 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production
+# Install dependencies (including devDependencies needed for build)
+RUN npm ci
 
 # Copy source code
 COPY . .
 
+# Fix permissions for vite executable
+RUN chmod +x node_modules/.bin/vite
+
 # Build the application
-RUN npm run build
+RUN npx vite build
 
 # Production stage with nginx
 FROM nginx:alpine as production
@@ -28,10 +31,8 @@ COPY --from=build /app/dist /usr/share/nginx/html
 # Copy nginx configuration
 COPY nginx.conf /etc/nginx/nginx.conf
 
-# Create nginx user and set permissions
-RUN addgroup -g 1001 -S nginx && \
-    adduser -S nginx -u 1001 && \
-    chown -R nginx:nginx /usr/share/nginx/html && \
+# Set permissions (nginx user already exists in nginx:alpine)
+RUN chown -R nginx:nginx /usr/share/nginx/html && \
     chown -R nginx:nginx /var/cache/nginx && \
     chown -R nginx:nginx /var/log/nginx && \
     chown -R nginx:nginx /etc/nginx/conf.d && \

@@ -7,12 +7,11 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# Install system dependencies for GPU monitoring and system access
+# Install system dependencies for system monitoring
 RUN apt-get update && apt-get install -y \
     curl \
     procps \
     lsof \
-    nvidia-ml-py3 \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user for security
