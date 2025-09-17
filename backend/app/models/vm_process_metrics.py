@@ -36,6 +36,24 @@ class VMProcessMetric(Base):
     # Power estimation - same as host_process_metrics
     estimated_power_watts = Column(Float, nullable=True)
     
+    # NEW: VM-level memory information
+    vm_total_ram_gb = Column(Float, nullable=True)
+    vm_available_ram_gb = Column(Float, nullable=True) 
+    vm_used_ram_gb = Column(Float, nullable=True)
+    vm_ram_usage_percent = Column(Float, nullable=True)
+    
+    # NEW: VM-level GPU memory information
+    vm_total_vram_gb = Column(Float, nullable=True)
+    vm_used_vram_gb = Column(Float, nullable=True)
+    vm_free_vram_gb = Column(Float, nullable=True)
+    vm_vram_usage_percent = Column(Float, nullable=True)
+    gpu_count = Column(Integer, nullable=True)
+    gpu_names = Column(Text, nullable=True)  # JSON string of GPU names array
+    
+    # NEW: Overall VM-level utilization metrics (not per-process aggregation)
+    vm_overall_cpu_percent = Column(Float, nullable=True)      # Overall VM CPU usage
+    vm_overall_gpu_utilization = Column(Float, nullable=True)  # Overall VM GPU usage
+    
     def to_dict(self):
         return {
             "timestamp": self.timestamp.isoformat() if self.timestamp else None,
@@ -54,7 +72,21 @@ class VMProcessMetric(Base):
             "open_files": self.open_files,
             "gpu_memory_usage_mb": self.gpu_memory_usage_mb,
             "gpu_utilization_percent": self.gpu_utilization_percent,
-            "estimated_power_watts": self.estimated_power_watts
+            "estimated_power_watts": self.estimated_power_watts,
+            # NEW: VM-level memory fields
+            "vm_total_ram_gb": self.vm_total_ram_gb,
+            "vm_available_ram_gb": self.vm_available_ram_gb,
+            "vm_used_ram_gb": self.vm_used_ram_gb, 
+            "vm_ram_usage_percent": self.vm_ram_usage_percent,
+            "vm_total_vram_gb": self.vm_total_vram_gb,
+            "vm_used_vram_gb": self.vm_used_vram_gb,
+            "vm_free_vram_gb": self.vm_free_vram_gb,
+            "vm_vram_usage_percent": self.vm_vram_usage_percent,
+            "gpu_count": self.gpu_count,
+            "gpu_names": self.gpu_names,
+            # NEW: Overall VM-level utilization metrics
+            "vm_overall_cpu_percent": self.vm_overall_cpu_percent,
+            "vm_overall_gpu_utilization": self.vm_overall_gpu_utilization
         }
     
     def __repr__(self):

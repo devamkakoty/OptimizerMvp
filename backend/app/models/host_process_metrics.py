@@ -6,6 +6,7 @@ Base = declarative_base()
 
 class HostProcessMetric(Base):
     __tablename__ = "host_process_metrics"
+    __table_args__ = {'schema': 'public'}  # TimescaleDB schema
     
     # Composite primary key as per the new schema
     timestamp = Column(TIMESTAMP(timezone=True), primary_key=True, nullable=False)

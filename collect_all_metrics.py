@@ -20,7 +20,7 @@ BACKEND_URL = settings.get('backend_api_url', 'http://localhost:8000')
 API_TIMEOUT = settings.getint('api_request_timeout', 30)
 CPU_TDP_WATTS = settings.getfloat('cpu_tdp_watts', 125.0)
 
-def get_host_process_stats(interval=0.5):
+def get_host_process_stats(interval=2.0):
     """
     Get comprehensive process statistics with improved accuracy for Task Manager compatibility.
     Optimized for faster collection.
@@ -92,6 +92,10 @@ def get_host_process_stats(interval=0.5):
             # Get final CPU percentage
             cpu_percent = proc.cpu_percent(interval=None)
             
+            # Debug: If this is a process we know should have CPU usage, log it
+            if pinfo.get('name') == 'python3' and cpu_percent > 0:
+                print(f"DEBUG: {pinfo.get('name')} (PID {pid}) CPU: {cpu_percent}%")
+            
             # Get I/O stats if available
             try:
                 io_current = proc.io_counters()
@@ -153,11 +157,61 @@ def get_overall_host_metrics():
     # Use non-blocking CPU percent (it will be accurate after the first call)
     cpu_percent = psutil.cpu_percent(interval=None)
     memory_percent = psutil.virtual_memory().percent
-    
+
     metrics = {
         'host_cpu_usage_percent': cpu_percent,
         'host_ram_usage_percent': memory_percent
     }
+
+    # Network I/O metrics
+    try:
+        net_io = psutil.net_io_counters()
+        if net_io:
+            metrics.update({
+                'host_network_bytes_sent': net_io.bytes_sent,
+                'host_network_bytes_received': net_io.bytes_recv,
+                'host_network_packets_sent': net_io.packets_sent,
+                'host_network_packets_received': net_io.packets_recv
+            })
+        else:
+            metrics.update({
+                'host_network_bytes_sent': 0,
+                'host_network_bytes_received': 0,
+                'host_network_packets_sent': 0,
+                'host_network_packets_received': 0
+            })
+    except:
+        metrics.update({
+            'host_network_bytes_sent': 0,
+            'host_network_bytes_received': 0,
+            'host_network_packets_sent': 0,
+            'host_network_packets_received': 0
+        })
+
+    # Disk I/O metrics
+    try:
+        disk_io = psutil.disk_io_counters()
+        if disk_io:
+            metrics.update({
+                'host_disk_read_bytes': disk_io.read_bytes,
+                'host_disk_write_bytes': disk_io.write_bytes,
+                'host_disk_read_count': disk_io.read_count,
+                'host_disk_write_count': disk_io.write_count
+            })
+        else:
+            metrics.update({
+                'host_disk_read_bytes': 0,
+                'host_disk_write_bytes': 0,
+                'host_disk_read_count': 0,
+                'host_disk_write_count': 0
+            })
+    except:
+        metrics.update({
+            'host_disk_read_bytes': 0,
+            'host_disk_write_bytes': 0,
+            'host_disk_read_count': 0,
+            'host_disk_write_count': 0
+        })
     if platform.system() == 'Windows':
         try:
             nvmlInit()
@@ -258,6 +312,7 @@ if __name__ == "__main__":
                     "vm_metrics": [{'timestamp': timestamp, **vm} for vm in vm_metrics] if vm_metrics else []
                 }
                 
+                print(overall_metrics)
                 # Debug: print sample data
                 if host_processes:
                     sample_process = host_processes[0]

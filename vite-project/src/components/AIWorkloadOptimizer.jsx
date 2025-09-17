@@ -7,7 +7,6 @@ import SimulateTab from './SimulateTab';
 import OptimizeTab from './OptimizeTab';
 import ModelTab from './ModelTab';
 import Sidebar from './Sidebar';
-import Breadcrumb from './Breadcrumb';
 
 const AIWorkloadOptimizer = () => {
   const [activeTab, setActiveTab] = useState('simulate');
@@ -55,18 +54,11 @@ const AIWorkloadOptimizer = () => {
 
         {/* Content Area */}
         <div className="flex-1 overflow-auto">
-          {/* Breadcrumb */}
-          <div className="px-6 py-2 bg-white dark:bg-gray-800">
-            <Breadcrumb 
-              activeSection={activeSection}
-              activeTab={activeTab}
-            />
-          </div>
 
           {/* Hero Section */}
           {/* <div className="bg-gradient-to-b from-green-50 to-white dark:from-[#0e2b1a] dark:to-gray-900">
             <div className="max-w-6xl mx-auto px-6 py-12 text-center">
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-[#01a982] to-[#00d4aa] bg-clip-text text-transparent mb-4">
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-emerald-500 to-emerald-400 bg-clip-text text-transparent mb-4">
                 Green Matrix
               </h1>
               <p className="text-lg text-gray-600 dark:text-gray-300">
@@ -89,7 +81,7 @@ const AIWorkloadOptimizer = () => {
                   onClick={() => setActiveTab('simulate')}
                   className={`flex-1 py-4 px-6 text-center font-medium transition-all ${
                     activeTab === 'simulate'
-                      ? 'bg-gradient-to-r from-[#01a982] to-[#00d4aa] text-white'
+                      ? 'bg-gradient-to-r from-emerald-500 to-emerald-400 text-white'
                       : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700'
                   }`}
                 >
@@ -99,7 +91,7 @@ const AIWorkloadOptimizer = () => {
                   onClick={() => setActiveTab('optimize')}
                   className={`flex-1 py-4 px-6 text-center font-medium transition-all ${
                     activeTab === 'optimize'
-                      ? 'bg-gradient-to-r from-[#01a982] to-[#00d4aa] text-white'
+                      ? 'bg-gradient-to-r from-emerald-500 to-emerald-400 text-white'
                       : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700'
                   }`}
                 >
@@ -109,7 +101,7 @@ const AIWorkloadOptimizer = () => {
                   onClick={() => setActiveTab('model')}
                   className={`flex-1 py-4 px-6 text-center font-medium transition-all ${
                     activeTab === 'model'
-                      ? 'bg-gradient-to-r from-[#01a982] to-[#00d4aa] text-white'
+                      ? 'bg-gradient-to-r from-emerald-500 to-emerald-400 text-white'
                       : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700'
                   }`}
                 >

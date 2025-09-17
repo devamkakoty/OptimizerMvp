@@ -5,6 +5,7 @@ from typing import Dict, List, Any, Optional
 from pydantic import BaseModel, Field
 from datetime import datetime, timedelta
 import json
+import logging
 
 from app.database import get_db, get_metrics_db, get_timescaledb, init_db, get_db_stats, check_db_connection
 from controllers.model_controller import ModelController
@@ -19,16 +20,19 @@ from controllers.cost_models_controller import CostModelsController
 from controllers.cost_calculation_engine import CostCalculationEngine
 from controllers.recommendation_engine import RecommendationEngine
 from controllers.vm_process_metrics_controller import VMProcessMetricsController
+from controllers.model_management_controller import ModelManagementController
+from controllers.dashboard_controller import DashboardController
 
 # Pydantic models for request/response validation
 class ModelTypeTaskRequest(BaseModel):
-    model_type: str
+    model_name: str
     task_type: str
 
 class SimulationRequest(BaseModel):
     Model: str
     Framework: str
     Task_Type: str
+    Scenario: Optional[str] = None
     Total_Parameters_Millions: float
     Model_Size_MB: float
     Architecture_type: str
@@ -38,7 +42,13 @@ class SimulationRequest(BaseModel):
     Vocabulary_Size: int
     FFN_Dimension: int
     Activation_Function: str
-    FLOPs: float
+    Number_of_hidden_Layers: Optional[int] = None
+    Number_of_Attention_Layers: Optional[int] = None
+    GFLOPs_Billions: Optional[float] = None
+    # Training-specific fields
+    Batch_Size: Optional[int] = None
+    Input_Size: Optional[int] = None
+    Full_Training: Optional[int] = None
 
 class PostDeploymentRequest(BaseModel):
     # Model characteristics - exact field names as required by pickle model
@@ -61,6 +71,17 @@ class PostDeploymentRequest(BaseModel):
     network_bandwidth: float
     current_hardware_id: str
     
+    # Deployment type field - CRITICAL for VM-level routing
+    deployment_type: str = Field(default='bare-metal')
+    
+    # VM-level specific fields (optional, only used when deployment_type='vm-level')
+    vm_name: Optional[str] = None
+    vm_total_ram_gb: Optional[str] = None
+    vm_total_vram_gb: Optional[str] = None
+    vm_ram_usage_percent: Optional[float] = None
+    vm_vram_usage_percent: Optional[float] = None
+    vm_gpu_count: Optional[int] = None
+    
     class Config:
         allow_population_by_field_name = True
 
@@ -81,14 +102,6 @@ class MetricsBatchRequest(BaseModel):
     metrics_data: List[MetricsDataRequest]
 
 # New Pydantic models for VM and Host Process metrics
-class VMMetricsRequest(BaseModel):
-    timestamp: Optional[datetime] = None
-    VMName: str
-    CPUUsage: Optional[int] = None
-    AverageMemoryUsage: Optional[int] = None
-
-class VMMetricsBatchRequest(BaseModel):
-    vm_metrics: List[VMMetricsRequest]
 
 class HostProcessMetricsRequest(BaseModel):
     timestamp: Optional[datetime] = None
@@ -107,9 +120,13 @@ class HostProcessMetricsBatchRequest(BaseModel):
 # Hardware Specifications Pydantic models
 class HardwareSpecsRequest(BaseModel):
     timestamp: Optional[datetime] = None
+    
+    # Operating System Information
     os_name: str
     os_version: str
     os_architecture: str
+    
+    # CPU Information (required fields)
     cpu_brand: str
     cpu_model: str
     cpu_family: Optional[int] = None
@@ -119,13 +136,32 @@ class HardwareSpecsRequest(BaseModel):
     cpu_sockets: int
     cpu_cores_per_socket: int
     cpu_threads_per_core: float
+    
+    # Additional CPU fields that script collects (optional)
+    cpu_base_clock_ghz: Optional[float] = None
+    cpu_max_frequency_ghz: Optional[float] = None
+    l1_cache: Optional[int] = None
+    cpu_power_consumption: Optional[int] = None
+    
+    # Memory and Storage
     total_ram_gb: float
     total_storage_gb: float
+    
+    # GPU Information (all optional)
     gpu_cuda_cores: Optional[str] = None
     gpu_brand: Optional[str] = None
     gpu_model: Optional[str] = None
     gpu_driver_version: Optional[str] = None
     gpu_vram_total_mb: Optional[float] = None
+    
+    # Additional GPU fields that script collects (optional)
+    num_gpu: Optional[int] = None
+    gpu_graphics_clock: Optional[float] = None
+    gpu_memory_clock: Optional[float] = None
+    gpu_sm_cores: Optional[int] = None
+    gpu_power_consumption: Optional[int] = None
+    
+    # Other fields
     region: Optional[str] = 'US'
 
 class HardwareSpecsBatchRequest(BaseModel):
@@ -138,6 +174,14 @@ class OverallHostMetricsRequest(BaseModel):
     host_gpu_memory_utilization_percent: Optional[float] = 0
     host_gpu_temperature_celsius: Optional[float] = 0
     host_gpu_power_draw_watts: Optional[float] = 0
+    host_network_bytes_sent: Optional[int] = 0
+    host_network_bytes_received: Optional[int] = 0
+    host_network_packets_sent: Optional[int] = 0
+    host_network_packets_received: Optional[int] = 0
+    host_disk_read_bytes: Optional[int] = 0
+    host_disk_write_bytes: Optional[int] = 0
+    host_disk_read_count: Optional[int] = 0
+    host_disk_write_count: Optional[int] = 0
 
 class HostProcessRequest(BaseModel):
     timestamp: str
@@ -185,13 +229,13 @@ class ModelOptimizationRequest(BaseModel):
     Framework: str
     Total_Parameters_Millions: float
     Model_Size_MB: float
-    Architecture_type: str
-    Model_Type: str
-    Number_of_hidden_Layers: int
-    Precision: str
-    Vocabulary_Size: int
-    Number_of_Attention_Layers: int
-    Activation_Function: str
+    Architecture_type: Optional[str] = ""
+    Model_Type: Optional[str] = ""
+    Number_of_hidden_Layers: Optional[int] = 0
+    Precision: Optional[str] = "FP32"
+    Vocabulary_Size: Optional[int] = 0
+    Number_of_Attention_Layers: Optional[int] = 0
+    Activation_Function: Optional[str] = ""
 
 # Cost Management Pydantic models
 class CostModelRequest(BaseModel):
@@ -233,10 +277,65 @@ class VMProcessMetricRequest(BaseModel):
     estimated_power_watts: Optional[float] = 0
     vm_name: str
 
+class VMMemoryInfoRequest(BaseModel):
+    vm_total_ram_gb: float
+    vm_available_ram_gb: float
+    vm_used_ram_gb: float
+    vm_ram_usage_percent: float
+
+class VMGPUInfoRequest(BaseModel):
+    vm_total_vram_gb: float
+    vm_used_vram_gb: float
+    vm_free_vram_gb: float
+    vm_vram_usage_percent: float
+    gpu_count: int
+    gpu_names: List[str]
+
 class VMSnapshotRequest(BaseModel):
     timestamp: str
     vm_name: str
     process_metrics: List[VMProcessMetricRequest]
+    agent_version: Optional[str] = None
+    platform: Optional[str] = None
+    metrics_count: Optional[int] = None
+    # NEW: VM-level memory information
+    vm_memory_info: Optional[VMMemoryInfoRequest] = None
+    vm_gpu_info: Optional[VMGPUInfoRequest] = None
+
+# AI Model Management Pydantic models
+class ModelCreateRequest(BaseModel):
+    model_name: str
+    framework: str
+    task_type: str
+    total_parameters_millions: Optional[float] = None
+    model_size_mb: Optional[float] = None
+    architecture_type: Optional[str] = None
+    model_type: Optional[str] = None
+    number_of_hidden_layers: Optional[int] = None
+    embedding_vector_dimension: Optional[int] = None
+    precision: Optional[str] = None
+    vocabulary_size: Optional[int] = None
+    ffn_dimension: Optional[int] = None
+    activation_function: Optional[str] = None
+    gflops_billions: Optional[float] = None
+    number_of_attention_layers: Optional[int] = None
+
+class ModelUpdateRequest(BaseModel):
+    model_name: Optional[str] = None
+    framework: Optional[str] = None
+    task_type: Optional[str] = None
+    total_parameters_millions: Optional[float] = None
+    model_size_mb: Optional[float] = None
+    architecture_type: Optional[str] = None
+    model_type: Optional[str] = None
+    number_of_hidden_layers: Optional[int] = None
+    embedding_vector_dimension: Optional[int] = None
+    precision: Optional[str] = None
+    vocabulary_size: Optional[int] = None
+    ffn_dimension: Optional[int] = None
+    activation_function: Optional[str] = None
+    gflops_billions: Optional[float] = None
+    number_of_attention_layers: Optional[int] = None
     agent_version: Optional[str] = None
     platform: Optional[str] = None
     metrics_count: Optional[int] = None
@@ -257,6 +356,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Initialize logger
+logger = logging.getLogger(__name__)
+
 # Initialize controllers
 model_controller = ModelController()
 hardware_controller = HardwareInfoController()
@@ -270,6 +372,7 @@ cost_models_controller = CostModelsController()
 cost_calculation_engine = CostCalculationEngine()
 recommendation_engine = RecommendationEngine()
 vm_process_metrics_controller = VMProcessMetricsController()
+dashboard_controller = DashboardController()
 
 # Startup and shutdown events
 @app.on_event("startup")
@@ -320,9 +423,9 @@ async def get_model_data(
     db: Session = Depends(get_db)
 ):
     """Get model data based on model type and task type"""
-    result = model_controller.get_model_by_type_and_task(
+    result = model_controller.get_model_by_name_and_task(
         db, 
-        request.model_type, 
+        request.model_name, 
         request.task_type
     )
     
@@ -334,14 +437,25 @@ async def get_model_data(
 @app.post("/api/model/simulate-performance", response_model=Dict[str, Any])
 async def simulate_performance(
     request: SimulationRequest,
+    limit_results: Optional[int] = None,
     db: Session = Depends(get_db)
 ):
-    """Simulate performance and return top 3 performing hardware configurations"""
+    """Simulate performance and return hardware configurations
+    
+    Args:
+        request: Model simulation parameters
+        limit_results: Optional limit for results (None = all results, 3 = top 3 for recommendations)
+        db: Database session
+    """
+    # Use GFLOPs_Billions value
+    flops_value = request.GFLOPs_Billions
+    
     # Convert Pydantic model to dict for the controller
     user_input = {
         'Model': request.Model,
         'Framework': request.Framework,
         'Task Type': request.Task_Type,
+        'Scenario': request.Scenario,
         'Total Parameters (Millions)': request.Total_Parameters_Millions,
         'Model Size (MB)': request.Model_Size_MB,
         'Architecture type': request.Architecture_type,
@@ -351,10 +465,72 @@ async def simulate_performance(
         'Vocabulary Size': request.Vocabulary_Size,
         'FFN (MLP) Dimension': request.FFN_Dimension,
         'Activation Function': request.Activation_Function,
-        'FLOPs': request.FLOPs
+        'Number of hidden Layers': request.Number_of_hidden_Layers,
+        'Number of Attention Layers': request.Number_of_Attention_Layers,
+        'GFLOPs (Billions)': flops_value
     }
     
-    result = model_controller.simulate_performance(db, user_input)
+    # Add Training-specific fields if provided
+    if request.Task_Type == 'Training':
+        if request.Batch_Size is not None:
+            user_input['Batch Size'] = request.Batch_Size
+        if request.Input_Size is not None:
+            user_input['Input Size'] = request.Input_Size
+        if request.Full_Training is not None:
+            user_input['Full Training'] = request.Full_Training
+    
+    result = model_controller.simulate_performance(db, user_input, limit_results)
+    
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    
+    return result
+
+@app.post("/api/model/recommend-hardware", response_model=Dict[str, Any])
+async def recommend_hardware(
+    request: SimulationRequest,
+    top_n: Optional[int] = 3,
+    db: Session = Depends(get_db)
+):
+    """Get top N hardware recommendations for a model (default: top 3)
+    
+    This is a convenience endpoint that calls simulate-performance with result limiting.
+    Used by the Recommend Hardware tab for pre-deployment recommendations.
+    """
+    # Use GFLOPs_Billions value
+    flops_value = request.GFLOPs_Billions
+    
+    # Convert Pydantic model to dict for the controller
+    user_input = {
+        'Model': request.Model,
+        'Framework': request.Framework,
+        'Task Type': request.Task_Type,
+        'Scenario': request.Scenario,
+        'Total Parameters (Millions)': request.Total_Parameters_Millions,
+        'Model Size (MB)': request.Model_Size_MB,
+        'Architecture type': request.Architecture_type,
+        'Model Type': request.Model_Type,
+        'Embedding Vector Dimension (Hidden Size)': request.Embedding_Vector_Dimension,
+        'Precision': request.Precision,
+        'Vocabulary Size': request.Vocabulary_Size,
+        'FFN (MLP) Dimension': request.FFN_Dimension,
+        'Activation Function': request.Activation_Function,
+        'Number of hidden Layers': request.Number_of_hidden_Layers,
+        'Number of Attention Layers': request.Number_of_Attention_Layers,
+        'GFLOPs (Billions)': flops_value
+    }
+    
+    # Add Training-specific fields if provided
+    if request.Task_Type == 'Training':
+        if request.Batch_Size is not None:
+            user_input['Batch Size'] = request.Batch_Size
+        if request.Input_Size is not None:
+            user_input['Input Size'] = request.Input_Size
+        if request.Full_Training is not None:
+            user_input['Full Training'] = request.Full_Training
+    
+    # Call simulation with result limiting for recommendations
+    result = model_controller.simulate_performance(db, user_input, limit_results=top_n)
     
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
@@ -405,6 +581,40 @@ async def get_available_models():
     """Get information about available loaded models"""
     result = model_inference_controller.get_available_models()
     return result
+
+@app.get("/api/model/unique-names", response_model=Dict[str, Any])
+async def get_unique_model_names(db: Session = Depends(get_db)):
+    """Get all unique model names from Model_table for dropdown"""
+    try:
+        from app.models import ModelInfo
+        
+        # Get unique model names
+        unique_names = db.query(ModelInfo.model_name).distinct().all()
+        model_names = [name[0] for name in unique_names if name[0]]
+        
+        return {
+            "status": "success",
+            "model_names": sorted(model_names)
+        }
+    except Exception as e:
+        return {"status": "error", "message": f"Failed to fetch model names: {str(e)}"}
+
+@app.get("/api/model/unique-task-types", response_model=Dict[str, Any])
+async def get_unique_task_types(db: Session = Depends(get_db)):
+    """Get all unique task types from Model_table for dropdown"""
+    try:
+        from app.models import ModelInfo
+        
+        # Get unique task types
+        unique_types = db.query(ModelInfo.task_type).distinct().all()
+        task_types = [type_[0] for type_ in unique_types if type_[0]]
+        
+        return {
+            "status": "success",
+            "task_types": sorted(task_types)
+        }
+    except Exception as e:
+        return {"status": "error", "message": f"Failed to fetch task types: {str(e)}"}
 
 @app.post("/api/model/reload-models", response_model=Dict[str, Any])
 async def reload_models():
@@ -508,6 +718,50 @@ async def populate_hardware_database(
     result = hardware_controller.populate_hardware_database(db, csv_data)
     
     if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    
+    return result
+
+@app.post("/api/hardware/", response_model=Dict[str, Any])
+async def create_hardware(
+    hardware_data: Dict[str, Any] = Body(...),
+    db: Session = Depends(get_db)
+):
+    """Create a new hardware configuration"""
+    result = hardware_controller.create_hardware(db, hardware_data)
+    
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    
+    return result
+
+@app.put("/api/hardware/{hardware_id}", response_model=Dict[str, Any])
+async def update_hardware(
+    hardware_id: int,
+    hardware_data: Dict[str, Any] = Body(...),
+    db: Session = Depends(get_db)
+):
+    """Update an existing hardware configuration"""
+    result = hardware_controller.update_hardware(db, hardware_id, hardware_data)
+    
+    if "error" in result:
+        if "not found" in result["error"].lower():
+            raise HTTPException(status_code=404, detail=result["error"])
+        raise HTTPException(status_code=400, detail=result["error"])
+    
+    return result
+
+@app.delete("/api/hardware/{hardware_id}", response_model=Dict[str, Any])
+async def delete_hardware(
+    hardware_id: int,
+    db: Session = Depends(get_db)
+):
+    """Delete a hardware configuration"""
+    result = hardware_controller.delete_hardware(db, hardware_id)
+    
+    if "error" in result:
+        if "not found" in result["error"].lower():
+            raise HTTPException(status_code=404, detail=result["error"])
         raise HTTPException(status_code=400, detail=result["error"])
     
     return result
@@ -676,61 +930,54 @@ async def post_deployment_optimization(
     db: Session = Depends(get_db)
 ):
     """
-    Unified endpoint for both pre-deployment and post-deployment hardware optimization.
+    Post-deployment hardware optimization endpoint.
     
-    Pre-deployment: Uses workload parameters to recommend hardware configurations
-    Post-deployment: Uses resource metrics and runtime parameters to optimize existing deployment
-    
-    Determines workflow type based on provided parameters:
-    - If resource metrics are provided: Post-deployment optimization
-    - If only workload parameters are provided: Pre-deployment optimization
+    Supports both bare-metal and VM-level deployment optimization.
+    Uses deployment_type field to determine which optimization path to take.
     """
     try:
-        # Determine if this is post-deployment (always true now since we have the required fields)
-        is_post_deployment = True
+        # Convert Pydantic request to dict with all fields
+        optimization_input = {
+            # Model characteristics (using field aliases for ML model compatibility)
+            "Model Name": request.model_name,
+            "Framework": request.framework,
+            "Total Parameters (Millions)": request.parameters_millions,
+            "Model Size (MB)": request.model_size_mb,
+            "Architecture type": request.architecture_type,
+            "Model Type": request.model_type,
+            "Precision": request.precision,
+            "Vocabulary Size": request.vocabulary_size,
+            "Activation Function": request.activation_function,
+            
+            # Resource metrics
+            "gpu_memory_usage": request.gpu_memory_usage,
+            "cpu_memory_usage": request.cpu_memory_usage,
+            "cpu_utilization": request.cpu_utilization,
+            "gpu_utilization": request.gpu_utilization,
+            "disk_iops": request.disk_iops,
+            "network_bandwidth": request.network_bandwidth,
+            "current_hardware_id": request.current_hardware_id,
+            
+            # CRITICAL: deployment_type for routing
+            "deployment_type": request.deployment_type
+        }
         
-        if is_post_deployment:
-            # Post-deployment workflow - pass the request data directly to the controller
-            request_data = {
-                "workflow_type": "post_deployment",
-                # Pass all the new fields directly as they match the pickle model format
-                "model_name": request.model_name,
-                "framework": request.framework,
-                "parameters_millions": request.parameters_millions,
-                "model_size_mb": request.model_size_mb,
-                "architecture_type": request.architecture_type,
-                "model_type": request.model_type,
-                "precision": request.precision,
-                "vocabulary_size": request.vocabulary_size,
-                "activation_function": request.activation_function,
-                "gpu_memory_usage": request.gpu_memory_usage,
-                "cpu_memory_usage": request.cpu_memory_usage,
-                "cpu_utilization": request.cpu_utilization,
-                "gpu_utilization": request.gpu_utilization,
-                "disk_iops": request.disk_iops,
-                "network_bandwidth": request.network_bandwidth,
-                "current_hardware_id": request.current_hardware_id
-            }
-        else:
-            # Pre-deployment workflow
-            request_data = {
-                "workflow_type": "pre_deployment",
-                "workload_parameters": {
-                    "model_type": request.model_type,
-                    "framework": request.framework,
-                    "task_type": request.task_type,
-                    "model_size_mb": request.model_size_mb,
-                    "parameters_millions": request.parameters_millions,
-                    "flops_billions": request.flops_billions,
-                    "batch_size": request.batch_size,
-                    "latency_requirement_ms": request.latency_requirement_ms,
-                    "throughput_requirement_qps": request.throughput_requirement_qps,
-                    "target_fp16_performance": request.target_fp16_performance,
-                    "optimization_priority": request.optimization_priority
-                }
-            }
+        # Add VM-level specific fields if they exist
+        if request.vm_name:
+            optimization_input["vm_name"] = request.vm_name
+        if request.vm_total_ram_gb:
+            optimization_input["vm_total_ram_gb"] = request.vm_total_ram_gb
+        if request.vm_total_vram_gb:
+            optimization_input["vm_total_vram_gb"] = request.vm_total_vram_gb
+        if request.vm_ram_usage_percent is not None:
+            optimization_input["vm_ram_usage_percent"] = request.vm_ram_usage_percent
+        if request.vm_vram_usage_percent is not None:
+            optimization_input["vm_vram_usage_percent"] = request.vm_vram_usage_percent
+        if request.vm_gpu_count is not None:
+            optimization_input["vm_gpu_count"] = request.vm_gpu_count
         
-        result = model_controller.hardware_optimization(db, request_data)
+        # Use the correct controller for post-deployment optimization
+        result = model_inference_controller.get_post_deployment_optimization(db, optimization_input)
         
         if "error" in result:
             raise HTTPException(status_code=400, detail=result["error"])
@@ -738,88 +985,11 @@ async def post_deployment_optimization(
         return result
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Hardware optimization failed: {str(e)}") 
+        logger.error(f"Post-deployment optimization failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Post-deployment optimization failed: {str(e)}") 
 
-# VM Metrics endpoints
-@app.post("/api/vm-metrics/push")
-def push_vm_metrics(vm_metrics: VMMetricsRequest, db: Session = Depends(get_metrics_db)):
-    """Push VM metrics data to database"""
-    return vm_metrics_controller.push_vm_metrics(db, vm_metrics.dict())
 
-@app.post("/api/vm-metrics/push-batch")
-def push_vm_metrics_batch(vm_metrics_batch: VMMetricsBatchRequest, db: Session = Depends(get_metrics_db)):
-    """Push a batch of VM metrics data to database"""
-    vm_metrics_list = [metrics.dict() for metrics in vm_metrics_batch.vm_metrics]
-    return vm_metrics_controller.push_vm_metrics_batch(db, vm_metrics_list)
 
-@app.get("/api/vm-metrics")
-def get_vm_metrics(
-    vm_name: Optional[str] = None,
-    start_time: Optional[str] = None,
-    end_time: Optional[str] = None,
-    time_filter: Optional[str] = None,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
-    start_time_str: Optional[str] = None,
-    end_time_str: Optional[str] = None,
-    limit: int = 1000,
-    db: Session = Depends(get_metrics_db)
-):
-    """Get VM metrics data with optional filters, time-based filtering, and date range filtering"""
-    # Parse datetime strings
-    start_dt = None
-    end_dt = None
-    
-    if start_time:
-        try:
-            start_dt = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
-        except ValueError:
-            return {"error": "Invalid start_time format. Use ISO format (YYYY-MM-DDTHH:MM:SS)"}
-    
-    if end_time:
-        try:
-            end_dt = datetime.fromisoformat(end_time.replace('Z', '+00:00'))
-        except ValueError:
-            return {"error": "Invalid end_time format. Use ISO format (YYYY-MM-DDTHH:MM:SS)"}
-    
-    return vm_metrics_controller.get_vm_metrics(
-        db, vm_name=vm_name, start_time=start_dt, end_time=end_dt, time_filter=time_filter,
-        start_date=start_date, end_date=end_date, start_time_str=start_time_str, end_time_str=end_time_str, limit=limit
-    )
-
-@app.get("/api/vm-metrics/summary")
-def get_vm_metrics_summary(
-    vm_name: Optional[str] = None,
-    start_time: Optional[str] = None,
-    end_time: Optional[str] = None,
-    time_filter: Optional[str] = None,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
-    start_time_str: Optional[str] = None,
-    end_time_str: Optional[str] = None,
-    db: Session = Depends(get_metrics_db)
-):
-    """Get summary statistics for VM metrics with time-based filtering and date range filtering"""
-    # Parse datetime strings
-    start_dt = None
-    end_dt = None
-    
-    if start_time:
-        try:
-            start_dt = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
-        except ValueError:
-            return {"error": "Invalid start_time format. Use ISO format (YYYY-MM-DDTHH:MM:SS)"}
-    
-    if end_time:
-        try:
-            end_dt = datetime.fromisoformat(end_time.replace('Z', '+00:00'))
-        except ValueError:
-            return {"error": "Invalid end_time format. Use ISO format (YYYY-MM-DDTHH:MM:SS)"}
-    
-    return vm_metrics_controller.get_vm_metrics_summary(
-        db, vm_name=vm_name, start_time=start_dt, end_time=end_dt, time_filter=time_filter,
-        start_date=start_date, end_date=end_date, start_time_str=start_time_str, end_time_str=end_time_str
-    )
 
 # Host Process Metrics endpoints
 @app.post("/api/host-process-metrics/push")
@@ -938,27 +1108,6 @@ async def get_metrics_by_time_filter(
     
     return result
 
-@app.get("/api/vm-metrics/by-time-filter")
-def get_vm_metrics_by_time_filter(
-    time_filter: str = 'daily',
-    vm_name: Optional[str] = None,
-    group_by_vm: bool = True,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
-    start_time_str: Optional[str] = None,
-    end_time_str: Optional[str] = None,
-    db: Session = Depends(get_metrics_db)
-):
-    """Get VM metrics aggregated by time filter (daily, weekly, monthly) or date range"""
-    result = vm_metrics_controller.get_vm_metrics_by_time_filter(
-        db, time_filter=time_filter, vm_name=vm_name, group_by_vm=group_by_vm,
-        start_date=start_date, end_date=end_date, start_time_str=start_time_str, end_time_str=end_time_str
-    )
-    
-    if not result.get("success", False):
-        raise HTTPException(status_code=500, detail=result.get("message", "Unknown error"))
-    
-    return result
 
 @app.get("/api/host-process-metrics/by-time-filter")
 def get_host_process_metrics_by_time_filter(
@@ -990,16 +1139,6 @@ def push_hardware_specs_simple(hardware_specs: HardwareSpecsRequest, db: Session
     """Push hardware specifications data to database (simple endpoint for collect_hardware_specs.py)"""
     return hardware_specs_controller.push_hardware_specs(db, hardware_specs.dict())
 
-@app.post("/api/hardware-specs/push")
-def push_hardware_specs(hardware_specs: HardwareSpecsRequest, db: Session = Depends(get_metrics_db)):
-    """Push hardware specifications data to database"""
-    return hardware_specs_controller.push_hardware_specs(db, hardware_specs.dict())
-
-@app.post("/api/hardware-specs/push-batch")
-def push_hardware_specs_batch(hardware_specs_batch: HardwareSpecsBatchRequest, db: Session = Depends(get_metrics_db)):
-    """Push a batch of hardware specifications data to database"""
-    hardware_specs_list = [specs.dict() for specs in hardware_specs_batch.hardware_specs]
-    return hardware_specs_controller.push_hardware_specs_batch(db, hardware_specs_list)
 
 @app.get("/api/hardware-specs")
 def get_hardware_specs(
@@ -1039,41 +1178,6 @@ def get_hardware_specs(
         start_date=start_date, end_date=end_date, start_time_str=start_time_str, end_time_str=end_time_str, limit=limit
     )
 
-@app.get("/api/hardware-specs/summary")
-def get_hardware_specs_summary(
-    cpu_brand: Optional[str] = None,
-    gpu_brand: Optional[str] = None,
-    start_time: Optional[str] = None,
-    end_time: Optional[str] = None,
-    time_filter: Optional[str] = None,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
-    start_time_str: Optional[str] = None,
-    end_time_str: Optional[str] = None,
-    db: Session = Depends(get_metrics_db)
-):
-    """Get summary statistics for hardware specifications with time-based filtering and date range filtering"""
-    # Parse datetime strings
-    start_dt = None
-    end_dt = None
-    
-    if start_time:
-        try:
-            start_dt = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
-        except ValueError:
-            return {"error": "Invalid start_time format. Use ISO format (YYYY-MM-DDTHH:MM:SS)"}
-    
-    if end_time:
-        try:
-            end_dt = datetime.fromisoformat(end_time.replace('Z', '+00:00'))
-        except ValueError:
-            return {"error": "Invalid end_time format. Use ISO format (YYYY-MM-DDTHH:MM:SS)"}
-    
-    return hardware_specs_controller.get_hardware_specs_summary(
-        db, cpu_brand=cpu_brand, gpu_brand=gpu_brand,
-        start_time=start_dt, end_time=end_dt, time_filter=time_filter,
-        start_date=start_date, end_date=end_date, start_time_str=start_time_str, end_time_str=end_time_str
-    )
 
 @app.get("/api/hardware-specs/latest")
 def get_latest_hardware_specs(
@@ -1083,28 +1187,6 @@ def get_latest_hardware_specs(
     """Get the latest hardware specifications for a specific hardware or all"""
     return hardware_specs_controller.get_latest_hardware_specs(db, hardware_id=hardware_id)
 
-@app.get("/api/hardware-specs/by-time-filter")
-def get_hardware_specs_by_time_filter(
-    time_filter: str = 'daily',
-    cpu_brand: Optional[str] = None,
-    gpu_brand: Optional[str] = None,
-    group_by_cpu: bool = True,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
-    start_time_str: Optional[str] = None,
-    end_time_str: Optional[str] = None,
-    db: Session = Depends(get_metrics_db)
-):
-    """Get hardware specifications aggregated by time filter (daily, weekly, monthly) or date range"""
-    result = hardware_specs_controller.get_hardware_specs_by_time_filter(
-        db, time_filter=time_filter, cpu_brand=cpu_brand, gpu_brand=gpu_brand, group_by_cpu=group_by_cpu,
-        start_date=start_date, end_date=end_date, start_time_str=start_time_str, end_time_str=end_time_str
-    )
-    
-    if not result.get("success", False):
-        raise HTTPException(status_code=500, detail=result.get("message", "Unknown error"))
-    
-    return result
 
 # Metrics Snapshot endpoint for collect_all_metrics.py
 @app.post("/api/metrics/snapshot")
@@ -1119,7 +1201,15 @@ def push_metrics_snapshot(snapshot: MetricsSnapshotRequest, db: Session = Depend
             "host_gpu_utilization_percent": snapshot.overall_host_metrics.host_gpu_utilization_percent,
             "host_gpu_memory_utilization_percent": snapshot.overall_host_metrics.host_gpu_memory_utilization_percent,
             "host_gpu_temperature_celsius": snapshot.overall_host_metrics.host_gpu_temperature_celsius,
-            "host_gpu_power_draw_watts": snapshot.overall_host_metrics.host_gpu_power_draw_watts
+            "host_gpu_power_draw_watts": snapshot.overall_host_metrics.host_gpu_power_draw_watts,
+            "host_network_bytes_sent": snapshot.overall_host_metrics.host_network_bytes_sent,
+            "host_network_bytes_received": snapshot.overall_host_metrics.host_network_bytes_received,
+            "host_network_packets_sent": snapshot.overall_host_metrics.host_network_packets_sent,
+            "host_network_packets_received": snapshot.overall_host_metrics.host_network_packets_received,
+            "host_disk_read_bytes": snapshot.overall_host_metrics.host_disk_read_bytes,
+            "host_disk_write_bytes": snapshot.overall_host_metrics.host_disk_write_bytes,
+            "host_disk_read_count": snapshot.overall_host_metrics.host_disk_read_count,
+            "host_disk_write_count": snapshot.overall_host_metrics.host_disk_write_count
         }
         
         overall_metrics_result = host_overall_metrics_controller.push_host_overall_metrics(db, overall_metrics_data)
@@ -1489,7 +1579,7 @@ async def get_vm_recommendations(
     time_range_days: int = 7,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
-    db: Session = Depends(get_metrics_db)
+    db: Session = Depends(get_timescaledb)
 ):
     """Get performance and cost optimization recommendations for a specific VM"""
     try:
@@ -1511,7 +1601,7 @@ async def get_vm_analysis(
     time_range_days: int = 7,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
-    db: Session = Depends(get_metrics_db)
+    db: Session = Depends(get_timescaledb)
 ):
     """Get detailed resource consumption analysis for a specific VM"""
     try:
@@ -1565,10 +1655,29 @@ async def receive_vm_snapshot(
         
         # Convert process metrics to the format expected by the controller
         metrics_batch = []
+        
+        # Extract VM-level memory information
+        vm_memory_info = {}
+        vm_gpu_info = {}
+        
+        if request.vm_memory_info:
+            vm_memory_info = request.vm_memory_info.dict()
+        
+        if request.vm_gpu_info:
+            vm_gpu_info = request.vm_gpu_info.dict()
+            # Convert gpu_names list to JSON string for storage
+            import json
+            vm_gpu_info['gpu_names'] = json.dumps(vm_gpu_info.get('gpu_names', []))
+        
         for process_metric in request.process_metrics:
             metric_data = process_metric.dict()
             # Ensure vm_name is set correctly
             metric_data['vm_name'] = request.vm_name
+            
+            # Add VM-level memory information to each process metric record
+            metric_data.update(vm_memory_info)
+            metric_data.update(vm_gpu_info)
+            
             metrics_batch.append(metric_data)
         
         # Store metrics in TimescaleDB
@@ -1647,6 +1756,45 @@ async def get_active_vms(
         logger.error(f"Error getting active VMs: {e}")
         raise HTTPException(status_code=500, detail=f"Error getting active VMs: {str(e)}")
 
+@app.get("/api/v1/metrics/vms/active-with-memory", response_model=Dict[str, Any])
+async def get_active_vms_with_memory(
+    db: Session = Depends(get_timescaledb)
+):
+    """Get list of all active VMs with their RAM and VRAM information for optimization"""
+    try:
+        result = vm_process_metrics_controller.get_active_vms_with_memory_info(db)
+        
+        if result['success']:
+            return result
+        else:
+            raise HTTPException(status_code=500, detail=result.get('error', 'Failed to get active VMs with memory info'))
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting active VMs with memory info: {e}")
+        raise HTTPException(status_code=500, detail=f"Error getting active VMs with memory info: {str(e)}")
+
+@app.get("/api/v1/metrics/vm/{vm_name}/latest", response_model=Dict[str, Any])
+async def get_vm_latest_metrics(
+    vm_name: str,
+    db: Session = Depends(get_timescaledb)
+):
+    """Get the latest aggregated metrics for a specific VM"""
+    try:
+        result = vm_process_metrics_controller.get_vm_latest_metrics(db, vm_name)
+        
+        if result['success']:
+            return result
+        else:
+            raise HTTPException(status_code=404, detail=result.get('error', 'VM latest metrics not found'))
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting VM latest metrics: {e}")
+        raise HTTPException(status_code=500, detail=f"Error getting VM latest metrics: {str(e)}")
+
 @app.get("/api/v1/metrics/vm/{vm_name}/summary", response_model=Dict[str, Any])
 async def get_vm_summary(
     vm_name: str,
@@ -1718,6 +1866,137 @@ async def get_vm_processes(
         raise HTTPException(status_code=500, detail=f"Error getting VM processes: {str(e)}")
 
 # Host Overall Metrics endpoints
+# ==============================
+# AI Model Management API Endpoints
+# ==============================
+
+@app.get("/api/model-management/", response_model=Dict[str, Any])
+def get_all_models(db: Session = Depends(get_db)):
+    """Get all AI models"""
+    try:
+        controller = ModelManagementController()
+        result = controller.get_all_models(db)
+        
+        if result["status"] == "success":
+            return {
+                "success": True,
+                "models": result["model_list"],
+                "total_count": result["total_count"]
+            }
+        else:
+            raise HTTPException(status_code=500, detail=result["message"])
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch models: {str(e)}")
+
+@app.get("/api/model-management/{model_id}", response_model=Dict[str, Any])
+def get_model_by_id(model_id: int, db: Session = Depends(get_db)):
+    """Get a specific AI model by ID"""
+    try:
+        controller = ModelManagementController()
+        result = controller.get_model_by_id(db, model_id)
+        
+        if result["status"] == "success":
+            return {
+                "success": True,
+                "model": result["model_data"]
+            }
+        else:
+            raise HTTPException(status_code=404, detail=result["message"])
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch model: {str(e)}")
+
+@app.post("/api/model-management/", response_model=Dict[str, Any])
+def create_model(model_data: ModelCreateRequest, db: Session = Depends(get_db)):
+    """Create a new AI model"""
+    try:
+        controller = ModelManagementController()
+        result = controller.create_model(db, model_data.dict())
+        
+        if result["status"] == "success":
+            return {
+                "success": True,
+                "message": result["message"],
+                "model": result["model_data"]
+            }
+        else:
+            raise HTTPException(status_code=400, detail=result["message"])
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create model: {str(e)}")
+
+@app.put("/api/model-management/{model_id}", response_model=Dict[str, Any])
+def update_model(model_id: int, model_data: ModelUpdateRequest, db: Session = Depends(get_db)):
+    """Update an existing AI model"""
+    try:
+        controller = ModelManagementController()
+        # Only include non-None fields in the update
+        update_data = {k: v for k, v in model_data.dict().items() if v is not None}
+        result = controller.update_model(db, model_id, update_data)
+        
+        if result["status"] == "success":
+            return {
+                "success": True,
+                "message": result["message"],
+                "model": result["model_data"]
+            }
+        else:
+            raise HTTPException(status_code=404, detail=result["message"])
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update model: {str(e)}")
+
+@app.delete("/api/model-management/{model_id}", response_model=Dict[str, Any])
+def delete_model(model_id: int, db: Session = Depends(get_db)):
+    """Delete an AI model"""
+    try:
+        controller = ModelManagementController()
+        result = controller.delete_model(db, model_id)
+        
+        if result["status"] == "success":
+            return {
+                "success": True,
+                "message": result["message"],
+                "deleted_model": result["deleted_model"]
+            }
+        else:
+            raise HTTPException(status_code=404, detail=result["message"])
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete model: {str(e)}")
+
+@app.get("/api/model-management/search/{search_query}", response_model=Dict[str, Any])
+def search_models(search_query: str, db: Session = Depends(get_db)):
+    """Search AI models by name, framework, or task type"""
+    try:
+        controller = ModelManagementController()
+        result = controller.search_models(db, search_query)
+        
+        if result["status"] == "success":
+            return {
+                "success": True,
+                "models": result["model_list"],
+                "total_count": result["total_count"],
+                "search_query": result["search_query"]
+            }
+        else:
+            raise HTTPException(status_code=500, detail=result["message"])
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to search models: {str(e)}")
+
+@app.get("/api/model-management/statistics/", response_model=Dict[str, Any])
+def get_model_statistics(db: Session = Depends(get_db)):
+    """Get statistics about AI models in the database"""
+    try:
+        controller = ModelManagementController()
+        result = controller.get_model_statistics(db)
+        
+        if result["status"] == "success":
+            return {
+                "success": True,
+                "statistics": result["statistics"]
+            }
+        else:
+            raise HTTPException(status_code=500, detail=result["message"])
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch statistics: {str(e)}")
+
 @app.get("/api/host-overall-metrics")
 def get_host_overall_metrics(
     start_time: Optional[str] = None,
@@ -1751,3 +2030,70 @@ def get_host_overall_metrics(
         db, start_time=start_dt, end_time=end_dt, time_filter=time_filter,
         start_date=start_date, end_date=end_date, start_time_str=start_time_str, end_time_str=end_time_str, limit=limit
     ) # Force reload comment
+
+# =============================================================================
+# DASHBOARD AGGREGATION API ENDPOINTS
+# =============================================================================
+
+@app.get("/api/dashboard/top-processes", response_model=Dict[str, Any])
+async def get_dashboard_top_processes(
+    metric: str = 'cpu',
+    limit: int = 5,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    region: Optional[str] = None,
+    db: Session = Depends(get_metrics_db)
+):
+    """Get top N processes by specified metric (cpu, memory, gpu, power)"""
+    result = dashboard_controller.get_top_processes(db, metric, limit, start_date, end_date, region)
+    
+    if not result['success']:
+        raise HTTPException(status_code=500, detail=result['error'])
+    
+    return result
+
+@app.get("/api/dashboard/performance-summary", response_model=Dict[str, Any])
+async def get_dashboard_performance_summary(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    db: Session = Depends(get_metrics_db)
+):
+    """Get performance metrics summary with aggregated statistics"""
+    result = dashboard_controller.get_performance_summary(db, start_date, end_date)
+    
+    if not result['success']:
+        raise HTTPException(status_code=500, detail=result['error'])
+    
+    return result
+
+@app.get("/api/dashboard/system-overview", response_model=Dict[str, Any])
+async def get_dashboard_system_overview(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    metrics_db: Session = Depends(get_metrics_db),
+    greenmatrix_db: Session = Depends(get_db)
+):
+    """Get complete system overview with hardware specs and metrics"""
+    result = dashboard_controller.get_system_overview(metrics_db, greenmatrix_db, start_date, end_date)
+    
+    if not result['success']:
+        raise HTTPException(status_code=500, detail=result['error'])
+    
+    return result
+
+@app.get("/api/dashboard/chart-data", response_model=Dict[str, Any])
+async def get_dashboard_chart_data(
+    metric: str = 'cpu',
+    limit: int = 5,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    region: Optional[str] = None,
+    db: Session = Depends(get_metrics_db)
+):
+    """Get pre-processed chart data for frontend visualization"""
+    result = dashboard_controller.get_chart_data(db, metric, limit, start_date, end_date, region)
+    
+    if not result['success']:
+        raise HTTPException(status_code=500, detail=result['error'])
+    
+    return result

@@ -53,10 +53,11 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./backend/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
       - ./scripts/create-multiple-postgresql-databases.sh:/docker-entrypoint-initdb.d/02-create-multiple-databases.sh:ro
-      - ./docker-init-data/03-seed-hardware-table.sql:/docker-entrypoint-initdb.d/03-seed-hardware-table.sql:ro
-      - ./docker-init-data/04-seed-model-table.sql:/docker-entrypoint-initdb.d/04-seed-model-table.sql:ro
-      - ./docker-init-data/05-seed-cost-models.sql:/docker-entrypoint-initdb.d/05-seed-cost-models.sql:ro
-      - ./docker-init-data/06-create-empty-tables.sql:/docker-entrypoint-initdb.d/06-create-empty-tables.sql:ro
+      - ./scripts/setup-additional-db-extensions.sh:/docker-entrypoint-initdb.d/03-setup-extensions.sh:ro
+      - ./docker-init-data/04-create-hardware-table.sql:/docker-entrypoint-initdb.d/04-create-hardware-table.sql:ro
+      - ./docker-init-data/05-create-model-table.sql:/docker-entrypoint-initdb.d/05-create-model-table.sql:ro
+      - ./docker-init-data/05-seed-cost-models.sql:/docker-entrypoint-initdb.d/06-seed-cost-models.sql:ro
+      - ./docker-init-data/06-create-empty-tables.sql:/docker-entrypoint-initdb.d/07-create-empty-tables.sql:ro
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     healthcheck:
@@ -190,31 +191,6 @@ services:
     networks:
       - greenmatrix-network
 
-  # Data Collection Service
-  data-collector:
-    build:
-      context: .
-      dockerfile: Dockerfile.collector
-    container_name: greenmatrix-data-collector
-    environment:
-      - BACKEND_API_URL=http://backend:8000
-      - API_REQUEST_TIMEOUT=30
-      - COLLECTION_INTERVAL_MINUTES=${COLLECTION_INTERVAL_MINUTES:-5}
-      - COST_PER_KWH=0.12
-      - CPU_TDP_WATTS=125
-      - CURRENT_REGION=US
-    volumes:
-      - ./config.ini:/app/config.ini:ro
-      - collector_logs:/app/logs
-    depends_on:
-      backend:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - greenmatrix-network
-    # Run with host network mode to access system resources
-    pid: host
-    privileged: true
     
   # Database Setup and Seeding Service (runs once)
   db-setup:
@@ -225,10 +201,12 @@ services:
     environment:
       - MODEL_DB_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@postgres:5432/Model_Recommendation_DB
       - METRICS_DB_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@postgres:5432/Metrics_db
+      - TIMESCALEDB_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@timescaledb:5432/vm_metrics_ts
       - PYTHONPATH=/app
     volumes:
       - ./Pickel Models:/app/models:ro
       - ./sample_data:/app/sample_data:ro
+      - ./scripts:/app/scripts:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -236,7 +214,9 @@ services:
       sh -c "
         echo 'Setting up database schema...' &&
         python -c 'from app.database import init_db; init_db()' &&
-        echo 'Database setup completed successfully!'
+        echo 'Populating tables from CSV files...' &&
+        python /app/scripts/populate_from_csv.py &&
+        echo 'Database setup and population completed successfully!'
       "
     restart: "no"
     networks:
@@ -388,8 +368,6 @@ volumes:
   timescaledb_data:
     driver: local
   backend_logs:
-    driver: local
-  collector_logs:
     driver: local
   airflow_postgres_data:
     driver: local

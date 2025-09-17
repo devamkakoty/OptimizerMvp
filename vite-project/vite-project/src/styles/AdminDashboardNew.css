@@ -1,0 +1,895 @@
+/* Custom styles for AdminDashboardNew component */
+
+/* SimulateTab Component Styles */
+.simulate-tab-container {
+  background: #ffffff;
+  border-radius: 0;
+  box-shadow: none;
+  border: none;
+  padding: 0;
+}
+
+.simulate-tab-header {
+  margin-bottom: 32px;
+}
+
+.simulate-tab-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 8px;
+}
+
+.simulate-tab-subtitle {
+  font-size: 20px;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 8px;
+}
+
+.simulate-tab-description {
+  font-size: 16px;
+  color: #6b7280;
+}
+
+.simulate-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+.simulate-form-field {
+  margin-bottom: 20px;
+}
+
+.simulate-form-label {
+  display: block;
+  font-size: 16px;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 8px;
+}
+
+.simulate-form-input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 16px;
+  color: #111827;
+  background-color: #ffffff;
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.simulate-form-input:focus {
+  outline: none;
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+}
+
+.simulate-form-input::placeholder {
+  color: #9ca3af;
+}
+
+.simulate-form-select {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 16px;
+  color: #111827;
+  background-color: #ffffff;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 12px center;
+  background-repeat: no-repeat;
+  background-size: 20px;
+  appearance: none;
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.simulate-form-select:focus {
+  outline: none;
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+}
+
+.simulate-action-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 16px;
+  margin-top: 32px;
+}
+
+.simulate-btn {
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 2px solid;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+}
+
+.simulate-btn-run {
+  background-color: #ffffff;
+  color: #374151;
+  border-color: #d1d5db;
+}
+
+.simulate-btn-run:hover {
+  background-color: #f9fafb;
+  border-color: #9ca3af;
+}
+
+.simulate-btn-demo {
+  background-color: #10b981;
+  color: #ffffff;
+  border-color: #10b981;
+}
+
+.simulate-btn-demo:hover {
+  background-color: #059669;
+  border-color: #059669;
+}
+
+.simulate-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Hardware Performance Comparison Section */
+.hardware-comparison-section {
+  margin-top: 48px;
+}
+
+.hardware-comparison-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 8px;
+}
+
+.hardware-comparison-subtitle {
+  font-size: 18px;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 24px;
+}
+
+.hardware-search-filter {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.hardware-search-container {
+  position: relative;
+  flex: 1;
+  max-width: 400px;
+}
+
+.hardware-search-input {
+  width: 100%;
+  padding: 8px 12px 8px 36px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #111827;
+  background-color: #ffffff;
+}
+
+.hardware-search-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 1px #3b82f6;
+}
+
+.hardware-search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  color: #9ca3af;
+}
+
+.hardware-filter-btn {
+  padding: 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background-color: #ffffff;
+  cursor: pointer;
+  transition: background-color 0.15s ease-in-out;
+}
+
+.hardware-filter-btn:hover {
+  background-color: #f9fafb;
+}
+
+.hardware-export-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.hardware-export-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.15s ease-in-out;
+}
+
+.hardware-export-btn-json {
+  background-color: #3b82f6;
+}
+
+.hardware-export-btn-json:hover {
+  background-color: #2563eb;
+}
+
+.hardware-export-btn-csv {
+  background-color: #10b981;
+}
+
+.hardware-export-btn-csv:hover {
+  background-color: #059669;
+}
+
+.hardware-export-btn-report {
+  background-color: #8b5cf6;
+}
+
+.hardware-export-btn-report:hover {
+  background-color: #7c3aed;
+}
+
+.hardware-export-icon {
+  width: 12px;
+  height: 12px;
+}
+
+/* Results Table */
+.hardware-results-table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.hardware-results-table th {
+  background-color: #f9fafb;
+  border: 1px solid #d1d5db;
+  padding: 12px;
+  text-align: left;
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.hardware-results-table th:first-child {
+  text-align: left;
+}
+
+.hardware-results-table th:not(:first-child) {
+  text-align: center;
+}
+
+.hardware-results-table td {
+  border: 1px solid #d1d5db;
+  padding: 12px;
+  font-size: 14px;
+  color: #111827;
+}
+
+.hardware-results-table td:first-child {
+  font-weight: 500;
+  text-align: left;
+}
+
+.hardware-results-table td:not(:first-child) {
+  text-align: center;
+}
+
+.hardware-results-table tbody tr:hover {
+  background-color: #f9fafb;
+}
+
+.hardware-highlighted-row {
+  background-color: #f3f4f6;
+}
+
+.hardware-cost-cell {
+  color: #10b981;
+  font-weight: 500;
+}
+
+.hardware-fullname-cell {
+  color: #6b7280;
+}
+
+/* Pagination */
+.hardware-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 16px;
+}
+
+.hardware-pagination-info {
+  font-size: 14px;
+  color: #374151;
+}
+
+.hardware-pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hardware-pagination-items {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hardware-pagination-items-label {
+  font-size: 14px;
+  color: #374151;
+}
+
+.hardware-pagination-select {
+  padding: 4px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background-color: #ffffff;
+  font-size: 14px;
+  color: #111827;
+}
+
+.hardware-pagination-pages {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.hardware-pagination-btn {
+  padding: 4px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background-color: #ffffff;
+  font-size: 14px;
+  color: #374151;
+  cursor: pointer;
+  transition: background-color 0.15s ease-in-out;
+}
+
+.hardware-pagination-btn:hover {
+  background-color: #f9fafb;
+}
+
+.hardware-pagination-btn.active {
+  background-color: #3b82f6;
+  color: #ffffff;
+  border-color: #3b82f6;
+}
+
+.hardware-pagination-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* SimulateTab Form Grid Spacing */
+.simulate-form-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  column-gap: 2.5rem;
+  row-gap: 1.5rem;
+}
+
+@media (min-width: 768px) {
+  .simulate-form-grid {
+    grid-template-columns: repeat(2, 1fr);
+    column-gap: 3rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .simulate-form-grid {
+    grid-template-columns: repeat(3, 1fr);
+    column-gap: 3.5rem;
+  }
+}
+
+/* Process Performance & Cost Analysis - Search and Filter Bar */
+
+/* Search bar styling */
+.process-search-input {
+  box-sizing: border-box;
+  font-size: inherit;
+  font-family: inherit;
+  appearance: none;
+  background: transparent;
+  color: inherit;
+  width: 100%;
+  line-height: inherit;
+  padding: 5px 11px 5px 42px;
+  font-weight: 500;
+  margin: 0px;
+  border: 1px solid rgba(0, 0, 0, 0.36);
+  border-radius: 6px;
+}
+
+.process-search-input:focus {
+  outline: none;
+  border-color: #01a982;
+  box-shadow: 0 0 0 2px rgba(1, 169, 130, 0.2);
+}
+
+.process-search-input::placeholder {
+  color: #6b7280;
+}
+
+/* Dark mode for search input */
+.dark .process-search-input {
+  background-color: #374151;
+  border-color: #4b5563;
+  color: #e5e7eb;
+}
+
+.dark .process-search-input::placeholder {
+  color: #9ca3af;
+}
+
+/* Search icon styling */
+.process-search-icon {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1rem;
+  height: 1rem;
+  color: #9ca3af;
+}
+
+.dark .process-search-icon {
+  color: #6b7280;
+}
+
+/* Filter button styling */
+.process-filter-button {
+  padding: 0.5rem 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  background-color: white;
+  color: #374151;
+  transition: all 0.15s ease-in-out;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.process-filter-button:hover {
+  background-color: #f9fafb;
+}
+
+/* Dark mode for filter button */
+.dark .process-filter-button {
+  background-color: #374151;
+  border-color: #4b5563;
+  color: #d1d5db;
+}
+
+.dark .process-filter-button:hover {
+  background-color: #4b5563;
+}
+
+/* Filter icon styling */
+.process-filter-icon {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* Remove border line above table header in Process Performance section */
+.process-table {
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+}
+
+.process-table thead {
+  border-top: none !important;
+  border: none !important;
+}
+
+.process-table thead tr {
+  border-top: none !important;
+  border: none !important;
+}
+
+.process-table thead th {
+  border-top: none !important;
+  border-bottom: none !important;
+  border-left: none !important;
+  border-right: none !important;
+  border: none !important;
+}
+
+.process-table tbody tr:first-child {
+  border-top: none !important;
+}
+
+.process-table tbody tr:first-child td {
+  border-top: none !important;
+}
+
+/* Target the container that might have the border */
+.process-table-container {
+  border-top: none !important;
+}
+
+.process-table-container .overflow-x-auto {
+  border-top: none !important;
+}
+
+
+.btn3 {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    box-sizing: border-box;
+    cursor: pointer;
+    font-style: inherit;
+    font-variant: inherit;
+    font-stretch: inherit;
+    font-family: inherit;
+    font-optical-sizing: inherit;
+    font-size-adjust: inherit;
+    font-kerning: inherit;
+    font-feature-settings: inherit;
+    font-variation-settings: inherit;
+    text-decoration: none;
+    margin: 0px;
+    background: transparent;
+    overflow: visible;
+    text-transform: none;
+    border: 2px solid rgb(1, 169, 130);
+    border-radius: 2em;
+    color: rgb(68, 68, 68);
+    font-weight: 700;
+    padding: 4px 16px;
+    text-align: center;
+    transition-property: color, background-color, border-color, box-shadow;
+    transition-duration: 0.1s;
+    transition-timing-function: ease-in-out;
+    font-size: 19px;
+    line-height: 24px;
+}
+
+/* Hardware Overview Cards */
+.hardware-overview-card {
+    background: white;
+    border-radius: 5px;
+    padding: 20px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease;
+    cursor: pointer;
+    min-height: 140px;
+    display: flex;
+    flex-direction: column;
+}
+
+.hardware-overview-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.dark .hardware-overview-card {
+    background: #374151;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.dark .hardware-overview-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+/* CPU Card - Light Pink */
+.hardware-overview-card.cpu-card {
+    background: #fce7f3;
+}
+
+.dark .hardware-overview-card.cpu-card {
+    background: #4c1d95;
+}
+
+/* GPU Card - Light Beige/Cream */
+.hardware-overview-card.gpu-card {
+    background: #fef3c7;
+}
+
+.dark .hardware-overview-card.gpu-card {
+    background: #92400e;
+}
+
+/* Memory Card - Light Blue */
+.hardware-overview-card.memory-card {
+    background: #dbeafe;
+}
+
+.dark .hardware-overview-card.memory-card {
+    background: #1e3a8a;
+}
+
+/* VRAM Card - Light Green/Teal */
+.hardware-overview-card.vram-card {
+    background: #d1fae5;
+}
+
+.dark .hardware-overview-card.vram-card {
+    background: #064e3b;
+}
+
+/* Hardware Card Header */
+.hardware-card-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.hardware-icon {
+    width: 20px;
+    height: 20px;
+    color: #374151;
+}
+
+.dark .hardware-icon {
+    color: #e5e7eb;
+}
+
+.hardware-title-section {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex: 1;
+}
+
+.hardware-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #374151;
+    margin: 0;
+}
+
+.dark .hardware-title {
+    color: #e5e7eb;
+}
+
+.hardware-subtitle {
+    font-size: 12px;
+    color: #6b7280;
+    font-weight: 500;
+    margin-left: auto;
+}
+
+.dark .hardware-subtitle {
+    color: #9ca3af;
+}
+
+/* Hardware Content */
+.hardware-content {
+    color: #374151;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.dark .hardware-content {
+    color: #e5e7eb;
+}
+
+.hardware-status {
+    font-size: 12px;
+    margin: 0 0 4px 0;
+    font-weight: 500;
+    color: #6b7280;
+}
+
+.dark .hardware-status {
+    color: #9ca3af;
+}
+
+.hardware-processes {
+    font-size: 12px;
+    margin: 0;
+    color: #6b7280;
+}
+
+.dark .hardware-processes {
+    color: #9ca3af;
+}
+
+/* Hardware Usage Section */
+.hardware-usage-section {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-top: auto;
+}
+
+.hardware-usage-info {
+    flex: 1;
+}
+
+.hardware-total {
+    font-size: 16px;
+    font-weight: 700;
+    color: #f97316;
+    margin: 0 0 2px 0;
+}
+
+.memory-total {
+    color: #3b82f6;
+}
+
+.vram-total {
+    color: #10b981;
+}
+
+.hardware-used,
+.hardware-available,
+.hardware-usage {
+    font-size: 10px;
+    margin: 1px 0;
+    color: #6b7280;
+    line-height: 1.2;
+}
+
+.dark .hardware-used,
+.dark .hardware-available,
+.dark .hardware-usage {
+    color: #9ca3af;
+}
+
+/* Progress Indicators */
+.hardware-progress {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.progress-circle,
+.progress-donut {
+    position: relative;
+}
+
+.progress-ring,
+.donut-chart {
+    transform: rotate(-90deg);
+}
+
+.progress-ring-circle {
+    transition: stroke-dashoffset 0.3s ease;
+}
+
+.progress-ring-fill {
+    stroke-dasharray: 125.66;
+    stroke-dashoffset: 120.5;
+}
+
+.donut-background {
+    fill: transparent;
+}
+
+.donut-fill {
+    fill: transparent;
+    stroke-dasharray: 113.1;
+    stroke-dashoffset: 108.4;
+    transition: stroke-dashoffset 0.3s ease;
+}
+
+.t1{
+        display: flex
+    ;
+        flex-direction: column;
+    }
+.t2{
+    align-self: normal;
+}
+
+.tc{
+    align-self: start;
+}
+
+.text3 {
+    color: #01a982;
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin: 0;
+    padding: 0;
+}
+.clr{
+    
+        color: #302d78;
+        font-weight: 400;
+    
+}
+.mt-8 {
+    margin-top: 0.8rem;
+}
+.txt5 {
+    font-size: 31px;
+    color: #01a982;
+    padding-bottom: 10px;
+    font-weight: 600;
+}
+.text-2xl {
+    font-size: 1.3rem;
+    line-height: 2rem;
+}
+
+.text6{
+    font-size: 17px;
+    color: #05004E;
+
+    font-weight: 500;
+}
+
+/* .p-4 {
+    padding: 1rem;
+    padding-top: 5px;
+} */
+
+.text7{
+    color: #05004E;
+    font-size: 20px;
+    font-weight: 400;
+}
+
+.para1{
+    background: linear-gradient(
+      to bottom, 
+      rgba(206, 231, 225, 0.41) 0%,   /* Top: #CEE7E1 at 41% opacity */
+      rgba(255, 255, 255, 0.18) 8%,   /* Middle: White at 18% opacity */
+      rgba(255, 255, 255, 0.18) 51%   /* Further down: White at 18% opacity */
+    );
+  }
+
+
+.btn4
+    {
+        border-radius: 36px;
+        background-color: #eaeaea;
+        color: #006750;
+        font-weight: 600;
+    }
+.btn5{
+    background-color: #008567;
+    border-radius: 30px;
+    font-weight: 600;
+}
+
+.disabled\:bg-gray-400:disabled {
+    --tw-bg-opacity: 1;
+    border-radius: 36px;
+    background-color: rgb(238 238 238);
+}
+
+.bgr{
+    background-color: transparent;
+}

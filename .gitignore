@@ -1,0 +1,56 @@
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Environment files (keep examples)
+.env
+vite-project/.env
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+
+# Logs
+*.log
+logs/
+*.pid
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Build outputs (users can rebuild)
+vite-project/dist/
+vite-project/build/
+
+# Docker volumes (will be created)
+postgres_data/
+pgdata/
+
+# Local development files
+.local/
+secrets/
+.claude/settings.local.json
+
+# Remove problematic/empty files
+nul
+
+# Keep everything else including:
+# - Model files (*.pkl)
+# - Sample data (*.csv, *.json)
+# - Configuration files
+# - Scripts and documentation

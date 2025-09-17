@@ -61,7 +61,21 @@ class VMProcessMetricsController:
                 open_files=metrics_data.get('open_files'),
                 gpu_memory_usage_mb=metrics_data.get('gpu_memory_usage_mb'),
                 gpu_utilization_percent=metrics_data.get('gpu_utilization_percent'),
-                estimated_power_watts=metrics_data.get('estimated_power_watts')
+                estimated_power_watts=metrics_data.get('estimated_power_watts'),
+                # NEW: VM-level memory fields
+                vm_total_ram_gb=metrics_data.get('vm_total_ram_gb'),
+                vm_available_ram_gb=metrics_data.get('vm_available_ram_gb'),
+                vm_used_ram_gb=metrics_data.get('vm_used_ram_gb'),
+                vm_ram_usage_percent=metrics_data.get('vm_ram_usage_percent'),
+                vm_total_vram_gb=metrics_data.get('vm_total_vram_gb'),
+                vm_used_vram_gb=metrics_data.get('vm_used_vram_gb'),
+                vm_free_vram_gb=metrics_data.get('vm_free_vram_gb'),
+                vm_vram_usage_percent=metrics_data.get('vm_vram_usage_percent'),
+                gpu_count=metrics_data.get('gpu_count'),
+                gpu_names=metrics_data.get('gpu_names'),
+                # NEW: Overall VM-level utilization metrics
+                vm_overall_cpu_percent=metrics_data.get('vm_overall_cpu_percent'),
+                vm_overall_gpu_utilization=metrics_data.get('vm_overall_gpu_utilization')
             )
             
             db.add(vm_process_metric)
@@ -150,7 +164,21 @@ class VMProcessMetricsController:
                         open_files=metrics_data.get('open_files'),
                         gpu_memory_usage_mb=metrics_data.get('gpu_memory_usage_mb'),
                         gpu_utilization_percent=metrics_data.get('gpu_utilization_percent'),
-                        estimated_power_watts=metrics_data.get('estimated_power_watts')
+                        estimated_power_watts=metrics_data.get('estimated_power_watts'),
+                        # NEW: VM-level memory fields
+                        vm_total_ram_gb=metrics_data.get('vm_total_ram_gb'),
+                        vm_available_ram_gb=metrics_data.get('vm_available_ram_gb'),
+                        vm_used_ram_gb=metrics_data.get('vm_used_ram_gb'),
+                        vm_ram_usage_percent=metrics_data.get('vm_ram_usage_percent'),
+                        vm_total_vram_gb=metrics_data.get('vm_total_vram_gb'),
+                        vm_used_vram_gb=metrics_data.get('vm_used_vram_gb'),
+                        vm_free_vram_gb=metrics_data.get('vm_free_vram_gb'),
+                        vm_vram_usage_percent=metrics_data.get('vm_vram_usage_percent'),
+                        gpu_count=metrics_data.get('gpu_count'),
+                        gpu_names=metrics_data.get('gpu_names'),
+                        # NEW: Overall VM-level utilization metrics
+                        vm_overall_cpu_percent=metrics_data.get('vm_overall_cpu_percent'),
+                        vm_overall_gpu_utilization=metrics_data.get('vm_overall_gpu_utilization')
                     )
                     
                     db.add(vm_process_metric)
@@ -376,6 +404,219 @@ class VMProcessMetricsController:
             }
         except Exception as e:
             self.logger.error(f"Unexpected error getting active VMs: {e}")
+            return {
+                "success": False,
+                "error": f"Unexpected error: {str(e)}"
+            }
+    
+    def get_active_vms_with_memory_info(self, db: Session) -> Dict[str, Any]:
+        """
+        Get list of all active VMs with their RAM and VRAM information
+        
+        Args:
+            db: Database session
+            
+        Returns:
+            Dictionary containing list of active VMs with memory details
+        """
+        try:
+            # Get VMs that have sent data in the last hour with latest memory info
+            cutoff_time = datetime.utcnow() - timedelta(hours=1)
+            
+            # Subquery to get the latest record for each VM
+            latest_record_subquery = db.query(
+                VMProcessMetric.vm_name,
+                func.max(VMProcessMetric.timestamp).label('max_timestamp')
+            ).filter(
+                VMProcessMetric.timestamp >= cutoff_time
+            ).group_by(
+                VMProcessMetric.vm_name
+            ).subquery()
+            
+            # Main query to get VM details with memory information
+            query = db.query(
+                VMProcessMetric.vm_name,
+                VMProcessMetric.timestamp.label('last_seen'),
+                func.count(func.distinct(VMProcessMetric.process_id)).label('process_count'),
+                func.avg(VMProcessMetric.vm_total_ram_gb).label('total_ram_gb'),
+                func.avg(VMProcessMetric.vm_total_vram_gb).label('total_vram_gb'),
+                func.avg(VMProcessMetric.vm_ram_usage_percent).label('ram_usage_percent'),
+                func.avg(VMProcessMetric.vm_vram_usage_percent).label('vram_usage_percent'),
+                func.max(VMProcessMetric.gpu_count).label('gpu_count')
+            ).join(
+                latest_record_subquery,
+                and_(
+                    VMProcessMetric.vm_name == latest_record_subquery.c.vm_name,
+                    VMProcessMetric.timestamp == latest_record_subquery.c.max_timestamp
+                )
+            ).group_by(
+                VMProcessMetric.vm_name,
+                VMProcessMetric.timestamp
+            ).order_by(
+                desc('last_seen')
+            )
+            
+            results = query.all()
+            
+            active_vms = []
+            for result in results:
+                # Format memory values safely
+                total_ram_gb = float(result.total_ram_gb or 0)
+                total_vram_gb = float(result.total_vram_gb or 0)
+                ram_usage_percent = float(result.ram_usage_percent or 0)
+                vram_usage_percent = float(result.vram_usage_percent or 0)
+                gpu_count = int(result.gpu_count or 0)
+                
+                active_vms.append({
+                    "vm_name": result.vm_name,
+                    "last_seen": result.last_seen.isoformat() if result.last_seen else None,
+                    "process_count": result.process_count,
+                    "total_ram_gb": total_ram_gb,
+                    "total_vram_gb": total_vram_gb,
+                    "ram_usage_percent": ram_usage_percent,
+                    "vram_usage_percent": vram_usage_percent,
+                    "gpu_count": gpu_count,
+                    # Format display strings for dropdown
+                    "display_name": f"{result.vm_name} (RAM: {total_ram_gb:.1f}GB, VRAM: {total_vram_gb:.1f}GB)",
+                    "memory_summary": {
+                        "ram": f"{total_ram_gb:.1f}GB",
+                        "vram": f"{total_vram_gb:.1f}GB" if total_vram_gb > 0 else "No GPU",
+                        "gpu_count": gpu_count
+                    }
+                })
+            
+            return {
+                "success": True,
+                "active_vms": active_vms,
+                "count": len(active_vms),
+                "cutoff_time": cutoff_time.isoformat()
+            }
+            
+        except SQLAlchemyError as e:
+            self.logger.error(f"Database error getting active VMs with memory info: {e}")
+            return {
+                "success": False,
+                "error": f"Database error: {str(e)}"
+            }
+        except Exception as e:
+            self.logger.error(f"Unexpected error getting active VMs with memory info: {e}")
+            return {
+                "success": False,
+                "error": f"Unexpected error: {str(e)}"
+            }
+    
+    def get_vm_latest_metrics(self, db: Session, vm_name: str) -> Dict[str, Any]:
+        """
+        Get the latest overall metrics for a specific VM (aggregated across all processes)
+        
+        Args:
+            db: Database session
+            vm_name: Name of the VM
+            
+        Returns:
+            Dictionary containing latest VM metrics
+        """
+        try:
+            # Get the latest timestamp for this VM
+            latest_timestamp_subquery = db.query(
+                func.max(VMProcessMetric.timestamp).label('max_timestamp')
+            ).filter(
+                VMProcessMetric.vm_name == vm_name
+            ).subquery()
+            
+            # Get aggregated metrics for the latest timestamp
+            result = db.query(
+                VMProcessMetric.vm_name,
+                func.max(VMProcessMetric.timestamp).label('timestamp'),
+                func.sum(VMProcessMetric.memory_usage_mb).label('total_memory_mb'),    # Sum memory usage in MB for process-level calculation
+                func.sum(VMProcessMetric.gpu_memory_usage_mb).label('total_gpu_memory_mb'), # Sum GPU memory
+                func.sum(VMProcessMetric.iops).label('total_iops'),                    # Sum IOPS
+                func.count(func.distinct(VMProcessMetric.process_id)).label('process_count'),
+                # Use actual VM-level metrics (not process aggregation)
+                func.avg(VMProcessMetric.vm_overall_cpu_percent).label('vm_overall_cpu_percent'),
+                func.avg(VMProcessMetric.vm_overall_gpu_utilization).label('vm_overall_gpu_utilization'),
+                func.avg(VMProcessMetric.vm_total_ram_gb).label('total_ram_gb'),
+                func.avg(VMProcessMetric.vm_total_vram_gb).label('total_vram_gb'),
+                func.avg(VMProcessMetric.vm_ram_usage_percent).label('vm_ram_usage_percent'),  # Already VM-level
+                func.avg(VMProcessMetric.vm_vram_usage_percent).label('vm_vram_usage_percent'), # Already VM-level
+                func.max(VMProcessMetric.gpu_count).label('gpu_count')
+            ).filter(
+                and_(
+                    VMProcessMetric.vm_name == vm_name,
+                    VMProcessMetric.timestamp == latest_timestamp_subquery.c.max_timestamp
+                )
+            ).group_by(
+                VMProcessMetric.vm_name
+            ).first()
+            
+            if result:
+                # Debug logging to see what data we're getting
+                self.logger.info(f"VM latest metrics debug for {vm_name}:")
+                self.logger.info(f"  - total_ram_gb: {result.total_ram_gb}")
+                self.logger.info(f"  - total_memory_mb: {result.total_memory_mb}")
+                self.logger.info(f"  - vm_overall_cpu_percent: {result.vm_overall_cpu_percent}")
+                self.logger.info(f"  - vm_overall_gpu_utilization: {result.vm_overall_gpu_utilization}")
+                self.logger.info(f"  - vm_ram_usage_percent: {result.vm_ram_usage_percent}")
+                self.logger.info(f"  - vm_vram_usage_percent: {result.vm_vram_usage_percent}")
+                self.logger.info(f"  - process_count: {result.process_count}")
+                
+                # Calculate overall VM memory usage percentage from summed memory
+                vm_memory_usage_percent = 0
+                if result.total_ram_gb and result.total_ram_gb > 0 and result.total_memory_mb:
+                    vm_memory_usage_percent = round((result.total_memory_mb / (result.total_ram_gb * 1024)) * 100, 2)
+                    self.logger.info(f"  - calculated vm_memory_usage_percent: {vm_memory_usage_percent}")
+                else:
+                    # Fallback to VM-level RAM usage if available
+                    vm_memory_usage_percent = round(float(result.vm_ram_usage_percent or 0), 2)
+                    self.logger.info(f"  - fallback vm_memory_usage_percent: {vm_memory_usage_percent}")
+                
+                # Calculate GPU memory usage percentage from summed GPU memory
+                gpu_memory_usage_percent = 0
+                if result.total_vram_gb and result.total_vram_gb > 0 and result.total_gpu_memory_mb:
+                    gpu_memory_usage_percent = round((result.total_gpu_memory_mb / (result.total_vram_gb * 1024)) * 100, 2)
+                else:
+                    # Fallback to VM-level VRAM usage if available
+                    gpu_memory_usage_percent = round(float(result.vm_vram_usage_percent or 0), 2)
+                
+                # Use accurate VM-level CPU utilization instead of process aggregation
+                cpu_utilization = round(float(result.vm_overall_cpu_percent or 0), 2)
+                
+                # Use accurate VM-level GPU utilization instead of process aggregation
+                gpu_utilization = round(float(result.vm_overall_gpu_utilization or 0), 2)
+                
+                return {
+                    "success": True,
+                    "vm_name": result.vm_name,
+                    "timestamp": result.timestamp.isoformat() if result.timestamp else None,
+                    "metrics": {
+                        "cpu_utilization": cpu_utilization,
+                        "cpu_memory_usage": vm_memory_usage_percent,  # Use calculated VM memory percentage
+                        "gpu_utilization": gpu_utilization,
+                        "gpu_memory_usage": gpu_memory_usage_percent,
+                        "disk_iops": round(float(result.total_iops or 0), 2),
+                        "network_bandwidth": 0,  # Not currently collected at process level
+                        "vm_ram_usage_percent": round(float(result.vm_ram_usage_percent or 0), 2),
+                        "vm_vram_usage_percent": round(float(result.vm_vram_usage_percent or 0), 2),
+                        "total_ram_gb": round(float(result.total_ram_gb or 0), 2),
+                        "total_vram_gb": round(float(result.total_vram_gb or 0), 2),
+                        "process_count": int(result.process_count or 0),
+                        "gpu_count": int(result.gpu_count or 0)
+                    }
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": f"No recent data found for VM '{vm_name}'"
+                }
+                
+        except SQLAlchemyError as e:
+            self.logger.error(f"Database error getting VM latest metrics: {e}")
+            return {
+                "success": False,
+                "error": f"Database error: {str(e)}"
+            }
+        except Exception as e:
+            self.logger.error(f"Unexpected error getting VM latest metrics: {e}")
             return {
                 "success": False,
                 "error": f"Unexpected error: {str(e)}"

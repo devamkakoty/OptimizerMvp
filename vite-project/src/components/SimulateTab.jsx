@@ -2,75 +2,80 @@ import React, { useState, useEffect } from 'react';
 import { Info, Loader2 } from 'lucide-react';
 import apiClient from '../config/axios';
 import SimulationResults from './SimulationResults';
+import { useDropdownData } from '../hooks/useDropdownData';
+import '../styles/AdminDashboardNew.css';
 
 const SimulateTab = () => {
-  const [modelType, setModelType] = useState('');
-  const [framework, setFramework] = useState('');
+  // Primary fields - Model Name and Task Type (user fills these first)
+  const [modelName, setModelName] = useState('');
   const [taskType, setTaskType] = useState('');
+  const [scenario, setScenario] = useState('Single Stream'); // New required field
+  
+  // Auto-filled fields from database (can be overridden by user)
+  const [framework, setFramework] = useState('');
+  const [modelType, setModelType] = useState('');
   const [modelSize, setModelSize] = useState('');
   const [parameters, setParameters] = useState('');
   const [flops, setFlops] = useState('');
+  const [architectureType, setArchitectureType] = useState('');
+  const [precision, setPrecision] = useState('');
+  const [vocabularySize, setVocabularySize] = useState('');
+  const [activationFunction, setActivationFunction] = useState('');
+  
+  // User input fields (not from database)
   const [batchSize, setBatchSize] = useState('');
-  const [latency, setLatency] = useState('');
-  const [throughput, setThroughput] = useState('');
   const [showTooltip, setShowTooltip] = useState('');
   
-  // Additional parameters state
+  // Training-specific fields
+  const [inputSize, setInputSize] = useState('');
+  const [isFullTraining, setIsFullTraining] = useState('No');
+  
+  // Additional parameters state (hidden section)
   const [showMoreParams, setShowMoreParams] = useState(false);
-  const [architectureType, setArchitectureType] = useState('');
   const [hiddenLayers, setHiddenLayers] = useState('');
-  const [vocabularySize, setVocabularySize] = useState('');
   const [attentionLayers, setAttentionLayers] = useState('');
-  const [activationFunction, setActivationFunction] = useState('');
-  const [precision, setPrecision] = useState('');
+  const [embeddingDimension, setEmbeddingDimension] = useState('');
+  const [ffnDimension, setFfnDimension] = useState('');
   
-  // Dropdown options from backend
-  const [availableModelTypes, setAvailableModelTypes] = useState([]);
-  const [availableTaskTypes, setAvailableTaskTypes] = useState([]);
-  
-  // Store the actual model name from the API
-  const [selectedModelName, setSelectedModelName] = useState('');
+  // Use custom hook for dropdown data with caching
+  const { 
+    modelNames: availableModelNames, 
+    taskTypes: availableTaskTypes, 
+    isLoading: isLoadingDropdowns, 
+    error: dropdownError 
+  } = useDropdownData();
   
   // Loading and error states
-  const [isLoading, setIsLoading] = useState(false);
-  const [isLoadingDropdowns, setIsLoadingDropdowns] = useState(false);
+  const [isLoadingModelData, setIsLoadingModelData] = useState(false);
   const [error, setError] = useState('');
   
   // Simulation results state
   const [simulationResults, setSimulationResults] = useState(null);
   const [isRunningSimulation, setIsRunningSimulation] = useState(false);
 
-  // Initialize dropdown options with fallback values
+  // Error handling for dropdown data
   useEffect(() => {
-    const initializeDropdownOptions = () => {
-      setIsLoadingDropdowns(true);
-      
-      console.log('Initializing dropdown options with fallback values...');
-      
-      // Use fallback values directly since backend endpoints don't exist
-      setAvailableModelTypes(['llama', 'qwen2', 'phi3', 'mistral', 'gemma', 'phi', 'gpt2', 'bert', 'roberta', 'albert', 'distilbert', 'resnet18', 'resnet34', 'resnet50', 'vgg16', 'vgg19', 'inception_v3', 'efficientnet_b0', 'vit', 'deit', 'swin']);
-      setAvailableTaskTypes(['Inference', 'Training']);
-      
-      setIsLoadingDropdowns(false);
-    };
+    if (dropdownError) {
+      setError(dropdownError);
+    }
+  }, [dropdownError]);
 
-    initializeDropdownOptions();
-  }, []);
-
-  // Fetch and prefill parameters when both model type and task type are selected
+  // Fetch and prefill parameters when both model name and task type are selected
   useEffect(() => {
     const fetchModelData = async () => {
-      if (!modelType || !taskType) {
+      if (!modelName || !taskType) {
         return;
       }
 
-      setIsLoading(true);
+      setIsLoadingModelData(true);
       setError('');
 
       try {
-        // Call the backend API to get model data
+        console.log(`Fetching model data for: ${modelName} - ${taskType}`);
+        
+        // Call the backend API to get model data using model name and task type
         const response = await apiClient.post('/model/get-model-data', {
-          model_type: modelType,
+          model_name: modelName,
           task_type: taskType
         });
         
@@ -78,25 +83,35 @@ const SimulateTab = () => {
         if (response.data.status === 'success' && response.data.model_data) {
           const modelData = response.data.model_data;
           
-          // Prefill the form with model data from backend
-          setModelSize(modelData.model_size_mb?.toString());
-          setParameters(modelData.total_parameters_millions?.toString());
-          setFlops(modelData.flops?.toString());
-          // Keep batch size, latency, and throughput empty for user input
+          console.log('Model data received:', modelData);
           
-          // Set framework from model data
-          setFramework(modelData.framework?.toLowerCase());
+          // Prefill the form with model data from backend (field names match DB columns)
+          setFramework(modelData.framework || '');
+          setModelType(modelData.model_type || '');
+          setModelSize(modelData.model_size_mb?.toString() || '');
+          setParameters(modelData.total_parameters_millions?.toString() || '');
           
-          // Store the actual model name for simulation
-          setSelectedModelName(modelData.model_name);
+          // For Training task type, keep GFLOPs empty (user must input)
+          // For Inference task type, prefill GFLOPs from database
+          if (taskType === 'Training') {
+            setFlops('');
+          } else {
+            setFlops(modelData.gflops_billions?.toString() || '');
+          }
           
-          // Prefill additional parameters if available
-          setArchitectureType(modelData.architecture_type);
-          setHiddenLayers(modelData.embedding_vector_dimension?.toString());
-          setVocabularySize(modelData.vocabulary_size?.toString());
-          setAttentionLayers(modelData.ffn_dimension?.toString());
-          setActivationFunction(modelData.activation_function);
-          setPrecision(modelData.precision);
+          setArchitectureType(modelData.architecture_type || '');
+          setPrecision(modelData.precision || '');
+          setVocabularySize(modelData.vocabulary_size?.toString() || '');
+          setActivationFunction(modelData.activation_function || '');
+          
+          // Map fields correctly based on CSV columns
+          setHiddenLayers(modelData.number_of_hidden_layers?.toString() || '');
+          setAttentionLayers(modelData.number_of_attention_layers?.toString() || '');
+          setEmbeddingDimension(modelData.embedding_vector_dimension?.toString() || '');
+          setFfnDimension(modelData.ffn_dimension?.toString() || '');
+          
+          // Keep user input fields empty (batch size)
+          console.log('Model data prefilled successfully');
         } else {
           setError('Model data not found for the selected type and task.');
         }
@@ -104,33 +119,46 @@ const SimulateTab = () => {
       } catch (err) {
         console.error('Error fetching model data:', err);
         if (err.response?.status === 404) {
-          setError('No model found for the selected type and task combination.');
+          setError(`No model found for "${modelName}" with task type "${taskType}".`);
         } else {
           setError('Failed to load model data from backend. Please try again.');
         }
       } finally {
-        setIsLoading(false);
+        setIsLoadingModelData(false);
       }
     };
 
     fetchModelData();
-  }, [modelType, taskType]);
+  }, [modelName, taskType]);
 
   // Handle Run Simulation
   const handleRunSimulation = async () => {
-    if (!modelType || !taskType) {
-      setError('Please select both model type and task type');
+    // Validate required fields
+    if (!modelName || !taskType) {
+      setError('Please select both Model Name and Task Type');
       return;
     }
 
-    if (!selectedModelName) {
-      setError('Model data not loaded. Please select model type and task type first.');
+    if (!scenario) {
+      setError('Please select a Scenario');
       return;
     }
 
     if (!modelSize || !parameters || !flops) {
-      setError('Please ensure model size, parameters, and FLOPs are filled in.');
+      setError('Please ensure Model Size, Parameters, and GFLOPs are filled in.');
       return;
+    }
+
+    // Additional validation for Training task type
+    if (taskType === 'Training') {
+      if (!batchSize || !inputSize) {
+        setError('For Training task type, please fill in Batch Size and Input Size.');
+        return;
+      }
+      if (!isFullTraining) {
+        setError('For Training task type, please select Is Full Training option.');
+        return;
+      }
     }
 
     setIsRunningSimulation(true);
@@ -140,20 +168,30 @@ const SimulateTab = () => {
     try {
       // Prepare simulation parameters according to backend API format
       const simulationParams = {
-        Model: selectedModelName,
+        Model: modelName,
         Framework: framework,
         Task_Type: taskType,
+        Scenario: scenario, // New field
         Total_Parameters_Millions: parseFloat(parameters),
         Model_Size_MB: parseFloat(modelSize),
         Architecture_type: architectureType,
         Model_Type: modelType,
-        Embedding_Vector_Dimension: parseInt(hiddenLayers),
+        Embedding_Vector_Dimension: parseInt(embeddingDimension),
         Precision: precision,
         Vocabulary_Size: parseInt(vocabularySize),
-        FFN_Dimension: parseInt(attentionLayers),
+        FFN_Dimension: parseInt(ffnDimension),
         Activation_Function: activationFunction,
-        FLOPs: parseFloat(flops)
+        Number_of_hidden_Layers: parseInt(hiddenLayers),
+        Number_of_Attention_Layers: parseInt(attentionLayers),
+        GFLOPs_Billions: parseFloat(flops)
       };
+      
+      // Add Training-specific fields if task type is Training
+      if (taskType === 'Training') {
+        simulationParams.Batch_Size = parseInt(batchSize);
+        simulationParams.Input_Size = parseInt(inputSize);
+        simulationParams.Full_Training = isFullTraining === 'Yes' ? 1 : 0; // Map Yes/No to 1/0
+      }
       
       console.log('Simulation request payload:', simulationParams);
 
@@ -167,25 +205,24 @@ const SimulateTab = () => {
         // Format results to match the expected structure
         const formattedResults = {
           hardwareComparison: response.data.performance_results.map(result => {
-            console.log(`Processing hardware result:`, {
-              hardware: result.hardware,
-              latency_ms: result.latency_ms,
-              throughput_qps: result.throughput_qps,
-              cost_per_1000: result.cost_per_1000,
-              memory_gb: result.memory_gb
-            });
+            console.log(`Processing hardware result:`, result);
+            console.log(`GPU: "${result.GPU}", Hardware Name: "${result['Hardware Name']}"`);
+            console.log(`Latency: "${result['Latency (ms)']}", Total Cost: "${result['Total Cost']}"`);
+            console.log(`Confidence Score: "${result['Confidence Score']}", Status: "${result.Status}"`);
             
             return {
-              name: result.hardware,
-              fullName: result.full_name,
-              latency: `${result.latency_ms?.toFixed(2) || 0} ms`,
-              throughput: `${result.throughput_qps?.toFixed(2) || 0} QPS`,
-              costPer1000: `$${result.cost_per_1000?.toFixed(4) || 0}`,
-              memory: `${result.memory_gb?.toFixed(1) || 0} GB`,
-              hardwareId: result.hardware_id,
-              // Add additional details from your API
-              modelConfidence: result.model_confidence || 0,
-              inferenceUsed: result.inference_used || false
+              name: result.GPU || result['Hardware Name'] || 'Unknown Hardware',
+              fullName: `${result.CPU || 'Unknown CPU'} + ${result.GPU || 'Unknown GPU'}`,
+              latency: result['Latency (ms)'] !== 'N/A' ? `${parseFloat(result['Latency (ms)']).toFixed(2)} ms` : 'N/A',
+              throughput: '0.00 QPS', // Hide throughput as requested
+              costPer1000: result['Total Cost'] !== 'N/A' && result['Total Cost'] !== '0' ? `$${parseFloat(result['Total Cost']).toFixed(4)}` : '$0.0000',
+              memory: `${result['Recommended RAM'] || 0} GB`,
+              status: result.Status || 'Unknown',
+              confidence: `${parseFloat(result['Confidence Score'] || 0).toFixed(1)}%`,
+              recommendedStorage: result['Recommended Storage'] || 'N/A',
+              estimatedVRAM: result['Estimated_VRAM (GB)'] || 'N/A',
+              estimatedRAM: result['Estimated_RAM (GB)'] || 'N/A',
+              powerConsumption: result['Total power consumption'] || 'N/A'
             };
           })
         };
@@ -215,140 +252,27 @@ const SimulateTab = () => {
     }
   };
 
-  // Handle Demo Simulation (with mock data)
-  const handleDemoSimulation = () => {
-    setIsRunningSimulation(true);
-    setError('');
-    setSimulationResults(null);
-
-    // Simulate API delay
-    setTimeout(() => {
-      const mockResults = {
-        hardwareComparison: [
-          {
-            name: "CPU_i7",
-            fullName: "N/A",
-            latency: "13186.07 ms",
-            throughput: "0.08 QPS",
-            costPer1000: "$0.3764",
-            memory: "16.0 GB"
-          },
-          {
-            name: "AMD_EPYC",
-            fullName: "N/A",
-            latency: "2776.52 ms",
-            throughput: "0.36 QPS",
-            costPer1000: "$0.2407",
-            memory: "64.0 GB"
-          },
-          {
-            name: "T4",
-            fullName: "NVIDIA Tesla T4 GPU",
-            latency: "589.30 ms",
-            throughput: "1.70 QPS",
-            costPer1000: "$0.0585",
-            memory: "16.0 GB",
-            additionalInfo: {
-              arch: "Turing",
-              memory: "16GB GDDR6",
-              flops: "65 TFLOPS",
-              power: "70W"
-            }
-          },
-          {
-            name: "A10",
-            fullName: "NVIDIA A10 GPU",
-            latency: "137.33 ms",
-            throughput: "7.28 QPS",
-            costPer1000: "$0.0288",
-            memory: "24.0 GB",
-            additionalInfo: {
-              arch: "Ampere",
-              memory: "24GB GDDR6",
-              flops: "125 TFLOPS",
-              power: "150W"
-            }
-          },
-          {
-            name: "A100",
-            fullName: "NVIDIA A100 Tensor Core GPU",
-            latency: "13.91 ms",
-            throughput: "71.90 QPS",
-            costPer1000: "$0.0079",
-            memory: "40.0 GB",
-            additionalInfo: {
-              arch: "Ampere",
-              memory: "40GB HBM2e",
-              flops: "312 TFLOPS",
-              power: "400W"
-            }
-          },
-          {
-            name: "H100",
-            fullName: "NVIDIA H100 Tensor Core GPU",
-            latency: "12.96 ms",
-            throughput: "77.15 QPS",
-            costPer1000: "$0.0108",
-            memory: "80.0 GB",
-            additionalInfo: {
-              arch: "Hopper",
-              memory: "80GB HBM3",
-              flops: "989 TFLOPS",
-              power: "700W"
-            }
-          },
-          {
-            name: "RTX_A5000",
-            fullName: "NVIDIA RTX A5000",
-            latency: "152.47 ms",
-            throughput: "6.56 QPS",
-            costPer1000: "$0.0510",
-            memory: "24.0 GB",
-            additionalInfo: {
-              arch: "Ampere",
-              memory: "24GB GDDR6",
-              flops: "67 TFLOPS",
-              power: "230W"
-            }
-          },
-          {
-            name: "RTX_3070",
-            fullName: "NVIDIA GeForce RTX 3070",
-            latency: "222.65 ms",
-            throughput: "4.49 QPS",
-            costPer1000: "$0.0311",
-            memory: "8.0 GB",
-            additionalInfo: {
-              arch: "Ampere",
-              memory: "8GB GDDR6",
-              flops: "40 TFLOPS",
-              power: "220W"
-            }
-          },
-          {
-            name: "Intel_Xeon_Gold",
-            fullName: "N/A",
-            latency: "6713.06 ms",
-            throughput: "0.15 QPS",
-            costPer1000: "$0.7618",
-            memory: "128.0 GB"
-          }
-        ]
-      };
-      
-      setSimulationResults(mockResults);
-      setIsRunningSimulation(false);
-    }, 2000); // 2 second delay to show loading
-  };
-
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-8">
-      <div className="mb-8">
-        <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">Simulation Parameters</h2>
-        <p className="text-gray-600 dark:text-gray-300">
-          Enter your AI workload details to simulate performance across different hardware options
-        </p>
-        
+    <div className="main">
+      <div className="txt5">GreenMatrix Panel</div>
+      <div className="para">
+
+
+        {/* Outer Container */}
+        <div className="w-full max-w-6xl mx-auto bg-white rounded-lg shadow-sm border border-gray-200 p-6 para1">
+          <div className="paraetext-lg font-semibold text-gray-900 dark:text-white text7">Simulate Performance</div>
+
+          {/* Inner Container */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 max-w-6xl mx-auto mt-4 bgr">
+            {/* Header Section */}
+            <div className="mb-4">
+              <h1 className="text-xl font-bold text-gray-900 dark:text-white mb-1 text6">
+                Simulate Parameters
+              </h1>
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+                Enter your AI workload details to simulate performance across different hardware options.
+              </p>
+
         {/* Error Message */}
         {error && (
           <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
@@ -356,49 +280,58 @@ const SimulateTab = () => {
           </div>
         )}
         
-        {/* Loading Indicator */}
-        {isLoading && (
+        {/* Loading Indicators */}
+        {isLoadingDropdowns && (
           <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
             <div className="flex items-center gap-2">
               <Loader2 className="w-4 h-4 animate-spin text-blue-600 dark:text-blue-400" />
-              <p className="text-blue-600 dark:text-blue-400 text-sm">Loading default parameters...</p>
+              <p className="text-blue-600 dark:text-blue-400 text-sm">Loading model names and task types from database...</p>
+            </div>
+          </div>
+        )}
+        
+        {isLoadingModelData && (
+          <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+            <div className="flex items-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin text-blue-600 dark:text-blue-400" />
+              <p className="text-blue-600 dark:text-blue-400 text-sm">Loading model data and auto-filling fields...</p>
             </div>
           </div>
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Model Type */}
+      <div className="simulate-form-grid">
+        {/* Model Name */}
         <div>
           <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Model Type
+            Model Name
             <div className="relative">
               <Info 
                 className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" 
-                onMouseEnter={() => setShowTooltip('modelType')}
+                onMouseEnter={() => setShowTooltip('modelName')}
                 onMouseLeave={() => setShowTooltip('')}
               />
-              {showTooltip === 'modelType' && (
+              {showTooltip === 'modelName' && (
                 <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
                   <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
-                  Select the type of AI model architecture you want to simulate.
+                  Select the specific AI model from the database. Other fields will auto-populate.
                 </div>
               )}
             </div>
           </label>
           <div className="relative">
             <select
-              value={modelType}
-              onChange={(e) => setModelType(e.target.value)}
-              className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-transparent transition-all"
-              disabled={isLoading || isLoadingDropdowns}
+              value={modelName}
+              onChange={(e) => setModelName(e.target.value)}
+              className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
+              disabled={isLoadingDropdowns}
             >
               <option value="">
-                {isLoadingDropdowns ? 'Loading model types...' : 'Select model type'}
+                {isLoadingDropdowns ? 'Loading model names...' : 'Select model name'}
               </option>
-              {availableModelTypes.map((type) => (
-                <option key={type} value={type}>
-                  {type}
+              {availableModelNames.map((name) => (
+                <option key={name} value={name}>
+                  {name}
                 </option>
               ))}
             </select>
@@ -432,15 +365,16 @@ const SimulateTab = () => {
             <select
               value={framework}
               onChange={(e) => setFramework(e.target.value)}
-              className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-transparent transition-all"
-              disabled={isLoading}
+              className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
+              disabled={isLoadingModelData}
             >
               <option value="">Select framework</option>
-              <option value="pytorch">PyTorch</option>
-              <option value="tensorflow">TensorFlow</option>
-              <option value="jax">JAX</option>
-              <option value="onnx">ONNX</option>
-              <option value="tensorrt">TensorRT</option>
+              <option value="PyTorch">PyTorch</option>
+              <option value="TensorFlow">TensorFlow</option>
+              <option value="JAX">JAX</option>
+              <option value="ONNX">ONNX</option>
+              <option value="TensorRT">TensorRT</option>
+              <option value="Hugging Face">Hugging Face</option>
             </select>
             <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
               <svg className="w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -472,17 +406,47 @@ const SimulateTab = () => {
             <select
               value={taskType}
               onChange={(e) => setTaskType(e.target.value)}
-              className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={isLoading || isLoadingDropdowns}
+              className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isLoadingModelData || isLoadingDropdowns}
             >
-              <option value="">
-                {isLoadingDropdowns ? 'Loading task types...' : 'Select task type'}
-              </option>
-              {availableTaskTypes.map((type) => (
-                <option key={type} value={type}>
-                  {type}
-                </option>
-              ))}
+              <option value="">Select task type</option>
+              <option value="Training">Training</option>
+              <option value="Inference">Inference</option>
+            </select>
+            <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+              <svg className="w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        {/* Scenario */}
+        <div>
+          <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Scenario
+            <div className="relative">
+              <Info 
+                className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" 
+                onMouseEnter={() => setShowTooltip('scenario')}
+                onMouseLeave={() => setShowTooltip('')}
+              />
+              {showTooltip === 'scenario' && (
+                <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
+                  <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
+                  Single Stream for individual requests, Server for batch processing.
+                </div>
+              )}
+            </div>
+          </label>
+          <div className="relative">
+            <select
+              value={scenario}
+              onChange={(e) => setScenario(e.target.value)}
+              className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
+            >
+              <option value="Single Stream">Single Stream</option>
+              <option value="Server">Server</option>
             </select>
             <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
               <svg className="w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -515,8 +479,8 @@ const SimulateTab = () => {
             value={modelSize}
             onChange={(e) => setModelSize(e.target.value)}
             placeholder="Enter model size in MB"
-            className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={isLoading}
+            className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={isLoadingModelData}
           />
         </div>
 
@@ -543,15 +507,15 @@ const SimulateTab = () => {
             value={parameters}
             onChange={(e) => setParameters(e.target.value)}
             placeholder="Enter parameters in millions"
-            className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={isLoading}
+            className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={isLoadingModelData}
           />
         </div>
 
         {/* FLOPs */}
         <div>
           <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            FLOPs (Billions)
+            GFLOPs (Billions)
             <div className="relative">
               <Info 
                 className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" 
@@ -570,95 +534,72 @@ const SimulateTab = () => {
             type="number"
             value={flops}
             onChange={(e) => setFlops(e.target.value)}
-            placeholder="Enter FLOPs in billions"
-            className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={isLoading}
+            placeholder="Enter GFLOPs in billions"
+            className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={isLoadingModelData}
           />
         </div>
 
-        {/* Batch Size */}
-        {/* <div>
-          <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Batch Size
-            <div className="relative">
-              <Info 
-                className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" 
-                onMouseEnter={() => setShowTooltip('batchSize')}
-                onMouseLeave={() => setShowTooltip('')}
-              />
-              {showTooltip === 'batchSize' && (
-                <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
-                  <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
-                  Number of samples processed in parallel.
+        {/* Training-specific fields */}
+        {taskType === 'Training' && (
+          <>
+            {/* Batch Size */}
+            <div>
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Batch Size
+                <div className="relative">
+                  <Info 
+                    className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" 
+                    onMouseEnter={() => setShowTooltip('batchSize')}
+                    onMouseLeave={() => setShowTooltip('')}
+                  />
+                  {showTooltip === 'batchSize' && (
+                    <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
+                      <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
+                      Number of samples processed in parallel during training.
+                    </div>
+                  )}
                 </div>
-              )}
+              </label>
+              <input
+                type="number"
+                value={batchSize}
+                onChange={(e) => setBatchSize(e.target.value)}
+                placeholder="Enter batch size for training"
+                className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isLoadingModelData}
+              />
             </div>
-          </label>
-          <input
-            type="number"
-            value={batchSize}
-            onChange={(e) => setBatchSize(e.target.value)}
-            placeholder="Enter batch size"
-            className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={isLoading}
-          />
-        </div> */}
 
-        {/* Latency Requirement */}
-        {/* <div>
-          <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Latency Requirement (ms)
-            <div className="relative">
-              <Info 
-                className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" 
-                onMouseEnter={() => setShowTooltip('latency')}
-                onMouseLeave={() => setShowTooltip('')}
-              />
-              {showTooltip === 'latency' && (
-                <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
-                  <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
-                  Maximum acceptable latency for inference in milliseconds.
+            {/* Input Size */}
+            <div>
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Input Size
+                <div className="relative">
+                  <Info 
+                    className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" 
+                    onMouseEnter={() => setShowTooltip('inputSize')}
+                    onMouseLeave={() => setShowTooltip('')}
+                  />
+                  {showTooltip === 'inputSize' && (
+                    <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
+                      <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
+                      Dimension/size of input data for training.
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          </label>
-          <input
-            type="number"
-            value={latency}
-            onChange={(e) => setLatency(e.target.value)}
-            placeholder="Optional - Enter max latency in ms"
-            className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={isLoading}
-          />
-        </div> */}
-
-        {/* Throughput Requirement */}
-        {/* <div className="md:col-span-2">
-          <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Throughput Requirement (QPS)
-            <div className="relative">
-              <Info 
-                className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" 
-                onMouseEnter={() => setShowTooltip('throughput')}
-                onMouseLeave={() => setShowTooltip('')}
+              </label>
+              <input
+                type="number"
+                value={inputSize}
+                onChange={(e) => setInputSize(e.target.value)}
+                placeholder="Enter input size for training"
+                className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isLoadingModelData}
               />
-              {showTooltip === 'throughput' && (
-                <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
-                  <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
-                  Minimum required queries per second.
-                </div>
-              )}
             </div>
-          </label>
-          <input
-            type="number"
-            value={throughput}
-            onChange={(e) => setThroughput(e.target.value)}
-            placeholder="Optional - Enter min throughput in QPS"
-            className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={isLoading}
-          />
-        </div> */}
+          </>
+        )}
       </div>
 
       {/* Load More Parameters Button */}
@@ -666,7 +607,7 @@ const SimulateTab = () => {
         <div className="mt-6 flex justify-center">
           <button 
             onClick={() => setShowMoreParams(true)}
-            disabled={isLoading}
+            disabled={isLoadingModelData}
             className="px-6 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Load More Parameters
@@ -702,8 +643,8 @@ const SimulateTab = () => {
                 <select
                   value={architectureType}
                   onChange={(e) => setArchitectureType(e.target.value)}
-                  className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={isLoading}
+                  className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={isLoadingModelData}
                 >
                   <option value="">Select architecture type</option>
                   <option value="LlamaForCausalLM">LlamaForCausalLM</option>
@@ -759,8 +700,8 @@ const SimulateTab = () => {
                 value={hiddenLayers}
                 onChange={(e) => setHiddenLayers(e.target.value)}
                 placeholder="Enter number of hidden layers"
-                className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={isLoading}
+                className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isLoadingModelData}
               />
             </div>
 
@@ -787,8 +728,8 @@ const SimulateTab = () => {
                 value={vocabularySize}
                 onChange={(e) => setVocabularySize(e.target.value)}
                 placeholder="Enter vocabulary size"
-                className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={isLoading}
+                className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isLoadingModelData}
               />
             </div>
 
@@ -815,8 +756,8 @@ const SimulateTab = () => {
                 value={attentionLayers}
                 onChange={(e) => setAttentionLayers(e.target.value)}
                 placeholder="Enter number of attention layers"
-                className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={isLoading}
+                className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isLoadingModelData}
               />
             </div>
 
@@ -842,8 +783,8 @@ const SimulateTab = () => {
                 <select
                   value={precision}
                   onChange={(e) => setPrecision(e.target.value)}
-                  className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={isLoading}
+                  className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={isLoadingModelData}
                 >
                   <option value="">Select precision</option>
                   <option value="FP16">FP16 (Half Precision)</option>
@@ -882,8 +823,8 @@ const SimulateTab = () => {
                 <select
                   value={activationFunction}
                   onChange={(e) => setActivationFunction(e.target.value)}
-                  className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={isLoading}
+                  className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={isLoadingModelData}
                 >
                   <option value="">Select activation function</option>
                   <option value="silu">SiLU</option>
@@ -904,7 +845,83 @@ const SimulateTab = () => {
                 </div>
               </div>
             </div>
+
+            {/* Embedding Vector Dimension */}
+            <div>
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Embedding Vector Dimension
+                <div className="relative">
+                  <Info 
+                    className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" 
+                    onMouseEnter={() => setShowTooltip('embeddingDimension')}
+                    onMouseLeave={() => setShowTooltip('')}
+                  />
+                  {showTooltip === 'embeddingDimension' && (
+                    <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
+                      <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
+                      Dimension of the embedding vectors (hidden size).
+                    </div>
+                  )}
+                </div>
+              </label>
+              <input
+                type="number"
+                value={embeddingDimension}
+                onChange={(e) => setEmbeddingDimension(e.target.value)}
+                placeholder="Enter embedding dimension"
+                className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isLoadingModelData}
+              />
+            </div>
+
+            {/* FFN (MLP) Dimension */}
+            <div>
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                FFN (MLP) Dimension
+                <div className="relative">
+                  <Info 
+                    className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" 
+                    onMouseEnter={() => setShowTooltip('ffnDimension')}
+                    onMouseLeave={() => setShowTooltip('')}
+                  />
+                  {showTooltip === 'ffnDimension' && (
+                    <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
+                      <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
+                      Dimension of the feed-forward network (MLP) layers.
+                    </div>
+                  )}
+                </div>
+              </label>
+              <input
+                type="number"
+                value={ffnDimension}
+                onChange={(e) => setFfnDimension(e.target.value)}
+                placeholder="Enter FFN dimension"
+                className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isLoadingModelData}
+              />
+            </div>
           </div>
+
+          {/* Is Full Training field - only for Training task type */}
+          {taskType === 'Training' && (
+            <div className="grid grid-cols-1 gap-4">
+              <div>
+                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Is Full Training
+                </label>
+                <select
+                  value={isFullTraining}
+                  onChange={(e) => setIsFullTraining(e.target.value)}
+                  className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={isLoadingModelData}
+                >
+                  <option value="No">No</option>
+                  <option value="Yes">Yes</option>
+                </select>
+              </div>
+            </div>
+          )}
 
           {/* Collapse Button */}
           <div className="mt-4 flex justify-center">
@@ -922,7 +939,7 @@ const SimulateTab = () => {
       <div className="mt-8 flex justify-center gap-4">
         <button 
           onClick={handleRunSimulation}
-          disabled={isLoading || isRunningSimulation || !modelType || !taskType}
+          disabled={isLoadingModelData || isLoadingDropdowns || isRunningSimulation || !modelName || !taskType}
           className="px-8 py-3 bg-gradient-to-r from-[#01a982] to-[#00d4aa] text-white font-medium rounded-lg hover:from-[#019670] hover:to-[#00c299] transform hover:scale-105 transition-all duration-200 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
         >
           {isRunningSimulation ? (
@@ -934,27 +951,15 @@ const SimulateTab = () => {
             'Run Simulation'
           )}
         </button>
-        
-        <button 
-          onClick={handleDemoSimulation}
-          disabled={isLoading || isRunningSimulation}
-          className="px-8 py-3 bg-gradient-to-r from-purple-500 to-purple-600 text-white font-medium rounded-lg hover:from-purple-600 hover:to-purple-700 transform hover:scale-105 transition-all duration-200 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-        >
-          {isRunningSimulation ? (
-            <div className="flex items-center gap-2">
-              <Loader2 className="w-5 h-5 animate-spin" />
-              Loading Demo...
-            </div>
-          ) : (
-            'Demo Results'
-          )}
-        </button>
-      </div>
+        </div>
 
-      {/* Simulation Results */}
-      {simulationResults && (
-        <SimulationResults results={simulationResults} />
-      )}
+            {/* Simulation Results */}
+            {simulationResults && (
+              <SimulationResults results={simulationResults} />
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

@@ -37,6 +37,24 @@ CREATE TABLE IF NOT EXISTS vm_process_metrics (
     -- Power estimation
     estimated_power_watts REAL,
     
+    -- NEW: VM-level memory information
+    vm_total_ram_gb REAL,
+    vm_available_ram_gb REAL,
+    vm_used_ram_gb REAL,
+    vm_ram_usage_percent REAL,
+    
+    -- NEW: VM-level GPU memory information
+    vm_total_vram_gb REAL,
+    vm_used_vram_gb REAL,
+    vm_free_vram_gb REAL,
+    vm_vram_usage_percent REAL,
+    gpu_count INTEGER,
+    gpu_names TEXT, -- JSON string of GPU names array
+    
+    -- NEW: Overall VM-level utilization metrics (not per-process aggregation)
+    vm_overall_cpu_percent REAL, -- Overall VM CPU usage
+    vm_overall_gpu_utilization REAL, -- Overall VM GPU usage
+    
     -- Composite primary key including vm_name for proper partitioning
     PRIMARY KEY (timestamp, process_id, vm_name)
 );
@@ -85,6 +103,21 @@ CREATE INDEX IF NOT EXISTS idx_vm_process_metrics_high_gpu
     ON vm_process_metrics (timestamp DESC) 
     WHERE gpu_utilization_percent > 50;
 
+-- NEW: Indexes for VM-level memory fields
+CREATE INDEX IF NOT EXISTS idx_vm_process_metrics_vm_ram 
+    ON vm_process_metrics (vm_name, vm_ram_usage_percent DESC, timestamp DESC);
+
+CREATE INDEX IF NOT EXISTS idx_vm_process_metrics_vm_vram 
+    ON vm_process_metrics (vm_name, vm_vram_usage_percent DESC, timestamp DESC);
+
+CREATE INDEX IF NOT EXISTS idx_vm_process_metrics_high_vm_ram 
+    ON vm_process_metrics (timestamp DESC) 
+    WHERE vm_ram_usage_percent > 80;
+
+CREATE INDEX IF NOT EXISTS idx_vm_process_metrics_high_vm_vram 
+    ON vm_process_metrics (timestamp DESC) 
+    WHERE vm_vram_usage_percent > 80;
+
 -- Create a view for latest metrics per VM
 CREATE OR REPLACE VIEW vm_process_metrics_latest AS
 SELECT DISTINCT ON (vm_name, process_id)
@@ -100,7 +133,21 @@ SELECT DISTINCT ON (vm_name, process_id)
     gpu_memory_usage_mb,
     gpu_utilization_percent,
     estimated_power_watts,
-    iops
+    iops,
+    -- NEW: VM-level memory fields
+    vm_total_ram_gb,
+    vm_available_ram_gb,
+    vm_used_ram_gb,
+    vm_ram_usage_percent,
+    vm_total_vram_gb,
+    vm_used_vram_gb,
+    vm_free_vram_gb,
+    vm_vram_usage_percent,
+    gpu_count,
+    gpu_names,
+    -- NEW: Overall VM-level utilization metrics
+    vm_overall_cpu_percent,
+    vm_overall_gpu_utilization
 FROM vm_process_metrics
 ORDER BY vm_name, process_id, timestamp DESC;
 
@@ -117,7 +164,20 @@ SELECT
     SUM(gpu_memory_usage_mb) as total_gpu_memory_mb,
     AVG(gpu_utilization_percent) as avg_gpu_usage,
     SUM(estimated_power_watts) as total_power_watts,
-    SUM(iops) as total_iops
+    SUM(iops) as total_iops,
+    -- NEW: VM-level memory aggregations (these should be consistent across processes)
+    AVG(vm_total_ram_gb) as vm_total_ram_gb,
+    AVG(vm_available_ram_gb) as vm_available_ram_gb,
+    AVG(vm_used_ram_gb) as vm_used_ram_gb,
+    AVG(vm_ram_usage_percent) as vm_ram_usage_percent,
+    AVG(vm_total_vram_gb) as vm_total_vram_gb,
+    AVG(vm_used_vram_gb) as vm_used_vram_gb,
+    AVG(vm_free_vram_gb) as vm_free_vram_gb,
+    AVG(vm_vram_usage_percent) as vm_vram_usage_percent,
+    MAX(gpu_count) as gpu_count,
+    -- NEW: Overall VM-level utilization metrics (these should be consistent across processes)
+    AVG(vm_overall_cpu_percent) as vm_overall_cpu_percent,
+    AVG(vm_overall_gpu_utilization) as vm_overall_gpu_utilization
 FROM vm_process_metrics
 GROUP BY vm_name, DATE_TRUNC('hour', timestamp)
 ORDER BY vm_name, hour DESC;
@@ -145,7 +205,20 @@ SELECT
     AVG(gpu_utilization_percent) as avg_gpu_usage,
     MAX(gpu_utilization_percent) as peak_gpu_usage,
     SUM(estimated_power_watts) as total_power_consumption,
-    AVG(estimated_power_watts) as avg_power_per_process
+    AVG(estimated_power_watts) as avg_power_per_process,
+    -- NEW: VM-level memory daily aggregations
+    AVG(vm_ram_usage_percent) as avg_vm_ram_usage,
+    MAX(vm_ram_usage_percent) as peak_vm_ram_usage,
+    AVG(vm_vram_usage_percent) as avg_vm_vram_usage,
+    MAX(vm_vram_usage_percent) as peak_vm_vram_usage,
+    AVG(vm_total_ram_gb) as vm_total_ram_gb,
+    AVG(vm_total_vram_gb) as vm_total_vram_gb,
+    MAX(gpu_count) as gpu_count,
+    -- NEW: Overall VM-level daily aggregations
+    AVG(vm_overall_cpu_percent) as avg_vm_overall_cpu_percent,
+    MAX(vm_overall_cpu_percent) as peak_vm_overall_cpu_percent,
+    AVG(vm_overall_gpu_utilization) as avg_vm_overall_gpu_utilization,
+    MAX(vm_overall_gpu_utilization) as peak_vm_overall_gpu_utilization
 FROM vm_process_metrics
 GROUP BY vm_name, time_bucket('1 day', timestamp)
 WITH NO DATA;
@@ -219,6 +292,29 @@ BEGIN
             'process_name', NEW.process_name,
             'process_id', NEW.process_id,
             'memory_usage', NEW.memory_usage_percent,
+            'timestamp', NEW.timestamp
+        )::text);
+    END IF;
+    
+    -- NEW: Notify if VM RAM usage is very high
+    IF NEW.vm_ram_usage_percent > 90 THEN
+        PERFORM pg_notify('vm_high_ram', json_build_object(
+            'vm_name', NEW.vm_name,
+            'vm_ram_usage_percent', NEW.vm_ram_usage_percent,
+            'vm_total_ram_gb', NEW.vm_total_ram_gb,
+            'vm_used_ram_gb', NEW.vm_used_ram_gb,
+            'timestamp', NEW.timestamp
+        )::text);
+    END IF;
+    
+    -- NEW: Notify if VM VRAM usage is very high
+    IF NEW.vm_vram_usage_percent > 90 THEN
+        PERFORM pg_notify('vm_high_vram', json_build_object(
+            'vm_name', NEW.vm_name,
+            'vm_vram_usage_percent', NEW.vm_vram_usage_percent,
+            'vm_total_vram_gb', NEW.vm_total_vram_gb,
+            'vm_used_vram_gb', NEW.vm_used_vram_gb,
+            'gpu_count', NEW.gpu_count,
             'timestamp', NEW.timestamp
         )::text);
     END IF;

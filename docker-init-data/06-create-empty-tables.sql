@@ -4,70 +4,69 @@
 -- Switch to greenmatrix database for main application tables
 \c greenmatrix;
 
--- Create hardware_specs table (empty)
+-- Create hardware_specs table (empty) - Hardware_table compatible schema
 CREATE TABLE IF NOT EXISTS hardware_specs (
     id SERIAL PRIMARY KEY,
-    hostname VARCHAR(255) NOT NULL UNIQUE,
-    cpu_model VARCHAR(255),
-    cpu_cores INTEGER,
-    cpu_threads INTEGER,
-    cpu_frequency_ghz REAL,
-    total_memory_gb REAL,
-    gpu_model VARCHAR(255),
-    gpu_count INTEGER,
-    gpu_memory_gb REAL,
-    disk_total_gb REAL,
-    disk_available_gb REAL,
-    network_interfaces JSONB,
-    operating_system VARCHAR(255),
-    kernel_version VARCHAR(255),
-    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Create hardware_monitoring table (empty)
-CREATE TABLE IF NOT EXISTS hardware_monitoring (
-    id SERIAL PRIMARY KEY,
-    hostname VARCHAR(255) NOT NULL,
-    timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    cpu_usage_percent REAL,
-    memory_usage_percent REAL,
-    memory_used_gb REAL,
-    memory_available_gb REAL,
-    disk_usage_percent REAL,
-    disk_used_gb REAL,
-    disk_available_gb REAL,
-    network_bytes_sent BIGINT,
-    network_bytes_recv BIGINT,
-    gpu_usage_percent REAL,
-    gpu_memory_usage_percent REAL,
-    gpu_memory_used_mb REAL,
-    gpu_temperature_celsius REAL,
-    power_consumption_watts REAL,
-    INDEX idx_hardware_monitoring_hostname_timestamp (hostname, timestamp)
+    
+    -- Operating System Information (additional fields, not in Hardware_table)
+    os_name VARCHAR(100) NOT NULL,
+    os_version VARCHAR(100) NOT NULL,
+    os_architecture VARCHAR(50) NOT NULL,
+    
+    -- Hardware_table compatible fields - Exact column names as expected by PKL models
+    "CPU" VARCHAR(255) NOT NULL,  -- Full CPU model name
+    "GPU" VARCHAR(255) DEFAULT 'No GPU',  -- GPU model name  
+    num_gpu INTEGER DEFAULT 0,  -- "# of GPU"
+    gpu_memory_total_mb REAL DEFAULT 0,  -- "GPU Memory Total - VRAM (MB)"
+    gpu_graphics_clock REAL DEFAULT 0,  -- "GPU Graphics clock"
+    gpu_memory_clock REAL DEFAULT 0,  -- "GPU Memory clock"
+    gpu_sm_cores INTEGER DEFAULT 0,  -- "GPU SM Cores"
+    gpu_cuda_cores INTEGER DEFAULT 0,  -- "GPU CUDA Cores"
+    cpu_total_cores INTEGER NOT NULL,  -- "CPU Total cores (Including Logical cores)"
+    cpu_threads_per_core REAL NOT NULL,  -- "CPU Threads per Core"
+    cpu_base_clock_ghz REAL DEFAULT 0,  -- "CPU Base clock(GHz)"
+    cpu_max_frequency_ghz REAL DEFAULT 0,  -- "CPU Max Frequency(GHz)"
+    l1_cache INTEGER DEFAULT 0,  -- "L1 Cache"
+    cpu_power_consumption INTEGER DEFAULT 0,  -- "CPU Power Consumption"
+    gpu_power_consumption INTEGER DEFAULT 0,  -- "GPUPower Consumption"
+    
+    -- Additional fields for detailed info (not in Hardware_table but useful)
+    cpu_brand VARCHAR(100),
+    cpu_family INTEGER,
+    cpu_model_family INTEGER,
+    cpu_physical_cores INTEGER,
+    cpu_sockets INTEGER,
+    cpu_cores_per_socket INTEGER,
+    gpu_brand VARCHAR(100),
+    gpu_driver_version VARCHAR(100),
+    total_ram_gb REAL NOT NULL,
+    total_storage_gb REAL NOT NULL,
+    region VARCHAR(100) DEFAULT 'US',
+    
+    -- Timestamp
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Switch to Metrics_db for metrics tables
 \c Metrics_db;
 
--- Create host_overall_metrics table (empty)
+-- Create host_overall_metrics table (empty) - Schema matches collect_all_metrics.py
 CREATE TABLE IF NOT EXISTS host_overall_metrics (
-    id SERIAL PRIMARY KEY,
-    timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    hostname VARCHAR(255) NOT NULL,
-    cpu_usage_percent REAL,
-    memory_usage_percent REAL,
-    disk_usage_percent REAL,
-    network_bytes_sent BIGINT,
-    network_bytes_recv BIGINT,
-    gpu_usage_percent REAL,
-    gpu_memory_usage_mb REAL,
-    power_consumption_watts REAL,
-    temperature_celsius REAL,
-    uptime_seconds BIGINT,
-    load_average_1m REAL,
-    load_average_5m REAL,
-    load_average_15m REAL
+    timestamp TIMESTAMPTZ PRIMARY KEY NOT NULL,
+    host_cpu_usage_percent REAL,
+    host_ram_usage_percent REAL,
+    host_gpu_utilization_percent REAL,
+    host_gpu_memory_utilization_percent REAL,
+    host_gpu_temperature_celsius REAL,
+    host_gpu_power_draw_watts REAL,
+    host_network_bytes_sent BIGINT,
+    host_network_bytes_received BIGINT,
+    host_network_packets_sent BIGINT,
+    host_network_packets_received BIGINT,
+    host_disk_read_bytes BIGINT,
+    host_disk_write_bytes BIGINT,
+    host_disk_read_count BIGINT,
+    host_disk_write_count BIGINT
 );
 
 -- Create host_process_metrics table (empty)
@@ -112,7 +111,7 @@ CREATE TABLE IF NOT EXISTS vm_metrics (
 );
 
 -- Create indexes for performance
-CREATE INDEX IF NOT EXISTS idx_host_overall_metrics_timestamp_hostname ON host_overall_metrics (timestamp DESC, hostname);
+CREATE INDEX IF NOT EXISTS idx_host_overall_metrics_timestamp ON host_overall_metrics (timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_host_process_metrics_timestamp_process ON host_process_metrics (timestamp DESC, process_id);
 CREATE INDEX IF NOT EXISTS idx_vm_metrics_timestamp_vm ON vm_metrics (timestamp DESC, vm_name);
 

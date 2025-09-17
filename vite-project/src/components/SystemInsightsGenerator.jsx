@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
-import { Download, BarChart3, TrendingUp, DollarSign } from 'lucide-react';
+import { Download } from 'lucide-react';
 
-const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode }) => {
+const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode, hostMetrics }) => {
   const generateInsightsData = () => {
     const analysis = {
       cost: [],
@@ -14,6 +14,7 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode }
     // Ensure we have valid data
     const validProcessData = Array.isArray(processData) ? processData : [];
     const validVmData = Array.isArray(vmData) ? vmData : [];
+    const validHostMetrics = hostMetrics || {};
 
     // Calculate system metrics including GPU
     const totalCpuUsage = validProcessData.reduce((sum, p) => sum + (p['CPU Usage (%)'] || 0), 0);
@@ -48,7 +49,7 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode }
       'Weekly Average Analysis' : 
       selectedDate === 'today' ? 'Latest Data Analysis' : `Analysis for ${new Date(selectedDate).toLocaleDateString()}`;
 
-    // Store summary metrics including GPU
+    // Store summary metrics including GPU and host overall metrics
     analysis.summary = {
       totalProcesses: validProcessData.length,
       avgCpuUsage: avgCpuUsage.toFixed(1),
@@ -60,6 +61,21 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode }
       stoppedVMs: validVmData.length - runningVMs.length,
       vmCpuAvg: vmCpuAvg.toFixed(1),
       vmRamAvg: vmRamAvg.toFixed(1),
+
+      // Host Overall Metrics - Current System State
+      hostCpuUsage: (validHostMetrics.host_cpu_usage_percent || 0).toFixed(1),
+      hostRamUsage: (validHostMetrics.host_ram_usage_percent || 0).toFixed(1),
+      hostGpuUsage: (validHostMetrics.host_gpu_utilization_percent || 0).toFixed(1),
+      hostGpuMemoryUsage: (validHostMetrics.host_gpu_memory_utilization_percent || 0).toFixed(1),
+      hostGpuTemperature: (validHostMetrics.host_gpu_temperature_celsius || 0).toFixed(1),
+      hostGpuPowerDraw: (validHostMetrics.host_gpu_power_draw_watts || 0).toFixed(1),
+      hostNetworkTotal: validHostMetrics.host_network_bytes_sent && validHostMetrics.host_network_bytes_received
+        ? Math.round((validHostMetrics.host_network_bytes_sent + validHostMetrics.host_network_bytes_received) / 1024 / 1024 / 1024)
+        : 0,
+      hostDiskTotal: validHostMetrics.host_disk_read_bytes && validHostMetrics.host_disk_write_bytes
+        ? Math.round((validHostMetrics.host_disk_read_bytes + validHostMetrics.host_disk_write_bytes) / 1024 / 1024 / 1024)
+        : 0,
+
       analysisDate: new Date().toLocaleDateString(),
       analysisTime: new Date().toLocaleTimeString(),
       analysisDescription: analysisDescription,
@@ -592,12 +608,12 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode }
         }
         
         .savings strong {
-            color: #059669;
+            color: #01a982;
         }
         
         .no-issues {
             background: #f0fdf4;
-            color: #059669;
+            color: #01a982;
             padding: 20px;
             border-radius: 10px;
             text-align: center;
@@ -670,7 +686,7 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode }
         <section class="report-summary">
             <h2 style="margin-bottom: 20px; color: #2d3748;">System Overview</h2>
             ${summary.viewMode === 'week' ? `
-            <div style="background: #e0f7fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #00acc1;">
+            <div style="background: #e0f7fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #01a982;">
                 <h4 style="color: #00695c; margin-bottom: 10px;">📊 Weekly Analysis Methodology</h4>
                 <p style="color: #004d40; font-size: 14px; margin: 0;">
                     This report analyzes aggregated data over a 7-day period. Process metrics represent averages across all days, 
@@ -688,21 +704,58 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode }
                 </p>
             </div>
             `}
+            <h3 style="margin-bottom: 15px; color: #2d3748;">Current Host System Metrics</h3>
             <div class="summary-grid">
                 <div class="summary-card">
-                    <h4>Total Processes</h4>
+                    <h4>Host CPU Utilization</h4>
+                    <div class="value">${summary.hostCpuUsage}%</div>
+                </div>
+                <div class="summary-card">
+                    <h4>Host RAM Utilization</h4>
+                    <div class="value">${summary.hostRamUsage}%</div>
+                </div>
+                <div class="summary-card">
+                    <h4>Host GPU Utilization</h4>
+                    <div class="value">${summary.hostGpuUsage}%</div>
+                </div>
+                <div class="summary-card">
+                    <h4>Host GPU Memory Utilization</h4>
+                    <div class="value">${summary.hostGpuMemoryUsage}%</div>
+                </div>
+                <div class="summary-card">
+                    <h4>GPU Temperature</h4>
+                    <div class="value">${summary.hostGpuTemperature}°C</div>
+                </div>
+                <div class="summary-card">
+                    <h4>GPU Power Consumption</h4>
+                    <div class="value">${summary.hostGpuPowerDraw}W</div>
+                </div>
+                <div class="summary-card">
+                    <h4>Network I/O Total</h4>
+                    <div class="value">${summary.hostNetworkTotal}GB</div>
+                </div>
+                <div class="summary-card">
+                    <h4>Disk I/O Total</h4>
+                    <div class="value">${summary.hostDiskTotal}GB</div>
+                </div>
+            </div>
+
+            <h3 style="margin: 30px 0 15px 0; color: #2d3748;">Process and Virtual Machine Analysis</h3>
+            <div class="summary-grid">
+                <div class="summary-card">
+                    <h4>Total Active Processes</h4>
                     <div class="value">${summary.totalProcesses}</div>
                 </div>
                 <div class="summary-card">
-                    <h4>Average CPU Usage</h4>
+                    <h4>Average Process CPU Usage</h4>
                     <div class="value">${summary.avgCpuUsage}%</div>
                 </div>
                 <div class="summary-card">
-                    <h4>Average Memory Usage</h4>
+                    <h4>Average Process Memory Usage</h4>
                     <div class="value">${summary.avgMemoryUsage}%</div>
                 </div>
                 <div class="summary-card">
-                    <h4>Running VMs</h4>
+                    <h4>Running Virtual Machines</h4>
                     <div class="value">${summary.runningVMs}</div>
                 </div>
                 <div class="summary-card">
@@ -714,18 +767,18 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode }
                     <div class="value">${summary.vmRamAvg}%</div>
                 </div>
                 <div class="summary-card">
-                    <h4>Average GPU Memory</h4>
+                    <h4>Average Process GPU Memory</h4>
                     <div class="value">${summary.avgGpuMemoryUsage}MB</div>
                 </div>
                 <div class="summary-card">
-                    <h4>Average GPU Utilization</h4>
+                    <h4>Average Process GPU Utilization</h4>
                     <div class="value">${summary.avgGpuUtilization}%</div>
                 </div>
             </div>
         </section>
 
         <main class="report-content">
-            ${generateSectionHTML('💰 Cost Optimization', cost, 'dollar-icon', '#059669')}
+            ${generateSectionHTML('💰 Cost Optimization', cost, 'dollar-icon', '#01a982')}
             ${generateSectionHTML('📈 Scaling Recommendations', scaling, 'scale-icon', '#2563eb')}
             ${generateSectionHTML('⚡ Performance Insights', performance, 'performance-icon', '#7c3aed')}
             ${generateSectionHTML('🔒 Security & Maintenance', security, 'security-icon', '#dc2626')}
@@ -768,7 +821,7 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode }
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-6">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-6">
         <div>
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
             System Insights & Recommendations
@@ -779,51 +832,51 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode }
         </div>
         <button
           onClick={handleDownloadReport}
-          className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-900 text-white rounded-lg transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-[#01a982] hover:bg-[#019670] text-white rounded-lg transition-colors"
         >
           <Download className="w-4 h-4" />
-          Get Recommendations
+          Recommendations
         </button>
       </div>
       
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg border border-green-200 dark:border-green-800">
-          <div className="flex items-center gap-2 mb-1">
-            <DollarSign className="w-4 h-4 text-green-600" />
-            <span className="text-sm font-medium text-green-700 dark:text-green-300">Cost Savings</span>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+        <div className="space-y-2">
+          <div className="text-sm font-medium text-gray-600 dark:text-gray-400">Cost Savings</div>
+          <div className="text-2xl font-bold text-gray-900 dark:text-white">
+            $ {previewData.cost.reduce((sum, item) => sum + (parseInt(item.savings?.replace(/[$,]/g, '') || 0)), 0)}
           </div>
-          <div className="text-lg font-bold text-green-800 dark:text-green-200">
+          <div className="text-xs text-gray-500 dark:text-gray-500">
             {previewData.cost.length} opportunities
           </div>
         </div>
         
-        <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border border-blue-200 dark:border-blue-800">
-          <div className="flex items-center gap-2 mb-1">
-            <TrendingUp className="w-4 h-4 text-blue-600" />
-            <span className="text-sm font-medium text-blue-700 dark:text-blue-300">Scaling</span>
+        <div className="space-y-2">
+          <div className="text-sm font-medium text-gray-600 dark:text-gray-400">Scaling</div>
+          <div className="text-2xl font-bold text-gray-900 dark:text-white">
+            {previewData.scaling.length}
           </div>
-          <div className="text-lg font-bold text-blue-800 dark:text-blue-200">
-            {previewData.scaling.length} recommendations
-          </div>
-        </div>
-        
-        <div className="bg-purple-50 dark:bg-purple-900/20 p-3 rounded-lg border border-purple-200 dark:border-purple-800">
-          <div className="flex items-center gap-2 mb-1">
-            <BarChart3 className="w-4 h-4 text-purple-600" />
-            <span className="text-sm font-medium text-purple-700 dark:text-purple-300">Performance</span>
-          </div>
-          <div className="text-lg font-bold text-purple-800 dark:text-purple-200">
-            {previewData.performance.length} insights
+          <div className="text-xs text-gray-500 dark:text-gray-500">
+            recommendations
           </div>
         </div>
         
-        <div className="bg-red-50 dark:bg-red-900/20 p-3 rounded-lg border border-red-200 dark:border-red-800">
-          <div className="flex items-center gap-2 mb-1">
-            <BarChart3 className="w-4 h-4 text-red-600" />
-            <span className="text-sm font-medium text-red-700 dark:text-red-300">Security</span>
+        <div className="space-y-2">
+          <div className="text-sm font-medium text-gray-600 dark:text-gray-400">Performance</div>
+          <div className="text-2xl font-bold text-gray-900 dark:text-white">
+            {previewData.performance.length}
           </div>
-          <div className="text-lg font-bold text-red-800 dark:text-red-200">
-            {previewData.security.length} alerts
+          <div className="text-xs text-gray-500 dark:text-gray-500">
+            insights
+          </div>
+        </div>
+        
+        <div className="space-y-2">
+          <div className="text-sm font-medium text-gray-600 dark:text-gray-400">Security</div>
+          <div className="text-2xl font-bold text-gray-900 dark:text-white">
+            {previewData.security.length}
+          </div>
+          <div className="text-xs text-gray-500 dark:text-gray-500">
+            alerts
           </div>
         </div>
       </div>

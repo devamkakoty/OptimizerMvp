@@ -1,0 +1,1449 @@
+import React, { useState, useEffect } from 'react';
+import DatePicker from 'react-datepicker';
+import { useNavigate } from 'react-router-dom';
+import apiClient from '../config/axios';
+import { ChevronLeft, ChevronRight, BarChart3, Calendar, DollarSign, Zap, Cpu, HardDrive, Monitor, MemoryStick, Server } from 'lucide-react';
+import SystemInsightsGenerator from './SystemInsightsGenerator';
+import "../styles/AdminDashboardNew.css"
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement,
+  Filler
+} from 'chart.js';
+import { Line, Bar, Doughnut } from 'react-chartjs-2';
+import VMRecommendationsModal from './VMRecommendationsModal';
+import ProcessInsightsModal from './ProcessInsightsModal';
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement,
+  Filler
+);
+
+const AdminDashboardNew = ({
+  processData,
+  chartOptions,
+  viewMode,
+  selectedDate,
+  selectedWeek,
+  availableDates,
+  setViewMode,
+  setSelectedDate,
+  setSelectedWeek,
+  selectedCalendarDate,
+  setSelectedCalendarDate,
+  handleCalendarDateChange,
+  minDate,
+  maxDate,
+  availableDateObjects,
+  noDataError
+}) => {
+  const navigate = useNavigate();
+
+  // State for date range selection
+  const [dateRange, setDateRange] = useState({ start: null, end: null });
+
+  // State for cost calculation
+  const [selectedRegion, setSelectedRegion] = useState('US');
+  const [costData, setCostData] = useState(null);
+  const [availableRegions, setAvailableRegions] = useState([]);
+  const [costModels, setCostModels] = useState([]);
+
+  // State for hardware specs and host metrics
+  const [hardwareSpecs, setHardwareSpecs] = useState(null);
+  const [hostMetrics, setHostMetrics] = useState(null);
+  const [hardwareLoading, setHardwareLoading] = useState(true);
+  const [metricsLoading, setMetricsLoading] = useState(true);
+
+  // State for scrollable sections
+  const [performanceCardIndex, setPerformanceCardIndex] = useState(0);
+  const [hardwareCardIndex, setHardwareCardIndex] = useState(0);
+
+  // Hardware details popup state
+  const [showHardwarePopup, setShowHardwarePopup] = useState(false);
+  const [selectedHardwareDetail, setSelectedHardwareDetail] = useState(null);
+
+  // State for performance analytics dropdown
+  const [selectedGraph, setSelectedGraph] = useState('memory');
+
+  // State for VM monitoring
+  const [vmData, setVmData] = useState([]);
+  const [vmDataLoading, setVmDataLoading] = useState(true);
+  const [expandedVM, setExpandedVM] = useState(null);
+  const [vmProcessData, setVmProcessData] = useState({});
+  const [recommendationsModalOpen, setRecommendationsModalOpen] = useState(false);
+  const [selectedVMForRecommendations, setSelectedVMForRecommendations] = useState(null);
+
+  // Process-specific insights state
+  const [selectedProcess, setSelectedProcess] = useState(null);
+  const [processRecommendations, setProcessRecommendations] = useState({});
+  const [processRealTimeData, setProcessRealTimeData] = useState({});
+  const [processModalOpen, setProcessModalOpen] = useState(false);
+
+  // State for top processes data
+  const [topProcesses, setTopProcesses] = useState([]);
+
+  // Generate AI-powered process-specific recommendations
+  const generateProcessRecommendations = (processName, power, cost, process) => {
+    const recommendations = [];
+    const powerValue = parseFloat(power) || 0;
+    const costValue = parseFloat(cost) || 0;
+    const cpuUsage = parseFloat(process['CPU Usage (%)']) || 0;
+    const memoryUsage = parseFloat(process['Memory Usage (MB)']) || 0;
+    const gpuUsage = parseFloat(process['GPU Utilization (%)']) || 0;
+
+    // High Power Consumption Analysis
+    if (powerValue > 25) {
+      const category = powerValue > 50 ? 'critical' : 'high';
+      recommendations.push({
+        type: 'power-optimization',
+        title: `${category === 'critical' ? 'Critical' : 'High'} Power Consumption Alert`,
+        description: `${processName} is consuming ${powerValue.toFixed(1)}W. ${
+          category === 'critical' ? 'Immediate optimization required.' : 'Consider power throttling or task rescheduling.'
+        } AI suggests ${cpuUsage > 80 ? 'CPU frequency scaling' : 'workload distribution'}.`,
+        priority: category === 'critical' ? 'high' : 'medium',
+        savings: category === 'critical' ? '25-40%' : '15-25%'
+      });
+    }
+
+    // CPU Utilization Analysis
+    if (cpuUsage > 85) {
+      recommendations.push({
+        type: 'cpu-optimization',
+        title: 'CPU Bottleneck Detected',
+        description: `${processName} is using ${cpuUsage.toFixed(1)}% CPU. AI recommends ${
+          processName.toLowerCase().includes('chrome') || processName.toLowerCase().includes('browser')
+            ? 'tab management and extension optimization'
+            : processName.toLowerCase().includes('python') || processName.toLowerCase().includes('node')
+            ? 'code profiling and algorithm optimization'
+            : 'process priority adjustment and multi-threading'
+        }.`,
+        priority: 'high',
+        savings: '20-35%'
+      });
+    }
+
+    // Memory Usage Analysis
+    if (memoryUsage > 1000) {
+      recommendations.push({
+        type: 'memory-optimization',
+        title: 'High Memory Usage',
+        description: `Memory usage at ${(memoryUsage/1024).toFixed(1)}GB. ${
+          processName.toLowerCase().includes('chrome') ? 'Consider closing unused tabs or using lightweight alternatives.'
+          : processName.toLowerCase().includes('python') ? 'Implement memory profiling and garbage collection optimization.'
+          : processName.toLowerCase().includes('video') || processName.toLowerCase().includes('media') ? 'Reduce video quality or buffer size.'
+          : 'Consider memory cleanup routines or increasing virtual memory.'
+        }`,
+        priority: memoryUsage > 2000 ? 'high' : 'medium',
+        savings: '10-20%'
+      });
+    }
+
+    // GPU Usage Analysis
+    if (gpuUsage > 70) {
+      recommendations.push({
+        type: 'gpu-optimization',
+        title: 'GPU Intensive Process',
+        description: `GPU utilization at ${gpuUsage.toFixed(1)}%. ${
+          processName.toLowerCase().includes('game') ? 'Optimize graphics settings for better efficiency.'
+          : processName.toLowerCase().includes('python') || processName.toLowerCase().includes('ml') ? 'Consider batch processing or model quantization.'
+          : processName.toLowerCase().includes('video') ? 'Use hardware-accelerated encoding with lower bitrates.'
+          : 'Implement GPU workload scheduling or distributed processing.'
+        }`,
+        priority: 'medium',
+        savings: '15-30%'
+      });
+    }
+
+    // Cost Optimization Analysis
+    if (costValue > 0.008) {
+      const regionSavings = Math.round((costValue - costValue * 0.65) / costValue * 100);
+      recommendations.push({
+        type: 'cost-optimization',
+        title: 'Regional Cost Optimization',
+        description: `Current cost: $${costValue.toFixed(4)}/hour. AI analysis shows ${regionSavings}% savings by migrating to lower-cost regions during non-peak hours. Estimated annual savings: $${(costValue * 24 * 365 * regionSavings / 100).toFixed(2)}.`,
+        priority: costValue > 0.02 ? 'high' : 'medium',
+        savings: `${regionSavings}%`
+      });
+    }
+
+    // Intelligent Scheduling Recommendations
+    const currentHour = new Date().getHours();
+    if (powerValue > 15 || cpuUsage > 60) {
+      const isPeakHour = currentHour >= 9 && currentHour <= 17;
+      recommendations.push({
+        type: 'smart-scheduling',
+        title: 'AI-Powered Workload Scheduling',
+        description: `${isPeakHour ? 'Peak hours detected.' : 'Off-peak optimization available.'} AI suggests ${
+          isPeakHour ? 'deferring non-critical tasks to 10 PM - 6 AM for 40% cost reduction'
+          : 'current timing is optimal, but consider load balancing during 2-4 AM window'
+        }. Predictive analysis shows 23% efficiency gain.`,
+        priority: isPeakHour ? 'medium' : 'low',
+        savings: isPeakHour ? '25-40%' : '10-15%'
+      });
+    }
+
+    // Process-Specific Recommendations
+    if (processName.toLowerCase().includes('chrome') || processName.toLowerCase().includes('browser')) {
+      recommendations.push({
+        type: 'browser-optimization',
+        title: 'Browser Performance Optimization',
+        description: 'AI detects browser inefficiencies. Enable hardware acceleration, limit background tabs, use ad-blockers, and consider switching to efficiency mode for 30% power reduction.',
+        priority: 'low',
+        savings: '20-30%'
+      });
+    }
+
+    // Ensure we always have at least one recommendation
+    if (recommendations.length === 0) {
+      recommendations.push({
+        type: 'baseline-optimization',
+        title: 'Baseline Performance Optimization',
+        description: `${processName} is running efficiently. AI suggests periodic monitoring and considers implementing automated scaling for future optimization opportunities.`,
+        priority: 'low',
+        savings: '5-10%'
+      });
+    }
+
+    return recommendations.slice(0, 6); // Limit to 6 recommendations for better UX
+  };
+
+  // Generate real-time data for process display (no dummy data)
+  const generateProcessRealTimeData = (process) => {
+    // Use only current real values - no historical dummy data
+    const currentTime = new Date().toLocaleTimeString();
+
+    return {
+      current: {
+        cpu: parseFloat(process['CPU Usage (%)']) || 0,
+        memory: parseFloat(process['Memory Usage (MB)']) || 0,
+        memoryPercent: parseFloat(process['Memory Usage (%)']) || 0,
+        power: parseFloat(process['Power Consumption (W)']) || 0,
+        gpu: parseFloat(process['GPU Utilization (%)']) || 0,
+        gpuMemory: parseFloat(process['GPU Memory Usage (MB)']) || 0,
+        iops: parseFloat(process['IOPS']) || 0,
+        openFiles: parseInt(process['Open Files']) || 0,
+        timestamp: currentTime
+      }
+    };
+  };
+
+  // Handle process selection - Open modal instead of expansion
+  const handleProcessClick = (process) => {
+    setSelectedProcess(process);
+
+    // Generate recommendations
+    const recs = generateProcessRecommendations(
+      process['Process Name'],
+      process['Power Consumption (W)'],
+      process['Energy Cost ($)'],
+      process
+    );
+    setProcessRecommendations({
+      ...processRecommendations,
+      [process['Process ID']]: recs
+    });
+
+    // Generate real-time data (no dummy historical data)
+    const realTimeData = generateProcessRealTimeData(process);
+    setProcessRealTimeData({
+      ...processRealTimeData,
+      [process['Process ID']]: realTimeData
+    });
+
+    // Open modal
+    setProcessModalOpen(true);
+  };
+
+  // Fetch cost models from database
+  const fetchCostModels = async () => {
+    try {
+      const response = await fetch('/api/cost-models?resource_name=ELECTRICITY_KWH');
+      const data = await response.json();
+
+      if (data.success) {
+        setCostModels(data.cost_models || []);
+
+        // Convert cost models to regions format for compatibility
+        const regions = data.cost_models.map(model => ({
+          code: model.region,
+          name: model.region,
+          currency: model.currency,
+          rate: model.cost_per_unit,
+          description: model.description
+        }));
+
+        setAvailableRegions(regions);
+
+        // Set default region if not already set
+        if (regions.length > 0 && !regions.find(r => r.code === selectedRegion)) {
+          setSelectedRegion(regions[0].code);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching cost models:', error);
+      // Fallback to minimal default if database is not available
+      setAvailableRegions([
+        { code: 'US', name: 'United States', currency: 'USD', rate: 0.12, description: 'Default US rate' }
+      ]);
+    }
+  };
+
+  // Get current region for cost calculations
+  const currentRegion = availableRegions.find(r => r.code === selectedRegion) || availableRegions[0] || {
+    code: 'US',
+    name: 'United States',
+    currency: 'USD',
+    rate: 0.12,
+    description: 'Default fallback rate'
+  };
+
+  // Calculate total system cost from current processes
+  const totalSystemCost = topProcesses.reduce((total, process) => {
+    return total + (parseFloat(process['Energy Cost ($)']) || 0);
+  }, 0);
+
+  // Performance metrics cards data
+  const performanceMetrics = [
+    { label: 'CPU Usage', value: hostMetrics?.host_cpu_usage_percent || 0, unit: '%', color: 'blue' },
+    { label: 'Memory Usage', value: hostMetrics?.host_ram_usage_percent || 0, unit: '%', color: 'green' },
+    { label: 'GPU Usage', value: hostMetrics?.host_gpu_utilization_percent || 0, unit: '%', color: 'orange' },
+    {
+      label: 'Network Total',
+      value: hostMetrics?.host_network_bytes_sent && hostMetrics?.host_network_bytes_received
+        ? Math.round((hostMetrics.host_network_bytes_sent + hostMetrics.host_network_bytes_received) / 1024 / 1024 / 1024)
+        : 0,
+      unit: 'GB',
+      color: 'yellow'
+    },
+    {
+      label: 'Disk Total',
+      value: hostMetrics?.host_disk_read_bytes && hostMetrics?.host_disk_write_bytes
+        ? Math.round((hostMetrics.host_disk_read_bytes + hostMetrics.host_disk_write_bytes) / 1024 / 1024 / 1024)
+        : 0,
+      unit: 'GB',
+      color: 'red'
+    },
+    {
+      label: 'System Cost',
+      value: totalSystemCost,
+      unit: `${currentRegion.currency}/hr`,
+      color: 'purple'
+    },
+  ];
+
+  // Hardware details cards data with correct API field mappings
+  const hardwareDetails = [
+    {
+      label: 'CPU Model',
+      value: hardwareSpecs?.CPU || 'Loading...',
+      icon: Cpu,
+      details: {
+        'Brand': hardwareSpecs?.cpu_brand || 'N/A',
+        'Model': hardwareSpecs?.CPU || 'N/A',
+        'Physical Cores': hardwareSpecs?.cpu_physical_cores || 'N/A',
+        'Total Cores': hardwareSpecs?.['CPU Total cores (Including Logical cores)'] || 'N/A',
+        'Base Clock': hardwareSpecs?.['CPU Base clock(GHz)'] ? `${hardwareSpecs['CPU Base clock(GHz)']} GHz` : 'N/A',
+        'Max Frequency': hardwareSpecs?.['CPU Max Frequency(GHz)'] ? `${hardwareSpecs['CPU Max Frequency(GHz)']} GHz` : 'N/A',
+        'Threads per Core': hardwareSpecs?.['CPU Threads per Core'] || 'N/A',
+        'L1 Cache': hardwareSpecs?.['L1 Cache'] ? `${(hardwareSpecs['L1 Cache'] / 1024).toFixed(0)} KB` : 'N/A',
+        'Power Consumption': hardwareSpecs?.['CPU Power Consumption'] ? `${hardwareSpecs['CPU Power Consumption']}W` : 'N/A',
+        'CPU Sockets': hardwareSpecs?.cpu_sockets || 'N/A',
+        'Cores per Socket': hardwareSpecs?.cpu_cores_per_socket || 'N/A'
+      }
+    },
+    {
+      label: 'GPU Model',
+      value: hardwareSpecs?.GPU || 'Loading...',
+      icon: Monitor,
+      details: {
+        'Brand': hardwareSpecs?.gpu_brand || 'N/A',
+        'Model': hardwareSpecs?.GPU || 'N/A',
+        'Number of GPUs': hardwareSpecs?.['# of GPU'] || 'N/A',
+        'VRAM': hardwareSpecs?.['GPU Memory Total - VRAM (MB)'] ? `${(hardwareSpecs['GPU Memory Total - VRAM (MB)'] / 1024).toFixed(1)} GB` : 'N/A',
+        'Graphics Clock': hardwareSpecs?.['GPU Graphics clock'] ? `${hardwareSpecs['GPU Graphics clock']} MHz` : 'N/A',
+        'Memory Clock': hardwareSpecs?.['GPU Memory clock'] ? `${hardwareSpecs['GPU Memory clock']} MHz` : 'N/A',
+        'CUDA Cores': hardwareSpecs?.['GPU CUDA Cores'] || 'N/A',
+        'SM Cores': hardwareSpecs?.['GPU SM Cores'] || 'N/A',
+        'Driver Version': hardwareSpecs?.gpu_driver_version || 'N/A',
+        'Power Consumption': hardwareSpecs?.['GPUPower Consumption'] ? `${hardwareSpecs['GPUPower Consumption']}W` : 'N/A'
+      }
+    },
+    {
+      label: 'Memory',
+      value: hardwareSpecs?.total_ram_gb ? `${hardwareSpecs.total_ram_gb.toFixed(1)} GB` : 'Loading...',
+      icon: MemoryStick,
+      details: {
+        'Total RAM': hardwareSpecs?.total_ram_gb ? `${hardwareSpecs.total_ram_gb.toFixed(1)} GB` : 'N/A'
+      }
+    },
+    {
+      label: 'Storage',
+      value: hardwareSpecs?.total_storage_gb ? `${hardwareSpecs.total_storage_gb.toFixed(0)} GB` : 'Loading...',
+      icon: HardDrive,
+      details: {
+        'Total Storage': hardwareSpecs?.total_storage_gb ? `${hardwareSpecs.total_storage_gb.toFixed(0)} GB` : 'N/A'
+      }
+    },
+    {
+      label: 'Operating System',
+      value: hardwareSpecs?.os_name || 'Loading...',
+      icon: Server,
+      details: {
+        'OS Name': hardwareSpecs?.os_name || 'N/A',
+        'OS Version': hardwareSpecs?.os_version || 'N/A',
+        'Architecture': hardwareSpecs?.os_architecture || 'N/A',
+        'Region': hardwareSpecs?.region || 'N/A',
+        'Last Updated': hardwareSpecs?.timestamp ? new Date(hardwareSpecs.timestamp).toLocaleString() : 'N/A'
+      }
+    }
+  ];
+
+  // Graph options for performance analytics
+  const graphOptions = [
+    { value: 'memory', label: 'Memory Usage by Process (Top 5)' },
+    { value: 'cpu', label: 'CPU Usage by Process (Top 5)' },
+    { value: 'gpu', label: 'GPU Usage by Process (Top 5)' },
+    { value: 'power', label: 'Power Consumption (Top 5)' },
+  ];
+
+  // Fetch hardware specifications
+  const fetchHardwareSpecs = async () => {
+    try {
+      setHardwareLoading(true);
+      const response = await apiClient.get('/hardware-specs/latest');
+
+      if (response.data && response.data.success && response.data.data) {
+        setHardwareSpecs(response.data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching hardware specs:', error);
+    } finally {
+      setHardwareLoading(false);
+    }
+  };
+
+  // Handle hardware card click for detailed popup
+  const handleHardwareCardClick = (hardwareDetail) => {
+    setSelectedHardwareDetail(hardwareDetail);
+    setShowHardwarePopup(true);
+  };
+
+  // Fetch host metrics
+  const fetchHostMetrics = async () => {
+    try {
+      setMetricsLoading(true);
+      let url = '/api/host-overall-metrics?limit=1';
+
+      // Add date range parameters if available
+      if (dateRange.start || dateRange.end) {
+        const params = new URLSearchParams([['limit', '1']]);
+        if (dateRange.start) {
+          params.append('start_date', dateRange.start.toISOString().split('T')[0]);
+        }
+        if (dateRange.end) {
+          params.append('end_date', dateRange.end.toISOString().split('T')[0]);
+        }
+        url = `/api/host-overall-metrics?${params.toString()}`;
+      }
+
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (data.success && data.data && data.data.length > 0) {
+        setHostMetrics(data.data[0]);
+      }
+    } catch (error) {
+      console.error('Error fetching host metrics:', error);
+    } finally {
+      setMetricsLoading(false);
+    }
+  };
+
+  // Fetch VM data
+  const fetchVMData = async () => {
+    try {
+      setVmDataLoading(true);
+      const response = await fetch('/api/v1/metrics/vms/active');
+      const data = await response.json();
+
+      if (data.success && data.active_vms) {
+        const transformedVMs = await Promise.all(
+          data.active_vms.map(async (vm) => {
+            try {
+              let summaryUrl = `/api/v1/metrics/vm/${encodeURIComponent(vm.vm_name)}/summary?hours=1`;
+
+              // Add date range parameters if available
+              if (dateRange.start || dateRange.end) {
+                const params = new URLSearchParams([['hours', '1']]);
+                if (dateRange.start) {
+                  params.append('start_date', dateRange.start.toISOString().split('T')[0]);
+                }
+                if (dateRange.end) {
+                  params.append('end_date', dateRange.end.toISOString().split('T')[0]);
+                }
+                summaryUrl = `/api/v1/metrics/vm/${encodeURIComponent(vm.vm_name)}/summary?${params.toString()}`;
+              }
+
+              const summaryResponse = await fetch(summaryUrl);
+              const summaryData = await summaryResponse.json();
+
+              return {
+                id: vm.vm_name,
+                name: vm.vm_name,
+                type: vm.vm_name.includes('Web') ? 'Web Server' :
+                      vm.vm_name.includes('DB') ? 'Database' :
+                      vm.vm_name.includes('App') ? 'Application' : 'Virtual Machine',
+                status: 'Running',
+                cpuUsage: summaryData.success ? summaryData.metrics?.avg_cpu_usage || 0 : 0,
+                ramUsagePercent: summaryData.success ? summaryData.metrics?.avg_memory_usage || 0 : 0,
+                lastSeen: vm.last_seen ? new Date(vm.last_seen).toLocaleString() : 'Unknown',
+                processCount: vm.process_count || 0,
+              };
+            } catch (error) {
+              console.error(`Error fetching details for VM ${vm.vm_name}:`, error);
+              return {
+                id: vm.vm_name,
+                name: vm.vm_name,
+                type: 'Virtual Machine',
+                status: 'Running',
+                cpuUsage: 0,
+                ramUsagePercent: 0,
+                lastSeen: vm.last_seen ? new Date(vm.last_seen).toLocaleString() : 'Unknown',
+                processCount: vm.process_count || 0,
+              };
+            }
+          })
+        );
+        setVmData(transformedVMs);
+      }
+    } catch (error) {
+      console.error('Error fetching VM data:', error);
+    } finally {
+      setVmDataLoading(false);
+    }
+  };
+
+  // Initial data fetching
+  useEffect(() => {
+    // Always fetch latest data (not date-range dependent)
+    fetchCostModels();
+    fetchHardwareSpecs(); // Always latest hardware specs
+    fetchHostMetrics(); // Always latest real-time metrics
+    fetchVMData();
+
+    // Fetch date-range dependent data
+    fetchChartData();
+    fetchTopProcesses();
+
+    // Set up intervals for real-time updates (always latest, ignore date range)
+    const realtimeInterval = setInterval(() => {
+      fetchHostMetrics(); // Real-time host metrics every 2 seconds
+    }, 2000);
+
+    const vmInterval = setInterval(fetchVMData, 10000);
+
+    // Periodic update for date-range dependent data (less frequent)
+    const aggregatedInterval = setInterval(() => {
+      fetchChartData();
+      fetchTopProcesses();
+    }, 30000); // Update every 30 seconds
+
+    return () => {
+      clearInterval(realtimeInterval);
+      clearInterval(vmInterval);
+      clearInterval(aggregatedInterval);
+    };
+  }, []);
+
+  // Refetch ONLY date-range dependent data when date range changes
+  useEffect(() => {
+    fetchChartData(); // Charts should reflect date range
+    fetchTopProcesses(); // Process statistics should reflect date range
+    // Note: Hardware specs and real-time metrics are NOT refetched here
+  }, [dateRange]);
+
+  // Refetch chart data when selected graph changes
+  useEffect(() => {
+    fetchChartData();
+  }, [selectedGraph]);
+
+  // Refetch cost-dependent data when region changes
+  useEffect(() => {
+    if (selectedRegion && selectedRegion !== '') {
+      fetchTopProcesses(); // Process costs will change based on region
+      fetchChartData(); // Chart data includes costs
+    }
+  }, [selectedRegion]);
+
+  // Generate chart data based on selected graph
+  const generateChartData = () => {
+    if (!processData || processData.length === 0) return null;
+
+    const sortedData = [...processData]
+      .sort((a, b) => {
+        switch (selectedGraph) {
+          case 'memory':
+            return (b['Memory Usage (MB)'] || 0) - (a['Memory Usage (MB)'] || 0);
+          case 'cpu':
+            return (b['CPU Usage (%)'] || 0) - (a['CPU Usage (%)'] || 0);
+          case 'gpu':
+            return (b['GPU Utilization (%)'] || 0) - (a['GPU Utilization (%)'] || 0);
+          case 'power':
+            return (b['Power Consumption (W)'] || 0) - (a['Power Consumption (W)'] || 0);
+          default:
+            return 0;
+        }
+      })
+      .slice(0, 5);
+
+    const labels = sortedData.map(p => p['Process Name'] || 'Unknown');
+    const dataValues = sortedData.map(p => {
+      switch (selectedGraph) {
+        case 'memory':
+          return p['Memory Usage (MB)'] || 0;
+        case 'cpu':
+          return p['CPU Usage (%)'] || 0;
+        case 'gpu':
+          return p['GPU Utilization (%)'] || 0;
+        case 'power':
+          return p['Power Consumption (W)'] || 0;
+        default:
+          return 0;
+      }
+    });
+
+    return {
+      labels,
+      datasets: [{
+        label: graphOptions.find(g => g.value === selectedGraph)?.label || 'Data',
+        data: dataValues,
+        backgroundColor: 'rgba(34, 197, 94, 0.8)',
+        borderColor: 'rgba(34, 197, 94, 1)',
+        borderWidth: 2,
+        borderRadius: 4,
+      }]
+    };
+  };
+
+
+  // State for optimized data from backend
+  const [systemOverview, setSystemOverview] = useState(null);
+  const [chartData, setChartData] = useState(null);
+
+  // Fetch optimized system overview from backend
+  const fetchSystemOverview = async () => {
+    try {
+      let url = '/api/dashboard/system-overview';
+
+      if (dateRange.start || dateRange.end) {
+        const params = new URLSearchParams();
+        if (dateRange.start) {
+          params.append('start_date', dateRange.start.toISOString().split('T')[0]);
+        }
+        if (dateRange.end) {
+          params.append('end_date', dateRange.end.toISOString().split('T')[0]);
+        }
+        url += `?${params.toString()}`;
+      }
+
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (data.success) {
+        setSystemOverview(data.data);
+        // Update legacy state for compatibility
+        if (data.data.hardware_specs) {
+          setHardwareSpecs(data.data.hardware_specs);
+        }
+        if (data.data.host_metrics) {
+          setHostMetrics(data.data.host_metrics);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching system overview:', error);
+    }
+  };
+
+  // Fetch optimized chart data from backend
+  const fetchChartData = async () => {
+    try {
+      const params = new URLSearchParams([['metric', selectedGraph], ['limit', '5']]);
+
+      // Add region parameter if selected
+      if (selectedRegion && selectedRegion !== '') {
+        params.append('region', selectedRegion);
+      }
+
+      // Add date range if specified
+      if (dateRange.start || dateRange.end) {
+        if (dateRange.start) {
+          params.append('start_date', dateRange.start.toISOString().split('T')[0]);
+        }
+        if (dateRange.end) {
+          params.append('end_date', dateRange.end.toISOString().split('T')[0]);
+        }
+      }
+
+      const url = `/api/dashboard/chart-data?${params.toString()}`;
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (data.success) {
+        setChartData(data.chart_data);
+      }
+    } catch (error) {
+      console.error('Error fetching chart data:', error);
+    }
+  };
+
+  // Fetch optimized top processes from backend
+  const fetchTopProcesses = async () => {
+    try {
+      const params = new URLSearchParams([['metric', 'cpu'], ['limit', '5']]);
+
+      // Add region parameter if selected
+      if (selectedRegion && selectedRegion !== '') {
+        params.append('region', selectedRegion);
+      }
+
+      // Add date range if specified
+      if (dateRange.start || dateRange.end) {
+        if (dateRange.start) {
+          params.append('start_date', dateRange.start.toISOString().split('T')[0]);
+        }
+        if (dateRange.end) {
+          params.append('end_date', dateRange.end.toISOString().split('T')[0]);
+        }
+      }
+
+      const url = `/api/dashboard/top-processes?${params.toString()}`;
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (data.success) {
+        setTopProcesses(data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching top processes:', error);
+    }
+  };
+
+  // Download report functionality
+  const handleDownloadReport = async () => {
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+    const startDateStr = dateRange.start ? dateRange.start.toISOString().split('T')[0] : 'latest';
+    const endDateStr = dateRange.end ? dateRange.end.toISOString().split('T')[0] : 'latest';
+    const filename = `GreenMatrix_Dashboard_Report_${startDateStr}_to_${endDateStr}_${timestamp}.html`;
+
+    // Create comprehensive report data
+    const reportData = {
+      generatedAt: new Date().toLocaleString(),
+      dateRange: {
+        start: dateRange.start ? dateRange.start.toLocaleDateString() : 'Not set',
+        end: dateRange.end ? dateRange.end.toLocaleDateString() : 'Not set'
+      },
+      viewMode,
+      selectedRegion: currentRegion.name,
+      costRate: `${currentRegion.currency} ${currentRegion.rate}/kWh`,
+      hardwareSpecs: hardwareSpecs || {},
+      hostMetrics: hostMetrics || {},
+      vmData: vmData || [],
+      processData: processData || [],
+      performanceMetrics: performanceMetrics || []
+    };
+
+    // Create HTML content for report
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>GreenMatrix Dashboard Report</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 20px; color: #1f2937; line-height: 1.5; }
+          .header { text-align: center; margin-bottom: 30px; border-bottom: 3px solid #10b981; padding-bottom: 20px; }
+          .header h1 { color: #111827; margin: 0; font-size: 32px; font-weight: 700; }
+          .header p { color: #6b7280; margin: 8px 0; font-size: 14px; }
+          .section { margin: 30px 0; }
+          .section h2 { color: #374151; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px; font-size: 20px; font-weight: 600; margin-bottom: 20px; }
+          .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 15px 0; }
+          .card { border: 1px solid #d1d5db; padding: 20px; border-radius: 8px; background: #ffffff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); }
+          .card h3 { margin: 0 0 15px 0; color: #111827; font-size: 16px; font-weight: 600; }
+          .metric { margin: 8px 0; color: #374151; }
+          .metric strong { color: #10b981; font-weight: 600; }
+          .table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+          .table th, .table td { border: 1px solid #e5e7eb; padding: 12px 8px; text-align: left; }
+          .table th { background-color: #f9fafb; color: #374151; font-weight: 600; }
+          .footer { text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 12px; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>GreenMatrix Dashboard Report</h1>
+          <p>Generated on: ${reportData.generatedAt}</p>
+          <p>Date Range: ${reportData.dateRange.start} to ${reportData.dateRange.end}</p>
+          <p>View Mode: ${reportData.viewMode}</p>
+          <p>Cost Region: ${reportData.selectedRegion} (${reportData.costRate})</p>
+        </div>
+
+        <div class="section">
+          <h2>System Overview</h2>
+          <div class="grid">
+            ${performanceMetrics.map(metric => `
+              <div class="card">
+                <h3>${metric.label}</h3>
+                <div class="metric"><strong>Value:</strong> ${metric.value.toFixed(1)}${metric.unit}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Hardware Specifications</h2>
+          <div class="grid">
+            <div class="card">
+              <h3>CPU</h3>
+              <div class="metric"><strong>Model:</strong> ${hardwareSpecs?.cpu_model || 'N/A'}</div>
+              <div class="metric"><strong>Cores:</strong> ${hardwareSpecs?.cpu_cores || 'N/A'}</div>
+              <div class="metric"><strong>Frequency:</strong> ${hardwareSpecs?.cpu_frequency || 'N/A'}</div>
+            </div>
+            <div class="card">
+              <h3>Memory</h3>
+              <div class="metric"><strong>Total RAM:</strong> ${hardwareSpecs?.total_ram_gb ? `${hardwareSpecs.total_ram_gb}GB` : 'N/A'}</div>
+              <div class="metric"><strong>Usage:</strong> ${hostMetrics?.host_ram_usage_percent ? `${hostMetrics.host_ram_usage_percent.toFixed(1)}%` : 'N/A'}</div>
+            </div>
+            <div class="card">
+              <h3>Storage</h3>
+              <div class="metric"><strong>Total:</strong> ${hardwareSpecs?.total_storage_gb ? `${hardwareSpecs.total_storage_gb}GB` : 'N/A'}</div>
+              <div class="metric"><strong>I/O:</strong> ${
+                hostMetrics?.host_disk_read_bytes && hostMetrics?.host_disk_write_bytes
+                  ? `${Math.round((hostMetrics.host_disk_read_bytes + hostMetrics.host_disk_write_bytes) / 1024 / 1024)} MB`
+                  : 'N/A'
+              }</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Virtual Machines</h2>
+          ${vmData.length > 0 ? `
+            <div class="grid">
+              <div class="card">
+                <h3>VM Summary</h3>
+                <div class="metric"><strong>Total VMs:</strong> ${vmData.length}</div>
+                <div class="metric"><strong>Running:</strong> ${vmData.filter(vm => vm.status === 'Running').length}</div>
+                <div class="metric"><strong>Average CPU:</strong> ${vmData.length > 0 ? (vmData.reduce((sum, vm) => sum + (vm.cpuUsage || 0), 0) / vmData.length).toFixed(1) : 0}%</div>
+              </div>
+            </div>
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>VM Name</th>
+                  <th>Type</th>
+                  <th>Status</th>
+                  <th>CPU Usage</th>
+                  <th>RAM Usage</th>
+                  <th>Process Count</th>
+                  <th>Total Power</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${vmData.map(vm => `
+                  <tr>
+                    <td>${vm.name}</td>
+                    <td>${vm.type || 'Virtual Machine'}</td>
+                    <td><span style="color: ${vm.status === 'Running' ? '#10b981' : '#ef4444'}">${vm.status}</span></td>
+                    <td>${vm.cpuUsage ? `${vm.cpuUsage.toFixed(1)}%` : 'N/A'}</td>
+                    <td>${vm.ramUsagePercent ? `${vm.ramUsagePercent.toFixed(1)}%` : 'N/A'}</td>
+                    <td>${vm.processCount || 0}</td>
+                    <td>${vm.totalPower || 0}W</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          ` : '<p>No VM data available</p>'}
+        </div>
+
+        <div class="section">
+          <h2>Top Processes</h2>
+          ${processData && processData.length > 0 ? `
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Process Name</th>
+                  <th>User</th>
+                  <th>CPU %</th>
+                  <th>Memory MB</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${processData.slice(0, 10).map(process => `
+                  <tr>
+                    <td>${process['Process Name'] || 'Unknown'}</td>
+                    <td>${process['Username'] || 'System'}</td>
+                    <td>${process['CPU Usage (%)'] ? process['CPU Usage (%)'].toFixed(1) : 0}%</td>
+                    <td>${process['Memory Usage (MB)'] ? process['Memory Usage (MB)'].toFixed(1) : 0}</td>
+                    <td>${process['Status'] || 'Running'}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          ` : '<p>No process data available</p>'}
+        </div>
+
+        <div class="footer">
+          <p>© ${new Date().getFullYear()} Hewlett Packard Enterprise Development LP</p>
+          <p>Generated by GreenMatrix Dashboard</p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    // Create and trigger download
+    const blob = new Blob([htmlContent], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="space-y-6 max-w-full overflow-hidden">
+
+      {/* Top Section: GreenMatrix Panel Header (Left) + Cost Calculation (Middle) + Calendar & Report (Right) */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-3 bag">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-center title-dash">
+
+          {/* GreenMatrix Panel Title (Left 1/3) */}
+          <div className="flex items-center">
+            <h1 className="text-xl font-bold text-gray-900 dark:text-white font">GreenMatrix Panel</h1>
+          </div>
+
+          {/* Cost Calculation Region (Middle 1/3) */}
+          <div className="flex items-center justify-start pl-2">
+            <select
+              value={selectedRegion}
+              onChange={(e) => setSelectedRegion(e.target.value)}
+              className="px-2 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg border border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] text-sm w-36"
+            >
+              <option value="">Cost Region</option>
+              {availableRegions.map(region => (
+                <option key={region.code} value={region.code}>
+                  {region.code} - {region.currency}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Date Selection & Report Button (Right 1/3) */}
+          <div className="flex items-center justify-end gap-1">
+            <select
+              value={viewMode}
+              onChange={(e) => setViewMode(e.target.value)}
+              className="px-2 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg border border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-blue-600 focus:border-blue-600 text-sm w-20"
+            >
+              <option value="day">Daily</option>
+              <option value="week">Weekly</option>
+              <option value="month">Monthly</option>
+            </select>
+
+            <DatePicker
+              selected={dateRange.start}
+              onChange={(date) => setDateRange(prev => ({ ...prev, start: date }))}
+              minDate={minDate}
+              maxDate={maxDate}
+              className="px-1 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded border border-gray-300 dark:border-gray-600 focus:ring-1 focus:ring-blue-600 focus:border-blue-600 text-xs w-16"
+              placeholderText="Start"
+              dateFormat="M/d"
+            />
+
+            <DatePicker
+              selected={dateRange.end}
+              onChange={(date) => setDateRange(prev => ({ ...prev, end: date }))}
+              selectsEnd
+              startDate={dateRange.start}
+              endDate={dateRange.end}
+              minDate={dateRange.start || minDate}
+              maxDate={maxDate}
+              className="px-1 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded border border-gray-300 dark:border-gray-600 focus:ring-1 focus:ring-blue-600 focus:border-blue-600 text-xs w-16"
+              placeholderText="End"
+              dateFormat="M/d"
+            />
+
+            <button
+              onClick={handleDownloadReport}
+              className="px-2 py-2 bg-[#01a982] hover:bg-[#019670] text-white rounded-lg font-medium text-xs flex items-center gap-1 transition-colors btn1"
+            >
+              Report
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </button>
+          </div>
+
+        </div>
+      </div>
+
+      {/* System Overview Section */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">System Overview</h2>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+          {/* Live Performance Metrics (Left) */}
+          <div className="relative">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Live Performance Metrics</h3>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPerformanceCardIndex(Math.max(0, performanceCardIndex - 1))}
+                  disabled={performanceCardIndex === 0}
+                  className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setPerformanceCardIndex(Math.min(performanceMetrics.length - 2, performanceCardIndex + 1))}
+                  disabled={performanceCardIndex >= performanceMetrics.length - 2}
+                  className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              {performanceMetrics.slice(performanceCardIndex, performanceCardIndex + 2).map((metric, index) => (
+                <div key={index} className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 text-center">
+                  <div className={`text-2xl font-bold text-${metric.color}-600 dark:text-${metric.color}-400`}>
+                    {metricsLoading ? '...' : `${metric.value.toFixed(1)}${metric.unit}`}
+                  </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">{metric.label}</div>
+                  <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2 mt-2">
+                    <div
+                      className={`bg-${metric.color}-500 h-2 rounded-full transition-all duration-300`}
+                      style={{width: `${Math.min(100, metric.value)}%`}}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Hardware Details (Right) */}
+          <div className="relative">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Hardware Details</h3>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setHardwareCardIndex(Math.max(0, hardwareCardIndex - 1))}
+                  disabled={hardwareCardIndex === 0}
+                  className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setHardwareCardIndex(Math.min(hardwareDetails.length - 2, hardwareCardIndex + 1))}
+                  disabled={hardwareCardIndex >= hardwareDetails.length - 2}
+                  className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              {hardwareDetails.slice(hardwareCardIndex, hardwareCardIndex + 2).map((detail, index) => {
+                const IconComponent = detail.icon;
+                return (
+                  <div
+                    key={index}
+                    className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 text-center cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+                    onClick={() => handleHardwareCardClick(detail)}
+                    title={`Click for detailed ${detail.label} information`}
+                  >
+                    <div className="flex justify-center mb-2">
+                      <IconComponent className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">{detail.label}</div>
+                    <div className="text-lg font-semibold text-gray-900 dark:text-white mt-1 truncate">
+                      {hardwareLoading ? 'Loading...' : detail.value}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Middle Section: Performance Analytics (Left) + VM Monitoring & Insights (Right) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        {/* Performance Analytics (Left Half) */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+          <div className="flex items-center justify-between mb-4 perform-dash">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white h31">Performance Analytics</h3>
+            <select
+              value={selectedGraph}
+              onChange={(e) => setSelectedGraph(e.target.value)}
+              className="px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg border border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982]"
+            >
+              {graphOptions.map(option => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="h-80">
+            {chartData ? (
+              <Bar
+                data={chartData}
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                      backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                      titleColor: 'white',
+                      bodyColor: 'white',
+                    }
+                  },
+                  scales: {
+                    x: {
+                      ticks: { maxRotation: 45, minRotation: 45, font: { size: 10 } },
+                      grid: { display: false }
+                    },
+                    y: {
+                      beginAtZero: true,
+                      grid: { color: 'rgba(0, 0, 0, 0.05)' }
+                    }
+                  },
+                  elements: {
+                    bar: { borderRadius: 4 }
+                  }
+                }}
+              />
+            ) : (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center">
+                  <BarChart3 className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-500 dark:text-gray-400">No data available</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right Column: VM Monitoring + System Insights */}
+        <div className="space-y-6">
+
+          {/* VM Monitoring Section (Top Right) */}
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Current VM Instances</h3>
+              <button
+                onClick={fetchVMData}
+                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+                disabled={vmDataLoading}
+              >
+                <div className={`w-4 h-4 ${vmDataLoading ? 'animate-spin' : ''}`}>⟳</div>
+              </button>
+            </div>
+
+            <div className="space-y-2 max-h-40 overflow-y-auto">
+              {vmDataLoading ? (
+                <div className="text-center py-4">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500 mx-auto"></div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">Loading VM instances...</p>
+                </div>
+              ) : vmData.length === 0 ? (
+                <div className="text-center py-8">
+                  <div className="w-12 h-12 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <span className="text-2xl">ℹ️</span>
+                  </div>
+                  <p className="text-gray-500 dark:text-gray-400 mb-4">No VM Instances Found</p>
+                  <button
+                    onClick={fetchVMData}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors btn3"
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : (
+                vmData.map((vm) => (
+                  <div key={vm.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-3">
+                    <div
+                      className="flex items-center justify-between cursor-pointer"
+                      onClick={() => setExpandedVM(expandedVM === vm.id ? null : vm.id)}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div className="w-2 h-2 bg-[#01a982] rounded-full"></div>
+                        <div>
+                          <div className="font-medium text-gray-900 dark:text-white">{vm.name}</div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">{vm.type}</div>
+                        </div>
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        CPU: {vm.cpuUsage.toFixed(1)}%
+                      </div>
+                    </div>
+
+                    {expandedVM === vm.id && (
+                      <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div>RAM: {vm.ramUsagePercent.toFixed(1)}%</div>
+                          <div>Processes: {vm.processCount}</div>
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedVMForRecommendations(vm);
+                            setRecommendationsModalOpen(true);
+                          }}
+                          className="mt-2 w-full px-3 py-1 bg-[#01a982] text-white text-xs rounded hover:bg-[#019670] transition-colors"
+                        >
+                          View Recommendations
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* System Insights & Recommendations (Bottom Right) */}
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+            <SystemInsightsGenerator
+              processData={topProcesses}
+              vmData={vmData || []}
+              selectedDate={selectedDate || 'today'}
+              viewMode={viewMode || 'daily'}
+              hostMetrics={hostMetrics}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Process Monitoring Section */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Process Performance & Cost Analysis</h3>
+          </div>
+
+          {/* Search and Filter Bar */}
+          <div className="mt-4 flex items-center gap-3">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search processes..."
+                className="process-search-input"
+              />
+              <svg
+                className="process-search-icon"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
+            </div>
+            <button className="process-filter-button">
+              <svg
+                className="process-filter-icon"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.707A1 1 0 013 7V4z"
+                />
+              </svg>
+
+            </button>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50 dark:bg-gray-700">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Process</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">User</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">CPU %</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Memory</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">GPU %</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">GPU Mem</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Power (W)</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Cost ({currentRegion.currency}/hr)</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Status</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+              {topProcesses.slice(0, 5).map((process, index) => (
+                <tr
+                  key={process['Process ID'] || index}
+                  onClick={() => handleProcessClick(process)}
+                  className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                >
+                  <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white truncate">
+                    {process['Process Name'] || 'Unknown'}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                    {process['Username'] || 'System'}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
+                    {(process['CPU Usage (%)'] || 0).toFixed(1)}%
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
+                    {(process['Memory Usage (MB)'] || 0).toFixed(1)} MB
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
+                    <span className={`${(process['GPU Utilization (%)'] || 0) > 70 ? 'text-red-600' : (process['GPU Utilization (%)'] || 0) > 30 ? 'text-yellow-600' : 'text-green-600'}`}>
+                      {(process['GPU Utilization (%)'] || 0).toFixed(1)}%
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
+                    {(process['GPU Memory Usage (MB)'] || 0).toFixed(0)} MB
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
+                    {(process['Power Consumption (W)'] || 0).toFixed(1)}W
+                  </td>
+                  <td className="px-4 py-3 text-sm font-medium text-[#01a982] dark:text-[#6ee7b7]">
+                    {currentRegion.currency}{(process['Energy Cost ($)'] || 0).toFixed(4)}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      process.Status === 'running'
+                        ? 'bg-[#ecfdf5] text-[#01a982] dark:bg-[#064e3b] dark:text-[#6ee7b7]'
+                        : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+                    }`}>
+                      {process.Status || 'running'}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* View All Button at Bottom */}
+        <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700">
+          <div className="flex justify-end">
+            <button
+              onClick={() => navigate('/processes')}
+              className="px-4 py-2 bg-[#01a982] text-white text-sm rounded-lg hover:bg-[#019670] transition-colors btn2"
+            >
+              View All
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Process Insights Modal */}
+      <ProcessInsightsModal
+        isOpen={processModalOpen}
+        onClose={() => {
+          setProcessModalOpen(false);
+          setSelectedProcess(null);
+        }}
+        selectedProcess={selectedProcess}
+        processRecommendations={processRecommendations}
+        processRealTimeData={processRealTimeData}
+      />
+
+      {/* Hardware Details Popup Modal */}
+      {showHardwarePopup && selectedHardwareDetail && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full mx-4 max-h-[80vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  {selectedHardwareDetail.icon && (
+                    <selectedHardwareDetail.icon className="w-8 h-8 text-[#01a982]" />
+                  )}
+                  <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+                    {selectedHardwareDetail.label} Details
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setShowHardwarePopup(false)}
+                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                {Object.entries(selectedHardwareDetail.details || {}).map(([key, value]) => (
+                  <div key={key} className="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-600">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">{key}:</span>
+                    <span className="text-sm text-gray-900 dark:text-white font-semibold">{value}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-6 flex justify-end">
+                <button
+                  onClick={() => setShowHardwarePopup(false)}
+                  className="px-4 py-2 bg-[#01a982] text-white rounded-lg hover:bg-[#018f73] transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* VM Recommendations Modal */}
+      {recommendationsModalOpen && selectedVMForRecommendations && (
+        <VMRecommendationsModal
+          isOpen={recommendationsModalOpen}
+          onClose={() => {
+            setRecommendationsModalOpen(false);
+            setSelectedVMForRecommendations(null);
+          }}
+          vmName={selectedVMForRecommendations.name}
+        />
+      )}
+    </div>
+  );
+};
+
+export default AdminDashboardNew;

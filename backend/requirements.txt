@@ -12,11 +12,13 @@ pydantic==2.5.0
 pydantic-settings==2.1.0
 python-dotenv==1.0.0
 
-# Data Processing and ML - Updated for model compatibility
-scikit-learn>=1.6.1
+# Data Processing and ML - Fixed for model compatibility
+scikit-learn==1.5.2
 numpy>=1.26.0
 pandas>=2.1.0
 joblib>=1.3.2
+mapie==0.9.2
+xgboost>=1.7.0
 
 # System Monitoring and Hardware
 psutil==5.9.8

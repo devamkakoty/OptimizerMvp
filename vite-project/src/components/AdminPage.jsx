@@ -4,12 +4,12 @@ import { Link } from 'react-router-dom';
 import logo from '../assets/logo.png';
 import DatePicker from 'react-datepicker';
 import { useDarkMode } from '../contexts/DarkModeContext';
-import AdminDashboard from './AdminDashboard';
+import AdminDashboardNew from './AdminDashboardNew';
 import HardwareTab from './HardwareTab';
 import CostManagementTab from './CostManagementTab';
 import PerformanceTab from './PerformanceTab';
+import AIModelManagementTab from './AIModelManagementTab';
 import Sidebar from './Sidebar';
-import Breadcrumb from './Breadcrumb';
 import 'react-datepicker/dist/react-datepicker.css';
 import '../styles/datepicker.css';
 
@@ -25,13 +25,14 @@ const AdminPage = () => {
   const [apiData, setApiData] = useState({});
   const [availableDates, setAvailableDates] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState(null);
   const [noDataError, setNoDataError] = useState(null);
 
   // Fetch available dates from API
   const fetchAvailableDates = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/host-process-metrics/available-dates?days_back=30');
+      const response = await fetch('/api/host-process-metrics/available-dates?days_back=30');
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -44,10 +45,13 @@ const AdminPage = () => {
   };
 
   // Fetch host process metrics from API
-  const fetchHostMetrics = async (filters = {}) => {
+  const fetchHostMetrics = async (filters = {}, isInitialLoad = false) => {
     try {
-      setLoading(true);
-      let url = 'http://localhost:8000/api/host-process-metrics';
+      if (isInitialLoad) {
+        setLoading(true);
+        setInitialLoading(true);
+      }
+      let url = '/api/host-process-metrics';
       
       // Add query parameters if filters are provided
       const params = new URLSearchParams();
@@ -72,6 +76,7 @@ const AdminPage = () => {
       return null;
     } finally {
       setLoading(false);
+      setInitialLoading(false);
     }
   };
 
@@ -117,11 +122,20 @@ const AdminPage = () => {
       const dates = await fetchAvailableDates();
       setAvailableDates(dates);
       
-      // Set the latest date as default selection
+      // Set default to 'today' for live data, or latest available date
       if (dates.length > 0) {
+        const today = new Date().toISOString().split('T')[0];
         const latestDate = dates[0]; // dates are sorted in descending order
-        setSelectedDate(latestDate);
-        setSelectedCalendarDate(new Date(latestDate));
+        
+        if (latestDate === today) {
+          // Today's data is available - use live mode
+          setSelectedDate('today');
+          setSelectedCalendarDate(new Date());
+        } else {
+          // Use latest available date
+          setSelectedDate(latestDate);
+          setSelectedCalendarDate(new Date(latestDate));
+        }
       }
     };
     
@@ -130,20 +144,20 @@ const AdminPage = () => {
 
   // Fetch data on component mount and set up auto-refresh
   useEffect(() => {
-    const loadData = async (dateFilters = {}) => {
+    const loadData = async (dateFilters = {}, isInitialLoad = false) => {
       const filters = { limit: 1000, ...dateFilters };
-      const response = await fetchHostMetrics(filters);
+      const response = await fetchHostMetrics(filters, isInitialLoad);
       if (response) {
         const transformed = transformApiData(response);
         setApiData(transformed);
       }
     };
     
-    // Load data immediately
-    loadData();
+    // Load data immediately (initial load)
+    loadData({}, true);
     
-    // Set up auto-refresh every 5 seconds
-    const interval = setInterval(loadData, 5000);
+    // Set up auto-refresh every 2 seconds for real-time monitoring
+    const interval = setInterval(loadData, 2000);
     
     // Cleanup interval on component unmount
     return () => clearInterval(interval);
@@ -173,9 +187,16 @@ const AdminPage = () => {
           const transformed = transformApiData(response);
           setApiData(transformed);
         } else {
-          // No data for selected date
-          setApiData({});
-          setNoDataError(`No data available for ${new Date(selectedDate).toLocaleDateString()}. Please select a different date.`);
+          // No data for selected date - switch to 'today' if current date has data
+          const today = new Date().toISOString().split('T')[0];
+          if (selectedDate === today) {
+            // If today has no data, switch to live mode
+            setSelectedDate('today');
+            setNoDataError(null);
+          } else {
+            setApiData({});
+            setNoDataError(`No data available for ${new Date(selectedDate).toLocaleDateString()}. Please select a different date.`);
+          }
         }
       }
       // For 'today', the main useEffect with interval will handle the loading
@@ -273,60 +294,50 @@ const AdminPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
-      {/* Sidebar */}
-      <Sidebar 
-        activeSection={activeSection}
-        setActiveSection={setActiveSection}
-        activeTab={activeAdminTab}
-        setActiveTab={setActiveAdminTab}
-        isCollapsed={isCollapsed}
-        setIsCollapsed={setIsCollapsed}
-      />
-
-      {/* Main Content */}
-      <div className={`flex-1 flex flex-col transition-all duration-300 overflow-hidden ${
-        isCollapsed ? 'lg:ml-16' : 'lg:ml-64'
-      }`}>
-        {/* Header */}
-        <header className="bg-white dark:bg-gray-800">
-          <div className="px-6 py-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <img src={logo} alt="GreenMatrix Logo" className="w-12" />
-              <span className="text-xl font-semibold text-gray-900 dark:text-white pt-1">
-                GreenMatrix Panel
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <button 
-                onClick={toggleDarkMode}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-              >
-                {isDarkMode ? <Sun color="#fbbf24" /> : <Moon color="#6b7280" />}
-              </button>
-            </div>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
+      {/* Full Width Header */}
+      <header className="bg-white dark:bg-gray-800 w-full z-10">
+        <div className="px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <img src={logo} alt="GreenMatrix Logo" className="w-10" />
+            <span className="text-xl font-semibold text-gray-900 dark:text-white">GreenMatrix</span>
           </div>
-        </header>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={toggleDarkMode}
+              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+            >
+              {isDarkMode ? <Sun color="#fbbf24" /> : <Moon color="#6b7280" />}
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Content Area with Sidebar */}
+      <div className="flex flex-1">
+        {/* Sidebar */}
+        <Sidebar 
+          activeSection={activeSection}
+          setActiveSection={setActiveSection}
+          activeTab={activeAdminTab}
+          setActiveTab={setActiveAdminTab}
+          isCollapsed={isCollapsed}
+          setIsCollapsed={setIsCollapsed}
+        />
+
+        {/* Main Content */}
+        <div className={`flex-1 flex flex-col transition-all duration-300 overflow-hidden ${
+          isCollapsed ? 'lg:ml-16' : 'lg:ml-64'
+        }`}>
 
         {/* Content Area */}
         <div className="flex-1 overflow-auto">
-          {/* Breadcrumb */}
-          <div className="px-6 py-4 bg-white dark:bg-gray-800">
-            <Breadcrumb 
-              activeSection={activeSection}
-              activeTab={activeAdminTab}
-              viewMode={viewMode}
-              selectedDate={selectedDate}
-              selectedWeek={selectedWeek}
-              availableDates={availableDates}
-            />
-          </div>
 
           {/* Hero Section */}
           {/* {activeSection === 'administration' && (
-            <div className="bg-gradient-to-b from-green-50 to-white dark:from-[#0e2b1a] dark:to-gray-900">
+            <div className="bg-gradient-to-b from-[#ecfdf5] to-white dark:from-[#0e2b1a] dark:to-gray-900">
               <div className="max-w-6xl mx-auto px-6 py-12 text-center">
-                <h1 className="text-4xl font-bold bg-gradient-to-r from-green-600 to-green-700 bg-clip-text text-transparent mb-4">
+                <h1 className="text-4xl font-bold bg-gradient-to-r from-[#01a982] to-[#047857] bg-clip-text text-transparent mb-4">
                   {activeAdminTab === 'dashboard' ? 'Dashboard' : 
                    activeAdminTab === 'hardware' ? 'Hardware Management' : 'Cost Management'}
                 </h1>
@@ -346,7 +357,7 @@ const AdminPage = () => {
           {activeSection !== 'administration' && (
             <div className="bg-gradient-to-b from-gray-50 to-white dark:from-gray-800 dark:to-gray-900">
               <div className="max-w-6xl mx-auto px-6 py-12 text-center">
-                <h1 className="text-4xl font-bold bg-gradient-to-r from-green-600 to-green-700 bg-clip-text text-transparent mb-4">
+                <h1 className="text-4xl font-bold bg-gradient-to-r from-[#01a982] to-[#047857] bg-clip-text text-transparent mb-4">
                   Welcome to HPE Analytics
                 </h1>
                 <p className="text-lg text-gray-600 dark:text-gray-300">
@@ -359,8 +370,8 @@ const AdminPage = () => {
           {/* Content based on active section */}
           {activeSection === 'administration' && (
             <>
-              {/* Loading indicator */}
-              {loading && (
+              {/* Loading indicator - only show on initial load */}
+              {initialLoading && (
                 <div className="max-w-6xl mx-auto px-6 mt-6">
                   <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 text-center">
                     <div className="text-gray-600 dark:text-gray-300">Loading process metrics data...</div>
@@ -371,9 +382,9 @@ const AdminPage = () => {
 
 
               {/* Admin Content */}
-              <div className="max-w-6xl mx-auto px-6 mt-8 mb-8 flex-1">
+              <div className="max-w-6xl mx-auto px-6 mt-4 mb-8 flex-1">
                 {activeAdminTab === 'dashboard' && (
-                  <AdminDashboard 
+                  <AdminDashboardNew 
                     processData={processData} 
                     chartOptions={chartOptions}
                     viewMode={viewMode}
@@ -404,6 +415,10 @@ const AdminPage = () => {
 
                 {activeAdminTab === 'costs' && (
                   <CostManagementTab />
+                )}
+
+                {activeAdminTab === 'models' && (
+                  <AIModelManagementTab />
                 )}
               </div>
             </>
@@ -444,6 +459,7 @@ const AdminPage = () => {
               </div>
             </div>
           </footer>
+        </div>
         </div>
       </div>
     </div>

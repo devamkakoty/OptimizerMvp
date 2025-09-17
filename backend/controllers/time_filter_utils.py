@@ -9,6 +9,42 @@ class TimeFilterUtils:
     """Utility class for time-based filtering and aggregation of metrics data"""
     
     @staticmethod
+    def build_time_filter(timestamp_column, start_date: Optional[str] = None, end_date: Optional[str] = None):
+        """
+        Build a SQLAlchemy filter condition for time-based queries
+        
+        Args:
+            timestamp_column: The timestamp column to filter on
+            start_date: Start date in format 'YYYY-MM-DD' (optional)
+            end_date: End date in format 'YYYY-MM-DD' (optional)
+            
+        Returns:
+            SQLAlchemy filter condition or True (no filter)
+        """
+        if start_date and end_date:
+            try:
+                start_dt, end_dt = TimeFilterUtils.parse_date_range(start_date, end_date)
+                return and_(timestamp_column >= start_dt, timestamp_column <= end_dt)
+            except ValueError:
+                # If date parsing fails, return no filter
+                return True
+        elif start_date:
+            try:
+                start_dt, _ = TimeFilterUtils.parse_date_range(start_date, start_date)
+                return timestamp_column >= start_dt
+            except ValueError:
+                return True
+        elif end_date:
+            try:
+                _, end_dt = TimeFilterUtils.parse_date_range(end_date, end_date)
+                return timestamp_column <= end_dt
+            except ValueError:
+                return True
+        else:
+            # No date filters, return a condition that's always true
+            return True
+
+    @staticmethod
     def parse_time_filter(time_filter: str) -> Tuple[datetime, datetime]:
         """
         Parse time filter string and return start and end datetime
@@ -288,8 +324,39 @@ class TimeFilterUtils:
         
         if group_by_field and hasattr(model_class, group_by_field):
             # Group by specified field and aggregate
-            if hasattr(model_class, 'cpu_usage_percent'):
-                # For monitoring metrics
+            if hasattr(model_class, 'cpu_usage_percent') and hasattr(model_class, 'memory_usage_mb'):
+                # For host process metrics (uses composite primary key: timestamp + process_id)
+                aggregated = query.with_entities(
+                    getattr(model_class, group_by_field),
+                    func.count(model_class.process_id).label('count'),
+                    func.avg(model_class.cpu_usage_percent).label('avg_cpu'),
+                    func.avg(model_class.memory_usage_mb).label('avg_memory'),
+                    func.avg(model_class.gpu_memory_usage_mb).label('avg_gpu_memory'),
+                    func.avg(model_class.gpu_utilization_percent).label('avg_gpu_util'),
+                    func.max(model_class.cpu_usage_percent).label('max_cpu'),
+                    func.max(model_class.memory_usage_mb).label('max_memory'),
+                    func.max(model_class.gpu_memory_usage_mb).label('max_gpu_memory'),
+                    func.max(model_class.gpu_utilization_percent).label('max_gpu_util')
+                ).group_by(getattr(model_class, group_by_field)).all()
+                
+                return [
+                    {
+                        group_by_field: getattr(record, group_by_field),
+                        'count': record.count,
+                        'avg_cpu_usage': float(record.avg_cpu) if record.avg_cpu else 0,
+                        'avg_memory_usage': float(record.avg_memory) if record.avg_memory else 0,
+                        'avg_gpu_memory': float(record.avg_gpu_memory) if record.avg_gpu_memory else 0,
+                        'avg_gpu_utilization': float(record.avg_gpu_util) if record.avg_gpu_util else 0,
+                        'max_cpu_usage': float(record.max_cpu) if record.max_cpu else 0,
+                        'max_memory_usage': float(record.max_memory) if record.max_memory else 0,
+                        'max_gpu_memory': float(record.max_gpu_memory) if record.max_gpu_memory else 0,
+                        'max_gpu_utilization': float(record.max_gpu_util) if record.max_gpu_util else 0
+                    }
+                    for record in aggregated
+                ]
+            
+            elif hasattr(model_class, 'cpu_usage_percent') and hasattr(model_class, 'id') and not hasattr(model_class, 'memory_usage_mb'):
+                # For monitoring metrics with single id primary key (but NOT host process metrics)
                 aggregated = query.with_entities(
                     getattr(model_class, group_by_field),
                     func.count(model_class.id).label('count'),
@@ -315,8 +382,8 @@ class TimeFilterUtils:
                     for record in aggregated
                 ]
             
-            elif hasattr(model_class, 'cpu_usage'):
-                # For VM metrics
+            elif hasattr(model_class, 'cpu_usage') and hasattr(model_class, 'id'):
+                # For VM metrics with single id primary key
                 aggregated = query.with_entities(
                     getattr(model_class, group_by_field),
                     func.count(model_class.id).label('count'),
@@ -337,46 +404,32 @@ class TimeFilterUtils:
                     }
                     for record in aggregated
                 ]
-            
-            elif hasattr(model_class, 'cpu_usage_percent') and hasattr(model_class, 'memory_usage_mb'):
-                # For host process metrics
-                aggregated = query.with_entities(
-                    getattr(model_class, group_by_field),
-                    func.count(model_class.id).label('count'),
-                    func.avg(model_class.cpu_usage_percent).label('avg_cpu'),
-                    func.avg(model_class.memory_usage_mb).label('avg_memory'),
-                    func.avg(model_class.gpu_memory_usage_mb).label('avg_gpu_memory'),
-                    func.avg(model_class.gpu_utilization_percent).label('avg_gpu_util'),
-                    func.max(model_class.cpu_usage_percent).label('max_cpu'),
-                    func.max(model_class.memory_usage_mb).label('max_memory'),
-                    func.max(model_class.gpu_memory_usage_mb).label('max_gpu_memory'),
-                    func.max(model_class.gpu_utilization_percent).label('max_gpu_util')
-                ).group_by(getattr(model_class, group_by_field)).all()
-                
-                return [
-                    {
-                        group_by_field: getattr(record, group_by_field),
-                        'count': record.count,
-                        'avg_cpu_usage_percent': float(record.avg_cpu) if record.avg_cpu else 0,
-                        'avg_memory_usage_mb': float(record.avg_memory) if record.avg_memory else 0,
-                        'avg_gpu_memory_usage_mb': float(record.avg_gpu_memory) if record.avg_gpu_memory else 0,
-                        'avg_gpu_utilization_percent': float(record.avg_gpu_util) if record.avg_gpu_util else 0,
-                        'max_cpu_usage_percent': float(record.max_cpu) if record.max_cpu else 0,
-                        'max_memory_usage_mb': float(record.max_memory) if record.max_memory else 0,
-                        'max_gpu_memory_usage_mb': float(record.max_gpu_memory) if record.max_gpu_memory else 0,
-                        'max_gpu_utilization_percent': float(record.max_gpu_util) if record.max_gpu_util else 0
-                    }
-                    for record in aggregated
-                ]
         
         # If no group by, return overall summary
         total_count = query.count()
         if total_count == 0:
             return []
         
-        # Get overall averages
-        if hasattr(model_class, 'cpu_usage_percent'):
-            # Monitoring metrics
+        # Get overall averages - check HostProcessMetric first
+        if hasattr(model_class, 'cpu_usage_percent') and hasattr(model_class, 'memory_usage_mb'):
+            # Host process metrics
+            avg_cpu = db.query(func.avg(model_class.cpu_usage_percent)).scalar() or 0
+            avg_memory = db.query(func.avg(model_class.memory_usage_mb)).scalar() or 0
+            avg_gpu_memory = db.query(func.avg(model_class.gpu_memory_usage_mb)).scalar() or 0
+            avg_gpu_util = db.query(func.avg(model_class.gpu_utilization_percent)).scalar() or 0
+            
+            return [{
+                'total_records': total_count,
+                'avg_cpu_usage_percent': float(avg_cpu),
+                'avg_memory_usage_mb': float(avg_memory),
+                'avg_gpu_memory_usage_mb': float(avg_gpu_memory),
+                'avg_gpu_utilization_percent': float(avg_gpu_util),
+                'time_filter': time_filter,
+                'date_range': f"{start_date} to {end_date}" if start_date and end_date else None
+            }]
+        
+        elif hasattr(model_class, 'cpu_usage_percent'):
+            # Other monitoring metrics
             avg_cpu = db.query(func.avg(model_class.cpu_usage_percent)).filter(
                 model_class.cpu_usage_percent.isnot(None)
             ).scalar() or 0
@@ -413,22 +466,6 @@ class TimeFilterUtils:
                 'date_range': f"{start_date} to {end_date}" if start_date and end_date else None
             }]
         
-        elif hasattr(model_class, 'cpu_usage_percent') and hasattr(model_class, 'memory_usage_mb'):
-            # Host process metrics
-            avg_cpu = db.query(func.avg(model_class.cpu_usage_percent)).scalar() or 0
-            avg_memory = db.query(func.avg(model_class.memory_usage_mb)).scalar() or 0
-            avg_gpu_memory = db.query(func.avg(model_class.gpu_memory_usage_mb)).scalar() or 0
-            avg_gpu_util = db.query(func.avg(model_class.gpu_utilization_percent)).scalar() or 0
-            
-            return [{
-                'total_records': total_count,
-                'avg_cpu_usage_percent': float(avg_cpu),
-                'avg_memory_usage_mb': float(avg_memory),
-                'avg_gpu_memory_usage_mb': float(avg_gpu_memory),
-                'avg_gpu_utilization_percent': float(avg_gpu_util),
-                'time_filter': time_filter,
-                'date_range': f"{start_date} to {end_date}" if start_date and end_date else None
-            }]
         
         return []
     

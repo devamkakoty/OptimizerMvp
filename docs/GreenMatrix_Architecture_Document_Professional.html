@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GreenMatrix Platform - Architecture Documentation</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #ffffff;
+        }
+        .container {
+            background-color: white;
+            padding: 40px;
+            border: 1px solid #e0e0e0;
+        }
+        h1 { 
+            color: #2c3e50; 
+            border-bottom: 2px solid #34495e; 
+            padding-bottom: 15px;
+            font-size: 2.2em;
+            font-weight: 600;
+            margin-bottom: 30px;
+        }
+        h2 { 
+            color: #2c3e50; 
+            margin-top: 40px;
+            margin-bottom: 20px;
+            font-size: 1.6em;
+            font-weight: 600;
+            border-left: 4px solid #3498db;
+            padding-left: 15px;
+        }
+        h3 { 
+            color: #34495e; 
+            margin-top: 30px;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+            font-weight: 600;
+        }
+        h4 { 
+            color: #5d6d7e; 
+            margin-top: 25px;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+            font-weight: 600;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 25px 0;
+            border: 1px solid #ddd;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px 15px;
+            text-align: left;
+            vertical-align: top;
+        }
+        th {
+            background-color: #f8f9fa;
+            color: #2c3e50;
+            font-weight: 600;
+        }
+        tr:nth-child(even) {
+            background-color: #fafbfc;
+        }
+        .mermaid {
+            text-align: center;
+            margin: 30px 0;
+            padding: 25px;
+            background-color: #fafbfc;
+            border: 1px solid #e1e5e9;
+        }
+        code {
+            background-color: #f1f2f6;
+            padding: 3px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 4px;
+            overflow-x: auto;
+            border-left: 3px solid #3498db;
+            margin: 20px 0;
+        }
+        .summary-section {
+            background-color: #f8f9fa;
+            padding: 25px;
+            border-left: 4px solid #3498db;
+            margin: 25px 0;
+        }
+        .diagram-title {
+            text-align: center;
+            font-weight: 600;
+            color: #2c3e50;
+            margin: 25px 0 15px 0;
+            font-size: 1.1em;
+        }
+        p {
+            margin-bottom: 15px;
+            line-height: 1.7;
+        }
+        ul, ol {
+            margin-bottom: 15px;
+            padding-left: 25px;
+        }
+        li {
+            margin-bottom: 8px;
+            line-height: 1.6;
+        }
+        .header-info {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border: 1px solid #e1e5e9;
+        }
+        .section-break {
+            margin: 50px 0;
+            border-bottom: 1px solid #e1e5e9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>GreenMatrix Platform - Architecture Documentation</h1>
+
+        <div class="header-info">
+            <p><strong>Document Purpose:</strong> Comprehensive architecture documentation for the GreenMatrix AI workload optimization platform</p>
+            <p><strong>Target Audience:</strong> Technical stakeholders, developers, architects, and system administrators</p>
+            <p><strong>Document Version:</strong> 2.0 | <strong>Last Updated:</strong> <span id="currentDate"></span></p>
+        </div>
+
+        <h2>1. Executive Summary</h2>
+
+        <h3>1.1 Project Overview</h3>
+        <p>GreenMatrix is an enterprise-grade AI workload optimization and monitoring platform designed to provide intelligent hardware recommendations, performance simulation, post-deployment optimization, and real-time system monitoring. The platform leverages machine learning models to predict optimal hardware configurations and provides comprehensive cost analysis for energy-efficient computing.</p>
+
+        <h3>1.2 Key Capabilities</h3>
+        <div class="summary-section">
+            <ul>
+                <li><strong>Pre-Deployment Hardware Recommendations:</strong> ML-powered hardware selection for AI workloads</li>
+                <li><strong>Post-Deployment Optimization:</strong> Real-time optimization recommendations for deployed systems</li>
+                <li><strong>Performance Simulation:</strong> Predictive modeling for training and inference workloads</li>
+                <li><strong>Real-Time Monitoring:</strong> Comprehensive system and process-level monitoring</li>
+                <li><strong>Cost Management:</strong> Multi-region cost analysis and FinOps capabilities</li>
+                <li><strong>Model Optimization:</strong> AI model optimization recommendations including quantization and pruning</li>
+            </ul>
+        </div>
+
+        <div class="section-break"></div>
+
+        <h2>2. System Overview</h2>
+
+        <h3>2.1 High-Level System Architecture</h3>
+        <div class="diagram-title">System Architecture Overview</div>
+        <div class="mermaid">
+            graph TB
+                subgraph "Client Layer"
+                    UI[React Frontend<br/>Admin Portal]
+                    WO[Workload Optimizer<br/>Interface]
+                    PM[Process Monitor<br/>Dashboard]
+                end
+                
+                subgraph "API Gateway Layer"
+                    API[FastAPI Gateway<br/>REST Endpoints]
+                    CORS[CORS Handler]
+                    AUTH[Authentication]
+                end
+                
+                subgraph "Application Layer"
+                    MC[Model Controller]
+                    HC[Hardware Controller]
+                    MTC[Metrics Controller]
+                    OC[Optimization Controller]
+                    CC[Cost Controller]
+                end
+                
+                subgraph "ML Processing Layer"
+                    INF[Inference Engine<br/>ML Models]
+                    PRE[Preprocessing<br/>Pipelines]
+                    POST[Post-processing<br/>and Formatting]
+                end
+                
+                subgraph "Data Layer"
+                    PG[(PostgreSQL<br/>Main Database)]
+                    TS[(TimescaleDB<br/>Time-Series)]
+                    RD[(Redis Cache<br/>Session Store)]
+                end
+                
+                subgraph "Monitoring Layer"
+                    HA[Host Agent<br/>System Metrics]
+                    VA[VM Agent<br/>VM Metrics]
+                    AF[Apache Airflow<br/>Orchestration]
+                end
+                
+                UI --> API
+                WO --> API
+                PM --> API
+                
+                API --> CORS
+                CORS --> AUTH
+                AUTH --> MC
+                AUTH --> HC
+                AUTH --> MTC
+                AUTH --> OC
+                AUTH --> CC
+                
+                MC --> INF
+                HC --> INF
+                OC --> INF
+                
+                INF --> PRE
+                PRE --> POST
+                
+                MC --> PG
+                HC --> PG
+                MTC --> TS
+                CC --> PG
+                API --> RD
+                
+                HA --> MTC
+                VA --> MTC
+                AF --> MTC
+                
+                style UI fill:#f8f9fa
+                style WO fill:#f8f9fa
+                style PM fill:#f8f9fa
+                style API fill:#f0f1f2
+                style INF fill:#f4f6f7
+                style PG fill:#fdf2e9
+                style TS fill:#fdf2e9
+                style RD fill:#fdf2e9
+        </div>
+
+        <h3>2.2 Core Components Summary</h3>
+        <table>
+            <tr>
+                <th>Component</th>
+                <th>Technology</th>
+                <th>Purpose</th>
+                <th>Key Metrics</th>
+            </tr>
+            <tr>
+                <td>Frontend</td>
+                <td>React + Vite</td>
+                <td>User interface and visualization</td>
+                <td>Multiple components, main routes</td>
+            </tr>
+            <tr>
+                <td>Backend API</td>
+                <td>FastAPI + Python</td>
+                <td>REST services and business logic</td>
+                <td>REST endpoints, multiple controllers</td>
+            </tr>
+            <tr>
+                <td>Database</td>
+                <td>PostgreSQL + TimescaleDB</td>
+                <td>Data persistence and time-series</td>
+                <td>Multiple tables, distributed databases</td>
+            </tr>
+            <tr>
+                <td>ML Models</td>
+                <td>Scikit-learn + XGBoost</td>
+                <td>Predictive modeling</td>
+                <td>Multiple models and preprocessors</td>
+            </tr>
+            <tr>
+                <td>Monitoring</td>
+                <td>Custom Python Agents</td>
+                <td>Real-time metrics collection</td>
+                <td>Host and VM agents, high-throughput metrics</td>
+            </tr>
+        </table>
+
+        <div class="section-break"></div>
+
+        <h2>3. Architecture Diagrams</h2>
+
+        <h3>3.1 Component Interaction Architecture</h3>
+        <div class="diagram-title">Component Interaction and Data Flow</div>
+        <div class="mermaid">
+            graph LR
+                subgraph "Frontend Components"
+                    AD[Admin Dashboard]
+                    WO[Workload Optimizer]
+                    PM[Process Monitor]
+                    MT[Model Tab]
+                    HT[Hardware Tab]
+                    PT[Performance Tab]
+                    CT[Cost Tab]
+                end
+                
+                subgraph "Backend Controllers"
+                    MC[Model Controller]
+                    HC[Hardware Controller]
+                    MTC[Metrics Controller]
+                    OC[Optimization Controller]
+                    CC[Cost Controller]
+                    DC[Dashboard Controller]
+                end
+                
+                subgraph "Data Sources"
+                    MDB[(Model Database<br/>PostgreSQL)]
+                    HDB[(Hardware Database<br/>PostgreSQL)]
+                    TSDB[(Metrics Database<br/>TimescaleDB)]
+                    MLM[ML Models<br/>Pickle Files]
+                    Cache[(Redis Cache<br/>Sessions)]
+                end
+                
+                AD --> DC
+                AD --> MTC
+                AD --> CC
+                
+                WO --> OC
+                WO --> MC
+                WO --> HC
+                
+                PM --> MTC
+                
+                MT --> MC
+                HT --> HC
+                PT --> MTC
+                CT --> CC
+                
+                MC --> MDB
+                MC --> MLM
+                HC --> HDB
+                MTC --> TSDB
+                OC --> MLM
+                CC --> MDB
+                DC --> TSDB
+                DC --> Cache
+                
+                style AD fill:#f8f9fa
+                style WO fill:#f4f6f7
+                style PM fill:#fdf2e9
+                style MC fill:#f0f1f2
+                style HC fill:#f0f1f2
+                style MTC fill:#f0f1f2
+                style MDB fill:#fdeded
+                style TSDB fill:#fdeded
+                style MLM fill:#f4f6f7
+        </div>
+
+        <h3>3.2 Data Flow Architecture</h3>
+        <div class="diagram-title">End-to-End Data Processing Flow</div>
+        <div class="mermaid">
+            flowchart TD
+                A[User Input] --> B{Request Classification}
+                
+                B -->|Pre-Deployment| C[Model Specifications]
+                B -->|Post-Deployment| D[Current Metrics]
+                B -->|Monitoring| E[Agent Data]
+                
+                C --> F[Hardware Matching<br/>Database Query]
+                F --> G[ML Simulation Models<br/>Inference + Training]
+                G --> H[Performance Predictions<br/>Latency + Throughput]
+                H --> I[Hardware Rankings<br/>Top-N Selection]
+                I --> J[Cost Analysis<br/>Multi-Region Pricing]
+                
+                D --> K[Resource Analysis<br/>GPU/CPU/Memory]
+                K --> L[Post-Deployment Models<br/>Bare-Metal + VM Level]
+                L --> M[Optimization Recommendations<br/>Upgrade/Maintain/Scale]
+                M --> N[ROI Calculations<br/>Cost-Benefit Analysis]
+                
+                E --> O[Metrics Validation<br/>Data Quality Checks]
+                O --> P[TimescaleDB Storage<br/>Time-Series Optimization]
+                P --> Q[Dashboard Updates<br/>Real-Time Visualization]
+                
+                J --> R[Results Presentation<br/>Formatted Response]
+                N --> R
+                Q --> R
+                
+                R --> S[API Response<br/>JSON Format]
+                S --> T[Frontend Display<br/>Charts + Tables]
+                
+                style A fill:#f8f9fa
+                style B fill:#f0f1f2
+                style G fill:#f4f6f7
+                style L fill:#f4f6f7
+                style P fill:#fdf2e9
+                style R fill:#f4f6f7
+                style T fill:#f8f9fa
+        </div>
+
+        <h3>3.3 ML Model Pipeline Architecture</h3>
+        <div class="diagram-title">Machine Learning Model Processing Pipeline</div>
+        <div class="mermaid">
+            graph TB
+                subgraph "Input Processing Layer"
+                    UI[User Input<br/>Model Specs]
+                    SM[System Metrics<br/>Real-time Data]
+                    HW[Hardware Config<br/>Available Options]
+                end
+                
+                subgraph "Preprocessing Layer"
+                    DV[Data Validation<br/>Schema Checks]
+                    FE[Feature Engineering<br/>Transformation]
+                    SC[Scaling and Encoding<br/>Normalization]
+                end
+                
+                subgraph "ML Model Execution Layer"
+                    subgraph "Simulation Models"
+                        IS[Inference Simulation<br/>XGBoost Regressor]
+                        TS[Training Simulation<br/>Random Forest]
+                    end
+                    subgraph "Optimization Models"
+                        BM[Bare-Metal Model<br/>Random Forest Classifier]
+                        VM[VM-Level Model<br/>Decision Tree Classifier]
+                    end
+                    subgraph "Enhancement Models"
+                        OM[Model Optimizer<br/>Multi-class Classifier]
+                        CM[Cost Predictor<br/>Regression Models]
+                    end
+                end
+                
+                subgraph "Output Processing Layer"
+                    HR[Hardware Recommendations<br/>Top-N Results]
+                    PM[Performance Metrics<br/>Latency/Throughput]
+                    CA[Cost Analysis<br/>Multi-Region Pricing]
+                    OS[Optimization Suggestions<br/>Quantization/Pruning]
+                end
+                
+                subgraph "Model Storage"
+                    PF[Pickle Files<br/>Pre-trained Models]
+                    PP[Preprocessors<br/>Feature Pipelines]
+                    LE[Label Encoders<br/>Category Mapping]
+                end
+                
+                UI --> DV
+                SM --> DV
+                HW --> DV
+                
+                DV --> FE
+                FE --> SC
+                
+                SC --> IS
+                SC --> TS
+                SC --> BM
+                SC --> VM
+                SC --> OM
+                SC --> CM
+                
+                IS --> HR
+                IS --> PM
+                TS --> PM
+                BM --> OS
+                VM --> OS
+                OM --> OS
+                CM --> CA
+                
+                PF --> IS
+                PF --> TS
+                PF --> BM
+                PF --> VM
+                PF --> OM
+                
+                PP --> SC
+                LE --> OS
+                
+                style UI fill:#f8f9fa
+                style DV fill:#f0f1f2
+                style IS fill:#f4f6f7
+                style BM fill:#f4f6f7
+                style OM fill:#f4f6f7
+                style PF fill:#fdf2e9
+                style HR fill:#f4f6f7
+        </div>
+
+        <div class="section-break"></div>
+
+        <h2>4. Technology Stack</h2>
+
+        <h3>4.1 Complete Technology Matrix</h3>
+        <table>
+            <tr>
+                <th>Layer</th>
+                <th>Technology</th>
+                <th>Version</th>
+                <th>Purpose</th>
+            </tr>
+            <tr>
+                <td rowspan="6"><strong>Frontend</strong></td>
+                <td>React</td>
+                <td>18.x</td>
+                <td>UI framework for building interactive user interfaces</td>
+            </tr>
+            <tr>
+                <td>Vite</td>
+                <td>4.x</td>
+                <td>Build tool and development server</td>
+            </tr>
+            <tr>
+                <td>Tailwind CSS</td>
+                <td>3.x</td>
+                <td>Utility-first CSS framework for styling</td>
+            </tr>
+            <tr>
+                <td>Chart.js</td>
+                <td>4.x</td>
+                <td>Data visualization and charting library</td>
+            </tr>
+            <tr>
+                <td>React Router</td>
+                <td>6.x</td>
+                <td>Client-side routing for single-page application</td>
+            </tr>
+            <tr>
+                <td>Lucide React</td>
+                <td>Latest</td>
+                <td>Icon library for UI components</td>
+            </tr>
+            <tr>
+                <td rowspan="6"><strong>Backend</strong></td>
+                <td>Python</td>
+                <td>3.11+</td>
+                <td>Core programming language for backend services</td>
+            </tr>
+            <tr>
+                <td>FastAPI</td>
+                <td>0.104+</td>
+                <td>Web framework for building REST APIs</td>
+            </tr>
+            <tr>
+                <td>SQLAlchemy</td>
+                <td>2.0+</td>
+                <td>Object-relational mapping for database operations</td>
+            </tr>
+            <tr>
+                <td>Pydantic</td>
+                <td>2.x</td>
+                <td>Data validation and serialization</td>
+            </tr>
+            <tr>
+                <td>Uvicorn</td>
+                <td>0.24+</td>
+                <td>ASGI server for running FastAPI applications</td>
+            </tr>
+            <tr>
+                <td>Alembic</td>
+                <td>1.12+</td>
+                <td>Database migration tool for SQLAlchemy</td>
+            </tr>
+            <tr>
+                <td rowspan="4"><strong>Data Storage</strong></td>
+                <td>PostgreSQL</td>
+                <td>15.x</td>
+                <td>Primary relational database for application data</td>
+            </tr>
+            <tr>
+                <td>TimescaleDB</td>
+                <td>2.11+</td>
+                <td>Time-series database extension for PostgreSQL</td>
+            </tr>
+            <tr>
+                <td>Redis</td>
+                <td>7.x</td>
+                <td>In-memory caching and session storage</td>
+            </tr>
+            <tr>
+                <td>Apache Airflow</td>
+                <td>2.7+</td>
+                <td>Workflow orchestration and data pipeline management</td>
+            </tr>
+            <tr>
+                <td rowspan="5"><strong>Machine Learning</strong></td>
+                <td>Scikit-learn</td>
+                <td>1.3+</td>
+                <td>Machine learning library for model training and inference</td>
+            </tr>
+            <tr>
+                <td>XGBoost</td>
+                <td>2.0+</td>
+                <td>Gradient boosting framework for enhanced model performance</td>
+            </tr>
+            <tr>
+                <td>NumPy</td>
+                <td>1.24+</td>
+                <td>Numerical computing library for array operations</td>
+            </tr>
+            <tr>
+                <td>Pandas</td>
+                <td>2.1+</td>
+                <td>Data manipulation and analysis library</td>
+            </tr>
+            <tr>
+                <td>Pickle</td>
+                <td>Built-in</td>
+                <td>Model serialization and persistence</td>
+            </tr>
+            <tr>
+                <td rowspan="3"><strong>DevOps</strong></td>
+                <td>Docker</td>
+                <td>24.x</td>
+                <td>Containerization platform for deployment</td>
+            </tr>
+            <tr>
+                <td>Docker Compose</td>
+                <td>2.x</td>
+                <td>Multi-container orchestration tool</td>
+            </tr>
+            <tr>
+                <td>Nginx</td>
+                <td>1.25+</td>
+                <td>Reverse proxy and static file serving</td>
+            </tr>
+        </table>
+
+        <div class="section-break"></div>
+
+        <h2>5. Key System Features</h2>
+
+        <h3>5.1 Pre-Deployment Hardware Recommendations</h3>
+        <p>The system provides ML-powered hardware selection for AI workloads by analyzing model specifications and predicting optimal hardware configurations. This includes performance simulation across multiple hardware options with cost-benefit analysis.</p>
+
+        <h3>5.2 Post-Deployment Optimization</h3>
+        <p>Real-time optimization recommendations for deployed systems, including both bare-metal and VM-level optimization strategies. The system analyzes current resource utilization patterns and suggests hardware upgrades or configuration changes.</p>
+
+        <h3>5.3 Performance Monitoring</h3>
+        <p>Comprehensive real-time monitoring of system and process-level metrics using custom Python agents. Data is stored in TimescaleDB for efficient time-series analysis and visualization.</p>
+
+        <div class="section-break"></div>
+
+        <div style="text-align: center; margin: 40px 0; padding: 25px; background-color: #f8f9fa; border: 1px solid #e1e5e9;">
+            <h3>Document Information</h3>
+            <p><strong>Document Version:</strong> 2.0</p>
+            <p><strong>Last Updated:</strong> <span id="currentDate2"></span></p>
+            <p><strong>Architecture Review Status:</strong> Current and Approved</p>
+            <p><strong>Next Review Date:</strong> <span id="nextReviewDate"></span></p>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Mermaid with professional theme
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'base',
+            themeVariables: {
+                primaryColor: '#f8f9fa',
+                primaryTextColor: '#2c3e50',
+                primaryBorderColor: '#bdc3c7',
+                lineColor: '#7f8c8d',
+                secondaryColor: '#ecf0f1',
+                tertiaryColor: '#ffffff'
+            },
+            flowchart: {
+                useMaxWidth: true,
+                htmlLabels: true,
+                curve: 'basis'
+            }
+        });
+
+        // Set current date
+        const now = new Date();
+        const dateString = now.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+        document.getElementById('currentDate').textContent = dateString;
+        document.getElementById('currentDate2').textContent = dateString;
+        
+        // Set next review date (6 months from now)
+        const nextReview = new Date(now);
+        nextReview.setMonth(nextReview.getMonth() + 6);
+        document.getElementById('nextReviewDate').textContent = nextReview.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+    </script>
+</body>
+</html>

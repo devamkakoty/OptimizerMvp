@@ -515,6 +515,18 @@ class RecommendationEngine:
     ) -> Dict[str, Any]:
         """Generate performance and cost optimization recommendations for a specific VM"""
         try:
+            # Define time range for analysis - needed for helper functions
+            if start_date and end_date:
+                start_time = datetime.fromisoformat(start_date.replace('Z', '+00:00')) if 'T' in start_date else datetime.strptime(start_date, '%Y-%m-%d')
+                end_time = datetime.fromisoformat(end_date.replace('Z', '+00:00')) if 'T' in end_date else datetime.strptime(end_date, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
+                
+                # For current date, limit to current time
+                if end_date == datetime.utcnow().strftime('%Y-%m-%d'):
+                    end_time = datetime.utcnow()
+            else:
+                end_time = datetime.utcnow()
+                start_time = end_time - timedelta(days=time_range_days)
+            
             # Step 1: Analyze VM resource consumption
             vm_result = self.analyze_vm_resource_consumption(db, vm_name, time_range_days, start_date, end_date)
             
@@ -556,35 +568,15 @@ class RecommendationEngine:
                     'potential_savings': 'Up to 30-50% cost reduction'
                 })
             
-            # Memory Optimization Recommendations
+            # Memory Optimization Recommendations - Enhanced Logic
             avg_memory_gb = vm_analysis['avg_memory_mb'] / 1024
             if avg_memory_gb > 0:
-                if avg_memory_gb > 8:  # High memory usage
-                    recommendations.append({
-                        'category': 'performance',
-                        'priority': 'medium',
-                        'title': 'High Memory Usage',
-                        'description': f'VM is using {avg_memory_gb:.1f}GB average memory',
-                        'recommendations': [
-                            'Monitor for memory leaks in applications',
-                            'Consider increasing memory allocation if performance issues occur',
-                            'Optimize memory-intensive processes',
-                            'Implement memory caching strategies'
-                        ],
-                        'impact': 'Potential performance bottlenecks'
-                    })
-                elif avg_memory_gb < 1:  # Low memory usage
-                    recommendations.append({
-                        'category': 'cost_optimization',
-                        'priority': 'low',
-                        'title': 'Low Memory Utilization',
-                        'description': f'VM is using only {avg_memory_gb:.1f}GB average memory',
-                        'recommendations': [
-                            'Consider reducing memory allocation',
-                            'Evaluate if current memory allocation is oversized'
-                        ],
-                        'potential_savings': 'Minor cost reduction possible'
-                    })
+                # Get hardware specs to calculate memory percentage
+                memory_recommendations = self._analyze_memory_usage_patterns(
+                    db, vm_name, start_time, end_time, avg_memory_gb
+                )
+                if memory_recommendations:
+                    recommendations.extend(memory_recommendations)
             
             # GPU Optimization Recommendations
             avg_gpu = vm_analysis['avg_gpu_percent']
@@ -617,24 +609,17 @@ class RecommendationEngine:
                         'potential_savings': 'Significant cost reduction (GPUs are expensive)'
                     })
             
-            # Power/Energy Efficiency Recommendations
+            # Power/Energy Efficiency Recommendations - Enhanced Logic
             avg_power = vm_analysis['avg_power_watts']
+            max_power = vm_analysis['max_power_watts']
             total_energy = vm_analysis['total_energy_kwh']
             
-            if avg_power > 100:  # High power consumption
-                recommendations.append({
-                    'category': 'sustainability',
-                    'priority': 'medium',
-                    'title': 'High Energy Consumption',
-                    'description': f'VM consumes {avg_power:.1f}W average power ({total_energy:.2f} kWh total)',
-                    'recommendations': [
-                        'Implement power management policies',
-                        'Optimize workload scheduling during off-peak hours',
-                        'Consider migrating to more energy-efficient hardware',
-                        'Review process efficiency and optimization opportunities'
-                    ],
-                    'environmental_impact': f'Estimated CO2 footprint: {total_energy * 0.4:.2f}kg for analyzed period'
-                })
+            # Enhanced power consumption analysis with adaptive thresholds
+            power_recommendations = self._analyze_power_consumption_patterns(
+                db, vm_name, start_time, end_time, avg_power, max_power, total_energy
+            )
+            if power_recommendations:
+                recommendations.extend(power_recommendations)
             
             # Process-Specific Recommendations
             top_processes = vm_analysis.get('top_processes', [])
@@ -725,3 +710,316 @@ class RecommendationEngine:
                 "success": False,
                 "error": f"Failed to generate VM recommendations: {str(e)}"
             }
+    
+    def _analyze_memory_usage_patterns(
+        self, 
+        db: Session, 
+        vm_name: str, 
+        start_time: datetime, 
+        end_time: datetime,
+        avg_memory_gb: float
+    ) -> List[Dict[str, Any]]:
+        """
+        Enhanced memory usage analysis with percentage-based thresholds and peak analysis
+        Your improved logic: Check peak memory usage and frequency of threshold crossings
+        """
+        try:
+            recommendations = []
+            
+            # Get detailed memory usage data for pattern analysis
+            memory_query = db.query(
+                VMProcessMetric.memory_usage_mb,
+                VMProcessMetric.timestamp
+            ).filter(
+                and_(
+                    VMProcessMetric.vm_name == vm_name,
+                    VMProcessMetric.timestamp >= start_time,
+                    VMProcessMetric.timestamp <= end_time,
+                    VMProcessMetric.memory_usage_mb.isnot(None)
+                )
+            ).order_by(VMProcessMetric.timestamp)
+            
+            memory_data = memory_query.all()
+            if not memory_data:
+                return recommendations
+            
+            # Get VM hardware specs to calculate memory percentage
+            # Try to get from hardware_specs table or use reasonable defaults
+            try:
+                from app.models.hardware_specs import HardwareSpecs
+                hw_spec = db.query(HardwareSpecs).filter(
+                    HardwareSpecs.vm_name == vm_name
+                ).first()
+                
+                if hw_spec and hw_spec.total_memory_gb:
+                    total_memory_gb = hw_spec.total_memory_gb
+                else:
+                    # Estimate total memory based on peak usage (assume peak is ~60-80% of total)
+                    peak_memory_gb = max([float(m.memory_usage_mb) / 1024 for m in memory_data])
+                    total_memory_gb = max(peak_memory_gb / 0.7, 8.0)  # Assume peak is 70% of total, min 8GB
+            except:
+                # Fallback: estimate based on usage patterns
+                peak_memory_gb = max([float(m.memory_usage_mb) / 1024 for m in memory_data])
+                total_memory_gb = max(peak_memory_gb / 0.7, 8.0)
+            
+            # Calculate memory statistics
+            memory_values_gb = [float(m.memory_usage_mb) / 1024 for m in memory_data]
+            peak_memory_gb = max(memory_values_gb)
+            min_memory_gb = min(memory_values_gb)
+            
+            # Calculate percentage usage
+            avg_memory_percent = (avg_memory_gb / total_memory_gb) * 100
+            peak_memory_percent = (peak_memory_gb / total_memory_gb) * 100
+            min_memory_percent = (min_memory_gb / total_memory_gb) * 100
+            
+            # Analyze threshold crossing frequency
+            high_threshold_80 = total_memory_gb * 0.8  # 80% threshold in GB
+            low_threshold_20 = total_memory_gb * 0.2   # 20% threshold in GB
+            
+            high_threshold_crossings = sum(1 for m in memory_values_gb if m > high_threshold_80)
+            low_threshold_count = sum(1 for m in memory_values_gb if m < low_threshold_20)
+            
+            total_data_points = len(memory_values_gb)
+            high_threshold_frequency = (high_threshold_crossings / total_data_points) * 100
+            low_threshold_frequency = (low_threshold_count / total_data_points) * 100
+            
+            # High Memory Usage Analysis (>80% sustained or frequent peak crossing)
+            if peak_memory_percent > 80 and high_threshold_frequency > 30:  # Frequently above 80%
+                recommendations.append({
+                    'category': 'performance',
+                    'priority': 'high',
+                    'title': 'Critical Memory Pressure Detected',
+                    'description': f'VM frequently exceeds 80% memory usage. Peak: {peak_memory_percent:.1f}%, Average: {avg_memory_percent:.1f}%',
+                    'analysis': {
+                        'total_memory_gb': round(total_memory_gb, 1),
+                        'peak_memory_gb': round(peak_memory_gb, 1),
+                        'peak_memory_percent': round(peak_memory_percent, 1),
+                        'high_usage_frequency': round(high_threshold_frequency, 1),
+                        'threshold_crossings': high_threshold_crossings,
+                        'total_data_points': total_data_points
+                    },
+                    'recommendations': [
+                        f'Immediate action required: Increase memory allocation to {int(peak_memory_gb * 1.2)}GB minimum',
+                        'Monitor for memory leaks in applications',
+                        'Implement memory optimization in top processes',
+                        'Consider memory profiling for resource-intensive applications',
+                        'Set up memory alerts at 70% and 85% thresholds'
+                    ],
+                    'impact': 'Critical: Performance degradation and potential system instability'
+                })
+            elif avg_memory_percent > 80:  # High average usage
+                recommendations.append({
+                    'category': 'performance',
+                    'priority': 'medium',
+                    'title': 'High Memory Utilization',
+                    'description': f'VM consistently uses {avg_memory_percent:.1f}% of available memory (Peak: {peak_memory_percent:.1f}%)',
+                    'analysis': {
+                        'total_memory_gb': round(total_memory_gb, 1),
+                        'avg_memory_percent': round(avg_memory_percent, 1),
+                        'peak_memory_percent': round(peak_memory_percent, 1)
+                    },
+                    'recommendations': [
+                        f'Consider increasing memory allocation to {int(total_memory_gb * 1.3)}GB',
+                        'Monitor memory usage trends',
+                        'Optimize memory-intensive processes',
+                        'Implement memory caching strategies'
+                    ],
+                    'impact': 'Potential performance bottlenecks during peak usage'
+                })
+            
+            # Low Memory Usage Analysis (<20% sustained)
+            elif low_threshold_frequency > 70:  # More than 70% of time below 20%
+                potential_savings_gb = total_memory_gb - (peak_memory_gb * 1.2)  # Keep 20% buffer above peak
+                if potential_savings_gb > 1:  # Only recommend if significant savings
+                    recommended_memory_gb = max(peak_memory_gb * 1.2, 2.0)  # At least 2GB minimum
+                    
+                    recommendations.append({
+                        'category': 'cost_optimization',
+                        'priority': 'medium',
+                        'title': 'Memory Over-Allocation Detected',
+                        'description': f'VM uses only {avg_memory_percent:.1f}% average memory ({low_threshold_frequency:.1f}% of time below 20%)',
+                        'analysis': {
+                            'total_memory_gb': round(total_memory_gb, 1),
+                            'avg_memory_percent': round(avg_memory_percent, 1),
+                            'peak_memory_gb': round(peak_memory_gb, 1),
+                            'low_usage_frequency': round(low_threshold_frequency, 1),
+                            'recommended_memory_gb': round(recommended_memory_gb, 1),
+                            'potential_savings_gb': round(potential_savings_gb, 1)
+                        },
+                        'recommendations': [
+                            f'Consider reducing memory allocation to {int(recommended_memory_gb)}GB',
+                            'Monitor peak usage patterns before making changes',
+                            'Implement auto-scaling if workload varies significantly',
+                            'Evaluate if current allocation is oversized for typical workload'
+                        ],
+                        'potential_savings': f'Estimated {(potential_savings_gb/total_memory_gb*100):.0f}% memory cost reduction',
+                        'cost_impact': f'Could save ~${(potential_savings_gb * 0.05 * 30):.2f}/month (estimated)'
+                    })
+            
+            return recommendations
+            
+        except Exception as e:
+            # Return empty list if analysis fails, don't break the main recommendation flow
+            return []
+    
+    def _analyze_power_consumption_patterns(
+        self,
+        db: Session,
+        vm_name: str,
+        start_time: datetime,
+        end_time: datetime,
+        avg_power: float,
+        max_power: float,
+        total_energy: float
+    ) -> List[Dict[str, Any]]:
+        """
+        Enhanced power consumption analysis with dynamic thresholds based on hardware capacity
+        """
+        try:
+            recommendations = []
+            
+            # Get detailed power consumption data for pattern analysis
+            power_query = db.query(
+                VMProcessMetric.estimated_power_watts,
+                VMProcessMetric.timestamp
+            ).filter(
+                and_(
+                    VMProcessMetric.vm_name == vm_name,
+                    VMProcessMetric.timestamp >= start_time,
+                    VMProcessMetric.timestamp <= end_time,
+                    VMProcessMetric.estimated_power_watts.isnot(None)
+                )
+            ).order_by(VMProcessMetric.timestamp)
+            
+            power_data = power_query.all()
+            if not power_data:
+                return recommendations
+            
+            # Calculate power statistics
+            power_values = [float(p.estimated_power_watts) for p in power_data]
+            min_power = min(power_values)
+            median_power = sorted(power_values)[len(power_values) // 2]
+            
+            # Estimate system's maximum power capacity based on observed patterns
+            # Use 95th percentile as a reasonable estimate of system capacity
+            power_95th = sorted(power_values)[int(len(power_values) * 0.95)]
+            estimated_max_capacity = max(power_95th * 1.2, 150.0)  # At least 150W capacity
+            
+            # Calculate percentage-based thresholds
+            high_power_threshold_80 = estimated_max_capacity * 0.8  # 80% of capacity
+            low_power_threshold_20 = estimated_max_capacity * 0.2   # 20% of capacity
+            
+            # Analyze threshold crossing frequency
+            high_power_crossings = sum(1 for p in power_values if p > high_power_threshold_80)
+            low_power_count = sum(1 for p in power_values if p < low_power_threshold_20)
+            
+            total_points = len(power_values)
+            high_power_frequency = (high_power_crossings / total_points) * 100
+            low_power_frequency = (low_power_count / total_points) * 100
+            
+            # Power efficiency analysis
+            power_utilization_percent = (avg_power / estimated_max_capacity) * 100
+            peak_power_percent = (max_power / estimated_max_capacity) * 100
+            
+            # High Power Consumption Analysis
+            if peak_power_percent > 85 and high_power_frequency > 25:  # Frequently near capacity
+                recommendations.append({
+                    'category': 'performance',
+                    'priority': 'high',
+                    'title': 'Critical Power Consumption Detected',
+                    'description': f'VM frequently operates at {peak_power_percent:.1f}% of estimated power capacity',
+                    'analysis': {
+                        'estimated_max_capacity_watts': round(estimated_max_capacity, 1),
+                        'peak_power_watts': round(max_power, 1),
+                        'avg_power_watts': round(avg_power, 1),
+                        'power_utilization_percent': round(power_utilization_percent, 1),
+                        'high_consumption_frequency': round(high_power_frequency, 1),
+                        'total_energy_kwh': round(total_energy, 3)
+                    },
+                    'recommendations': [
+                        'Immediate: Review thermal throttling and power limits',
+                        'Consider upgrading to higher capacity power supply',
+                        'Implement power management profiles',
+                        'Optimize power-hungry processes during peak hours',
+                        'Monitor for power-related performance degradation'
+                    ],
+                    'impact': 'Critical: Risk of power throttling and system instability',
+                    'environmental_impact': f'High CO2 footprint: {total_energy * 0.4:.2f}kg for analyzed period'
+                })
+            elif power_utilization_percent > 70:  # High average power usage
+                recommendations.append({
+                    'category': 'sustainability',
+                    'priority': 'medium',
+                    'title': 'High Energy Consumption',
+                    'description': f'VM consumes {power_utilization_percent:.1f}% of available power capacity on average',
+                    'analysis': {
+                        'avg_power_utilization_percent': round(power_utilization_percent, 1),
+                        'total_energy_kwh': round(total_energy, 3),
+                        'daily_energy_kwh': round(total_energy / 7, 3)  # Assuming 7-day analysis
+                    },
+                    'recommendations': [
+                        'Implement advanced power management policies',
+                        'Schedule intensive workloads during renewable energy peak hours',
+                        'Consider migrating to more energy-efficient hardware',
+                        'Review and optimize power-intensive processes',
+                        'Implement power monitoring and alerting'
+                    ],
+                    'environmental_impact': f'Estimated CO2 footprint: {total_energy * 0.4:.2f}kg',
+                    'potential_savings': f'Up to {(power_utilization_percent - 50):.0f}% energy reduction possible'
+                })
+            
+            # Low Power Consumption Analysis (under-utilization)
+            elif low_power_frequency > 60:  # More than 60% of time below 20% capacity
+                efficiency_opportunity = estimated_max_capacity - (max_power * 1.2)
+                if efficiency_opportunity > 30:  # Significant over-provisioning
+                    recommendations.append({
+                        'category': 'cost_optimization',
+                        'priority': 'medium',
+                        'title': 'Power Infrastructure Over-Provisioning',
+                        'description': f'VM uses only {power_utilization_percent:.1f}% of power capacity ({low_power_frequency:.1f}% of time below 20%)',
+                        'analysis': {
+                            'avg_power_utilization_percent': round(power_utilization_percent, 1),
+                            'low_usage_frequency': round(low_power_frequency, 1),
+                            'estimated_over_provision_watts': round(efficiency_opportunity, 1),
+                            'actual_peak_watts': round(max_power, 1)
+                        },
+                        'recommendations': [
+                            'Consider consolidating workloads on fewer, better-utilized systems',
+                            'Evaluate migration to lower-capacity, more efficient hardware',
+                            'Implement auto-scaling to match power provisioning with demand',
+                            'Consider cloud migration for variable workloads'
+                        ],
+                        'potential_savings': f'Infrastructure cost reduction potential: {(efficiency_opportunity/estimated_max_capacity*100):.0f}%',
+                        'environmental_benefit': 'Reduced carbon footprint through better resource utilization'
+                    })
+            
+            # Seasonal/Time-based analysis if we have enough data points
+            if total_points > 1000:  # More than ~17 hours of data (assuming 1-minute intervals)
+                # Analyze power consumption patterns by time of day
+                power_variance = max(power_values) - min(power_values)
+                if power_variance > (avg_power * 0.5):  # High variance indicates opportunity
+                    recommendations.append({
+                        'category': 'optimization',
+                        'priority': 'low',
+                        'title': 'Variable Power Consumption Pattern Detected',
+                        'description': f'Power usage varies significantly ({power_variance:.1f}W range)',
+                        'analysis': {
+                            'power_variance_watts': round(power_variance, 1),
+                            'min_power_watts': round(min_power, 1),
+                            'max_power_watts': round(max_power, 1),
+                            'median_power_watts': round(median_power, 1)
+                        },
+                        'recommendations': [
+                            'Implement time-based auto-scaling',
+                            'Schedule batch jobs during low-usage periods',
+                            'Consider demand-based power management',
+                            'Optimize workload distribution across time'
+                        ],
+                        'optimization_potential': 'Moderate energy savings through better scheduling'
+                    })
+            
+            return recommendations
+            
+        except Exception as e:
+            # Return empty list if analysis fails
+            return []

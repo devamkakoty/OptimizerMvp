@@ -60,7 +60,6 @@ class HardwareInfoController:
                     existing_hardware.l1_cache = row.get('L1 Cache')
                     existing_hardware.cpu_power_consumption = row.get('CPU Power Consumption')
                     existing_hardware.gpu_power_consumption = row.get('GPUPower Consumption')
-                    existing_hardware.updated_at = datetime.utcnow()
                 else:
                     # Create new hardware
                     new_hardware = HardwareInfo(
@@ -86,4 +85,119 @@ class HardwareInfoController:
             return {"status": "success", "message": f"Successfully populated database with {len(csv_data)} hardware configurations"}
         except Exception as e:
             db.rollback()
-            return {"error": f"Failed to populate database: {str(e)}"} 
+            return {"error": f"Failed to populate database: {str(e)}"}
+    
+    def create_hardware(self, db: Session, hardware_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Create a new hardware configuration"""
+        try:
+            # Check if hardware already exists with same CPU and GPU
+            existing_hardware = db.query(HardwareInfo).filter(
+                HardwareInfo.cpu == hardware_data.get('cpu'),
+                HardwareInfo.gpu == hardware_data.get('gpu')
+            ).first()
+            
+            if existing_hardware:
+                return {"error": f"Hardware with CPU '{hardware_data.get('cpu')}' and GPU '{hardware_data.get('gpu')}' already exists"}
+            
+            # Create new hardware
+            new_hardware = HardwareInfo(
+                cpu=hardware_data.get('cpu'),
+                gpu=hardware_data.get('gpu'),
+                num_gpu=hardware_data.get('num_gpu'),
+                gpu_memory_total_vram_mb=hardware_data.get('gpu_memory_total_vram_mb'),
+                gpu_graphics_clock=hardware_data.get('gpu_graphics_clock'),
+                gpu_memory_clock=hardware_data.get('gpu_memory_clock'),
+                gpu_sm_cores=hardware_data.get('gpu_sm_cores'),
+                gpu_cuda_cores=hardware_data.get('gpu_cuda_cores'),
+                cpu_total_cores=hardware_data.get('cpu_total_cores'),
+                cpu_threads_per_core=hardware_data.get('cpu_threads_per_core'),
+                cpu_base_clock_ghz=hardware_data.get('cpu_base_clock_ghz'),
+                cpu_max_frequency_ghz=hardware_data.get('cpu_max_frequency_ghz'),
+                l1_cache=hardware_data.get('l1_cache'),
+                cpu_power_consumption=hardware_data.get('cpu_power_consumption'),
+                gpu_power_consumption=hardware_data.get('gpu_power_consumption')
+            )
+            
+            db.add(new_hardware)
+            db.commit()
+            db.refresh(new_hardware)
+            
+            return {
+                "status": "success",
+                "message": "Hardware configuration created successfully",
+                "hardware": new_hardware.to_dict()
+            }
+        except Exception as e:
+            db.rollback()
+            return {"error": f"Failed to create hardware: {str(e)}"}
+    
+    def update_hardware(self, db: Session, hardware_id: int, hardware_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Update an existing hardware configuration"""
+        try:
+            hardware = db.query(HardwareInfo).filter(HardwareInfo.id == hardware_id).first()
+            
+            if not hardware:
+                return {"error": f"Hardware with ID {hardware_id} not found"}
+            
+            # Update fields if provided
+            if 'cpu' in hardware_data:
+                hardware.cpu = hardware_data['cpu']
+            if 'gpu' in hardware_data:
+                hardware.gpu = hardware_data['gpu']
+            if 'num_gpu' in hardware_data:
+                hardware.num_gpu = hardware_data['num_gpu']
+            if 'gpu_memory_total_vram_mb' in hardware_data:
+                hardware.gpu_memory_total_vram_mb = hardware_data['gpu_memory_total_vram_mb']
+            if 'gpu_graphics_clock' in hardware_data:
+                hardware.gpu_graphics_clock = hardware_data['gpu_graphics_clock']
+            if 'gpu_memory_clock' in hardware_data:
+                hardware.gpu_memory_clock = hardware_data['gpu_memory_clock']
+            if 'gpu_sm_cores' in hardware_data:
+                hardware.gpu_sm_cores = hardware_data['gpu_sm_cores']
+            if 'gpu_cuda_cores' in hardware_data:
+                hardware.gpu_cuda_cores = hardware_data['gpu_cuda_cores']
+            if 'cpu_total_cores' in hardware_data:
+                hardware.cpu_total_cores = hardware_data['cpu_total_cores']
+            if 'cpu_threads_per_core' in hardware_data:
+                hardware.cpu_threads_per_core = hardware_data['cpu_threads_per_core']
+            if 'cpu_base_clock_ghz' in hardware_data:
+                hardware.cpu_base_clock_ghz = hardware_data['cpu_base_clock_ghz']
+            if 'cpu_max_frequency_ghz' in hardware_data:
+                hardware.cpu_max_frequency_ghz = hardware_data['cpu_max_frequency_ghz']
+            if 'l1_cache' in hardware_data:
+                hardware.l1_cache = hardware_data['l1_cache']
+            if 'cpu_power_consumption' in hardware_data:
+                hardware.cpu_power_consumption = hardware_data['cpu_power_consumption']
+            if 'gpu_power_consumption' in hardware_data:
+                hardware.gpu_power_consumption = hardware_data['gpu_power_consumption']
+            
+            db.commit()
+            db.refresh(hardware)
+            
+            return {
+                "status": "success",
+                "message": "Hardware configuration updated successfully",
+                "hardware": hardware.to_dict()
+            }
+        except Exception as e:
+            db.rollback()
+            return {"error": f"Failed to update hardware: {str(e)}"}
+    
+    def delete_hardware(self, db: Session, hardware_id: int) -> Dict[str, Any]:
+        """Delete a hardware configuration"""
+        try:
+            hardware = db.query(HardwareInfo).filter(HardwareInfo.id == hardware_id).first()
+            
+            if not hardware:
+                return {"error": f"Hardware with ID {hardware_id} not found"}
+            
+            db.delete(hardware)
+            db.commit()
+            
+            return {
+                "status": "success",
+                "message": f"Hardware configuration with ID {hardware_id} deleted successfully"
+            }
+        except Exception as e:
+            db.rollback()
+            return {"error": f"Failed to delete hardware: {str(e)}"} 

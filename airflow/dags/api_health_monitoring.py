@@ -97,6 +97,41 @@ API_ENDPOINTS = [
         'expected_status': 200,
         'critical': False,
         'timeout': 30
+    },
+    # New Dashboard Optimization Endpoints
+    {
+        'name': 'Dashboard Top Processes',
+        'url': '/api/dashboard/top-processes',
+        'method': 'GET',
+        'expected_status': 200,
+        'critical': True,
+        'timeout': 10,
+        'params': {'metric': 'cpu', 'limit': 5}
+    },
+    {
+        'name': 'Dashboard Performance Summary',
+        'url': '/api/dashboard/performance-summary',
+        'method': 'GET',
+        'expected_status': 200,
+        'critical': True,
+        'timeout': 15
+    },
+    {
+        'name': 'Dashboard System Overview',
+        'url': '/api/dashboard/system-overview',
+        'method': 'GET',
+        'expected_status': 200,
+        'critical': True,
+        'timeout': 20
+    },
+    {
+        'name': 'Dashboard Chart Data',
+        'url': '/api/dashboard/chart-data',
+        'method': 'GET',
+        'expected_status': 200,
+        'critical': False,
+        'timeout': 12,
+        'params': {'metric': 'cpu', 'limit': 5}
     }
 ]
 
@@ -107,10 +142,13 @@ def check_api_endpoint(endpoint):
     try:
         start_time = time.time()
         
+        # Add query parameters if specified
+        params = endpoint.get('params', {})
+        
         if endpoint['method'] == 'GET':
-            response = requests.get(url, timeout=endpoint.get('timeout', API_TIMEOUT))
+            response = requests.get(url, params=params, timeout=endpoint.get('timeout', API_TIMEOUT))
         elif endpoint['method'] == 'POST':
-            response = requests.post(url, timeout=endpoint.get('timeout', API_TIMEOUT))
+            response = requests.post(url, params=params, timeout=endpoint.get('timeout', API_TIMEOUT))
         else:
             raise Exception(f"Unsupported HTTP method: {endpoint['method']}")
         

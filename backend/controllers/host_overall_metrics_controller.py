@@ -19,7 +19,15 @@ class HostOverallMetricsController:
                 host_gpu_utilization_percent=host_overall_metrics_data.get('host_gpu_utilization_percent'),
                 host_gpu_memory_utilization_percent=host_overall_metrics_data.get('host_gpu_memory_utilization_percent'),
                 host_gpu_temperature_celsius=host_overall_metrics_data.get('host_gpu_temperature_celsius'),
-                host_gpu_power_draw_watts=host_overall_metrics_data.get('host_gpu_power_draw_watts')
+                host_gpu_power_draw_watts=host_overall_metrics_data.get('host_gpu_power_draw_watts'),
+                host_network_bytes_sent=host_overall_metrics_data.get('host_network_bytes_sent'),
+                host_network_bytes_received=host_overall_metrics_data.get('host_network_bytes_received'),
+                host_network_packets_sent=host_overall_metrics_data.get('host_network_packets_sent'),
+                host_network_packets_received=host_overall_metrics_data.get('host_network_packets_received'),
+                host_disk_read_bytes=host_overall_metrics_data.get('host_disk_read_bytes'),
+                host_disk_write_bytes=host_overall_metrics_data.get('host_disk_write_bytes'),
+                host_disk_read_count=host_overall_metrics_data.get('host_disk_read_count'),
+                host_disk_write_count=host_overall_metrics_data.get('host_disk_write_count')
             )
             
             db.add(host_overall_metric)
@@ -55,7 +63,15 @@ class HostOverallMetricsController:
                     host_gpu_utilization_percent=metrics_data.get('host_gpu_utilization_percent'),
                     host_gpu_memory_utilization_percent=metrics_data.get('host_gpu_memory_utilization_percent'),
                     host_gpu_temperature_celsius=metrics_data.get('host_gpu_temperature_celsius'),
-                    host_gpu_power_draw_watts=metrics_data.get('host_gpu_power_draw_watts')
+                    host_gpu_power_draw_watts=metrics_data.get('host_gpu_power_draw_watts'),
+                    host_network_bytes_sent=metrics_data.get('host_network_bytes_sent'),
+                    host_network_bytes_received=metrics_data.get('host_network_bytes_received'),
+                    host_network_packets_sent=metrics_data.get('host_network_packets_sent'),
+                    host_network_packets_received=metrics_data.get('host_network_packets_received'),
+                    host_disk_read_bytes=metrics_data.get('host_disk_read_bytes'),
+                    host_disk_write_bytes=metrics_data.get('host_disk_write_bytes'),
+                    host_disk_read_count=metrics_data.get('host_disk_read_count'),
+                    host_disk_write_count=metrics_data.get('host_disk_write_count')
                 )
                 host_overall_metrics.append(host_overall_metric)
             

@@ -8,23 +8,22 @@ class HardwareInfo(Base):
     __tablename__ = "Hardware_table"
     
     id = Column(Integer, primary_key=True, index=True)
-    cpu = Column(String(255), nullable=False)
-    gpu = Column(String(255), nullable=True)
-    num_gpu = Column(Integer, nullable=True)
-    gpu_memory_total_vram_mb = Column(Integer, nullable=True)
-    gpu_graphics_clock = Column(Float, nullable=True)
-    gpu_memory_clock = Column(Float, nullable=True)
-    gpu_sm_cores = Column(Integer, nullable=True)
-    gpu_cuda_cores = Column(Integer, nullable=True)
-    cpu_total_cores = Column(Integer, nullable=True)
-    cpu_threads_per_core = Column(Integer, nullable=True)
-    cpu_base_clock_ghz = Column(Float, nullable=True)
-    cpu_max_frequency_ghz = Column(Float, nullable=True)
-    l1_cache = Column(Integer, nullable=True)
-    cpu_power_consumption = Column(Integer, nullable=True)
-    gpu_power_consumption = Column(Integer, nullable=True)
+    cpu = Column("CPU", String(255), nullable=True)
+    gpu = Column("GPU", String(255), nullable=True)
+    num_gpu = Column("# of GPU", Integer, nullable=True)
+    gpu_memory_total_vram_mb = Column("GPU Memory Total - VRAM (MB)", Integer, nullable=True)
+    gpu_graphics_clock = Column("GPU Graphics clock", Float, nullable=True)
+    gpu_memory_clock = Column("GPU Memory clock", Float, nullable=True)
+    gpu_sm_cores = Column("GPU SM Cores", Integer, nullable=True)
+    gpu_cuda_cores = Column("GPU CUDA Cores", Integer, nullable=True)
+    cpu_total_cores = Column("CPU Total cores (Including Logical cores)", Integer, nullable=True)
+    cpu_threads_per_core = Column("CPU Threads per Core", Integer, nullable=True)
+    cpu_base_clock_ghz = Column("CPU Base clock(GHz)", Float, nullable=True)
+    cpu_max_frequency_ghz = Column("CPU Max Frequency(GHz)", Float, nullable=True)
+    l1_cache = Column("L1 Cache", Integer, nullable=True)
+    cpu_power_consumption = Column("CPU Power Consumption", Integer, nullable=True)
+    gpu_power_consumption = Column("GPUPower Consumption", Integer, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
     def to_dict(self):
         return {
@@ -44,6 +43,5 @@ class HardwareInfo(Base):
             "l1_cache": self.l1_cache,
             "cpu_power_consumption": self.cpu_power_consumption,
             "gpu_power_consumption": self.gpu_power_consumption,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "updated_at": self.updated_at.isoformat() if self.updated_at else None
+            "created_at": self.created_at.isoformat() if self.created_at else None
         } 

@@ -1,34 +1,64 @@
-Model Name,Framework,Total Parameters (Millions),Model Size (MB),Architecture type,Model Type,Number of hidden Layers,Embedding Vector Dimension (Hidden Size),Precision,Vocabulary Size,FFN (MLP) Dimension,Number of Attention Layers,Activation Function,Task Type
-BERT,PyTorch,109.51,840.09,BertForMaskedLM,bert,12,768,FP32,30522,3072,12,gelu,Inference
-RoBERTa,PyTorch,124.7,951.42,RobertaForMaskedLM,roberta,12,768,FP32,50265,3072,12,gelu,Inference
-ALBERT,PyTorch,11.22,90.36,AlbertForMaskedLM,albert,12,768,FP32,30000,3072,12,gelu_new,Inference
-DistilBERT,PyTorch,66.99,511.08,DistilBertForMaskedLM,distilbert,6,768,FP32,30522,3072,12,gelu,Inference
-resnet18,PyTorch,11.69,44.59,resnet18,resnet18,18,512,FP32,1000,512,0,relu,Inference
-resnet34,PyTorch,21.8,83.15,resnet34,resnet34,34,512,FP32,1000,512,0,relu,Inference
-resnet50,PyTorch,25.56,97.49,resnet50,resnet50,50,2048,FP32,1000,2048,0,relu,Inference
-vgg16,PyTorch,138.36,527.79,vgg16,vgg16,16,512,FP32,1000,4096,0,relu,Inference
-vgg19,PyTorch,143.67,548.05,vgg19,vgg19,19,512,FP32,1000,2048,0,relu,Inference
-inception_v3,PyTorch,23.83,90.92,inception_v3,inception_v3,48,2048,FP32,1000,2048,0,relu,Inference
-EfficientNet-B0,PyTorch,5.29,20.17,efficientnet_b0,efficientnet_b0,7,1280,FP32,1000,1280,0,silu,Inference
-ViT-Base-Patch16-224,PyTorch,86.57,660.5,ViTForImageClassification,vit,12,768,FP32,1000,3072,12,gelu,Inference
-DeiT-Base-Distilled-Patch16-224,PyTorch,87.34,666.49,DeiTForImageClassificationWithTeacher,deit,12,768,FP32,1000,3072,12,gelu,Inference
-Swin-Base-Patch4-Window7-224,PyTorch,87.77,1336.99,SwinForImageClassification,swin,24,1024,FP32,1000,4096,32,gelu,Inference
-Stable-Diffusion-XL-1.0,PyTorch,2567.46,13556.92,UNet2DConditionModel,diffusion-unet,2,2048,FP16,40498,3072,10,silu,Inference
-Llama-2-13B,PyTorch,13015.86,49651.75,LlamaForCausalLM,llama,40,5120,FP16,32000,13824,40,silu,Inference
-Qwen-1.5-7B,PyTorch,7721.32,29454.66,Qwen2ForCausalLM,qwen2,32,4096,BF16,151936,11008,32,silu,Inference
-Microsoft Phi-3-Instruct,PyTorch,3821.08,14576.34,Phi3ForCausalLM,phi3,40,5120,BF16,32064,8192,32,silu,Inference
-Mistral-7B,PyTorch,7241.73,27625.13,MistralForCausalLM,mistral,32,4096,BF16,32000,14336,32,silu,Inference
-Gemma-2B,PyTorch,2506.17,9560.35,GemmaForCausalLM,gemma,18,2048,BF16,256000,16384,8,gelu,Inference
-CodeGemma-7B,PyTorch,8537.68,32568.77,GemmaForCausalLM,gemma,28,3072,BF16,256000,24576,16,gelu,Inference
-Llama-2-7B,PyTorch,6738.42,25705.15,LlamaForCausalLM,llama,32,4096,FP16,32000,11008,32,silu,Inference
-Microsoft Phi-2,PyTorch,2779.68,10603.82,PhiForCausalLM,phi,32,2560,FP16,51200,10240,32,gelu_new,Inference
-Yi-6B,PyTorch,6061.04,23121.13,LlamaForCausalLM,llama,32,4096,BF16,64000,11008,32,silu,Inference
-Yi-34B,PyTorch,34388.92,131183.52,LlamaForCausalLM,llama,60,7168,BF16,64000,20480,56,silu,Inference
-Zephyr-7B,PyTorch,7241.73,27625.13,MistralForCausalLM,mistral,32,4096,BF16,32000,14336,32,silu,Inference
-Yi-1.5-9B,PyTorch,8829.41,33681.68,LlamaForCausalLM,llama,48,4096,BF16,64000,11008,32,silu,Inference
-OpenChat-3.5-1210,PyTorch,7241.75,27625.19,MistralForCausalLM,mistral,32,4096,BF16,32002,14336,32,silu,Inference
-Hermes-2-Pro,PyTorch,7241.99,27626.13,MistralForCausalLM,mistral,32,4096,BF16,32032,14336,32,silu,Inference
-Qwen2-7B-Instruct,PyTorch,7615.62,29051.4,Qwen2ForCausalLM,qwen2,28,3584,BF16,152064,18944,28,silu,Inference
-GPT2,PyTorch,0.115893602,265130.13,GPT2LMHeadModel,gpt2,12,,FP32,50257,,12,gelu_new,Inference
-LLAMA2-70B,PyTorch,64.23950958,265130.13,LlamaForCausalLM,llama,80,8192,FLOAT16,32000,28672,64,silu,Inference
-Flan-T5 Small,TensorFlow,60.51,587.21,T5ForConditionalGeneration,t5,12,,FP32,32128,2048,6,relu,Inference
+Model Name,Framework,Task Type,Total Parameters (Millions),Model Size (MB),Architecture type,Model Type,Embedding Vector Dimension (Hidden Size),Precision,Vocabulary Size,FFN (MLP) Dimension,Activation Function,GFLOPs (Billions),Number of hidden Layers,Number of Attention Layers
+LLaMA 2 13B,PyTorch,Inference,13015.86,49651.75,LlamaForCausalLM,llama,5120,FP16,32000,13824,silu,11205.2,40,40
+Qwen 1.5 -7B,PyTorch,Inference,7721.32,29454.66,Qwen2ForCausalLM,qwen2,4096,BF16,151936,11008,silu,3067.2,32,32
+Microsoft Phi-3 instruct,PyTorch,Inference,3821.08,14576.34,Phi3ForCausalLM,phi3,5120,BF16,32064,17920,silu,1257.36,40,32
+Mistral 7B,PyTorch,Inference,7241.73,27625.13,MistralForCausalLM,mistral,4096,BF16,32000,14336,silu,6555.42,32,32
+Gemma-2B,PyTorch,Inference,2506.17,9560.35,GemmaForCausalLM,gemma,2048,BF16,256000,16384,gelu,2640.27,18,8
+CodeGemma-7B,PyTorch,Inference,8537.68,32568.77,GemmaForCausalLM,gemma,3072,BF16,256000,24576,gelu_pytorch_tanh,9206.12,28,16
+Llama 2 7B,PyTorch,Inference,6738.42,25705.15,LlamaForCausalLM,llama,4096,FP16,32000,11008,silu,7173.03,32,32
+Microsoft Phi-2,PyTorch,Inference,2779.68,10603.82,PhiForCausalLM,phi,2560,FP16,51200,10240,gelu_new,1049.4,32,32
+Yi-6B,PyTorch,Inference,6061.04,23121.13,LlamaForCausalLM,llama,4096,BF16,64000,11008,silu,5521.6,32,32
+Yi-34B,PyTorch,Inference,34388.92,131183.52,LlamaForCausalLM,llama,7168,BF16,64000,20480,silu,36644.4,60,56
+Zephyr-7B,PyTorch,Inference,7241.73,27625.13,MistralForCausalLM,mistral,4096,BF16,32000,14336,silu,6342.12,32,32
+Yi-1.5-9B,PyTorch,Inference,8829.41,33681.68,LlamaForCausalLM,llama,4096,BF16,64000,11008,silu,4111.2,48,32
+OpenChat-3.5-1210,PyTorch,Inference,7241.75,27625.19,MistralForCausalLM,mistral,4096,BF16,32002,14336,silu,4635.72,32,32
+Hermes-2-Pro,PyTorch,Inference,7241.99,27626.13,MistralForCausalLM,mistral,4096,BF16,32032,14336,silu,5161.86,32,32
+Qwen2-7B-Instruct,PyTorch,Inference,7615.62,29051.4,Qwen2ForCausalLM,qwen2,3584,BF16,152064,18944,silu,4454.1,28,28
+GPT2,PyTorch,Inference,0.115893602,265130.13,GPT2LMHeadModel,gpt2,,FP32,50257,,gelu_new,42.72,12,12
+LLAMA2-70B,PyTorch,Inference,64.23950958,265130.13,LlamaForCausalLM,llama,8192,FP16,32000,28672,silu,74212.2,80,64
+BERT,PyTorch,Inference,109.51,840.09,BertForMaskedLM,bert,768,FP32,30522,3072,gelu,4.42,32,32
+ROBERTA,PyTorch,Inference,124.7,951.42,RobertaForMaskedLM,roberta,768,FP32,50265,3072,gelu,4.59,32,32
+ALBERT,PyTorch,Inference,11.22,90.36,AlbertForMaskedLM,albert,768,FP32,30000,3072,gelu_new,4.43,32,32
+DISTILBERT,PyTorch,Inference,66.99,511.08,DistilBertForMaskedLM,distilbert,768,FP32,30522,3072,gelu,2.21,32,32
+RESNET18,PyTorch,Inference,11.69,44.59,resnet18,resnet18,512,FP32,1000,512,relu,3.98,32,32
+RESNET34,PyTorch,Inference,21.8,83.15,resnet34,resnet34,512,FP32,1000,512,relu,4.05,32,32
+RESNET50,PyTorch,Inference,25.56,97.49,resnet50,resnet50,2048,FP32,1000,2048,relu,4.11,32,32
+VGG16,PyTorch,Inference,138.36,527.79,vgg16,vgg16,512,FP32,1000,4096,relu,15.47,32,32
+VGG19,PyTorch,Inference,143.67,548.05,vgg19,vgg19,512,FP32,1000,2048,relu,18.78,32,32
+INCEPTION_V3,PyTorch,Inference,23.83,90.92,inception_v3,inception_v3,2048,FP32,1000,2048,relu,2.85,32,32
+EFFICIENTNET-B0,PyTorch,Inference,5.29,20.17,efficientnet_b0,efficientnet_b0,1280,FP32,1000,1280,silu,0.02,32,32
+VIT-BASE,PyTorch,Inference,86.57,660.5,ViTForImageClassification,vit,768,FP32,1000,3072,gelu,16.87,32,32
+DEIT-BASE,PyTorch,Inference,87.34,666.49,DeiTForImageClassificationWithTeacher,deit,768,FP32,1000,3072,gelu,16.95,32,32
+SWIN-BASE,PyTorch,Inference,87.77,1336.99,SwinForImageClassification,swin,1024,FP32,1000,4096,gelu,15.47,32,32
+LLaMA 2 13B,PyTorch,Training,13015.86,49651.75,LlamaForCausalLM,llama,5120,FP16,32000,13824,silu,0,40,40
+Qwen 1.5 -7B,PyTorch,Training,7721.32,29454.66,Qwen2ForCausalLM,qwen2,4096,BF16,151936,11008,silu,0,32,32
+Microsoft Phi-3 instruct,PyTorch,Training,3821.08,14576.34,Phi3ForCausalLM,phi3,5120,BF16,32064,17920,silu,0,40,32
+Mistral 7B,PyTorch,Training,7241.73,27625.13,MistralForCausalLM,mistral,4096,BF16,32000,14336,silu,0,32,32
+Gemma-2B,PyTorch,Training,2506.17,9560.35,GemmaForCausalLM,gemma,2048,BF16,256000,16384,gelu,0,18,8
+CodeGemma-7B,PyTorch,Training,8537.68,32568.77,GemmaForCausalLM,gemma,3072,BF16,256000,24576,gelu_pytorch_tanh,0,28,16
+Llama 2 7B,PyTorch,Training,6738.42,25705.15,LlamaForCausalLM,llama,4096,FP16,32000,11008,silu,0,32,32
+Microsoft Phi-2,PyTorch,Training,2779.68,10603.82,PhiForCausalLM,phi,2560,FP16,51200,10240,gelu_new,0,32,32
+Yi-6B,PyTorch,Training,6061.04,23121.13,LlamaForCausalLM,llama,4096,BF16,64000,11008,silu,0,32,32
+Yi-34B,PyTorch,Training,34388.92,131183.52,LlamaForCausalLM,llama,7168,BF16,64000,20480,silu,0,60,56
+Zephyr-7B,PyTorch,Training,7241.73,27625.13,MistralForCausalLM,mistral,4096,BF16,32000,14336,silu,0,32,32
+Yi-1.5-9B,PyTorch,Training,8829.41,33681.68,LlamaForCausalLM,llama,4096,BF16,64000,11008,silu,0,48,32
+OpenChat-3.5-1210,PyTorch,Training,7241.75,27625.19,MistralForCausalLM,mistral,4096,BF16,32002,14336,silu,0,32,32
+Hermes-2-Pro,PyTorch,Training,7241.99,27626.13,MistralForCausalLM,mistral,4096,BF16,32032,14336,silu,0,32,32
+Qwen2-7B-Instruct,PyTorch,Training,7615.62,29051.4,Qwen2ForCausalLM,qwen2,3584,BF16,152064,18944,silu,0,28,28
+GPT2,PyTorch,Training,0.115893602,265130.13,GPT2LMHeadModel,gpt2,,FP32,50257,,gelu_new,0,12,12
+LLAMA2-70B,PyTorch,Training,64.23950958,265130.13,LlamaForCausalLM,llama,8192,FP16,32000,28672,silu,0,80,64
+LLAMA3.1-405B,PyTorch,Training,405000,772476.2,LlamaForCausalLM,llama,8192,BF16,128256,28672,silu,0,80,64
+BERT,PyTorch,Training,109.51,840.09,BertForMaskedLM,bert,768,FP32,30522,3072,gelu,0,32,32
+ROBERTA,PyTorch,Training,124.7,951.42,RobertaForMaskedLM,roberta,768,FP32,50265,3072,gelu,0,32,32
+ALBERT,PyTorch,Training,11.22,90.36,AlbertForMaskedLM,albert,768,FP32,30000,3072,gelu_new,0,32,32
+DISTILBERT,PyTorch,Training,66.99,511.08,DistilBertForMaskedLM,distilbert,768,FP32,30522,3072,gelu,0,32,32
+RESNET18,PyTorch,Training,11.69,44.59,resnet18,resnet18,512,FP32,1000,512,relu,0,32,32
+RESNET34,PyTorch,Training,21.8,83.15,resnet34,resnet34,512,FP32,1000,512,relu,0,32,32
+RESNET50,PyTorch,Training,25.56,97.49,resnet50,resnet50,2048,FP32,1000,2048,relu,0,32,32
+VGG16,PyTorch,Training,138.36,527.79,vgg16,vgg16,512,FP32,1000,4096,relu,0,32,32
+VGG19,PyTorch,Training,143.67,548.05,vgg19,vgg19,512,FP32,1000,2048,relu,0,32,32
+INCEPTION_V3,PyTorch,Training,23.83,90.92,inception_v3,inception_v3,2048,FP32,1000,2048,relu,0,32,32
+EFFICIENTNET-B0,PyTorch,Training,5.29,20.17,efficientnet_b0,efficientnet_b0,1280,FP32,1000,1280,silu,0,32,32
+VIT-BASE,PyTorch,Training,86.57,660.5,ViTForImageClassification,vit,768,FP32,1000,3072,gelu,0,32,32
+DEIT-BASE,PyTorch,Training,87.34,666.49,DeiTForImageClassificationWithTeacher,deit,768,FP32,1000,3072,gelu,0,32,32
+SWIN-BASE,PyTorch,Training,87.77,1336.99,SwinForImageClassification,swin,1024,FP32,1000,4096,gelu,0,32,32

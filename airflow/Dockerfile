@@ -1,4 +1,4 @@
-FROM apache/airflow:2.7.3
+FROM apache/airflow:2.8.0-python3.9
 
 # Switch to root to install system packages
 USER root

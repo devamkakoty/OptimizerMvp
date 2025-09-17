@@ -1,7 +1,33 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm run dev:*)"
+      "Bash(npm run dev:*)",
+      "Read(/C:\\Users\\vabhinav\\Desktop\\GreenMatrix\\vite-project\\src\\components/**)",
+      "Read(/C:\\Users\\vabhinav\\Desktop\\GreenMatrix/**)",
+      "Read(/C:\\Users\\vabhinav\\Desktop\\GreenMatrix/**)",
+      "Read(/C:\\Users\\vabhinav\\Desktop\\GreenMatrix\\vite-project/**)",
+      "Read(/C:\\Users\\vabhinav\\Desktop\\GreenMatrix\\vite-project\\src\\components/**)",
+      "Read(/C:\\Users\\vabhinav\\Desktop\\GreenMatrix\\vite-project\\src\\components/**)",
+      "Read(/C:\\Users\\vabhinav\\Desktop\\GreenMatrix\\vite-project\\src\\components/**)",
+      "Read(/C:\\Users\\vabhinav\\Desktop\\GreenMatrix\\vite-project\\src\\components/**)",
+      "Read(/C:\\Users\\vabhinav\\Desktop\\GreenMatrix\\vite-project\\src\\components/**)",
+      "Read(/C:\\Users\\vabhinav\\Desktop\\GreenMatrix\\vite-project/**)",
+      "Read(/C:\\Users\\vabhinav\\Desktop\\GreenMatrix\\vite-project\\src\\components/**)",
+      "Read(/C:\\Users\\vabhinav\\Desktop\\GreenMatrix\\vite-project\\src\\components/**)",
+      "Read(/C:\\Users\\vabhinav\\Desktop\\GreenMatrix\\vite-project\\src\\components/**)",
+      "Read(/C:\\Users\\vabhinav\\Desktop\\GreenMatrix\\vite-project\\src\\components/**)",
+      "Read(/C:\\Users\\vabhinav\\Desktop\\GreenMatrix\\vite-project\\src\\components/**)",
+      "Read(/C:\\Users\\vabhinav\\Desktop\\GreenMatrix\\vite-project\\src\\components/**)",
+      "Read(/C:\\Users\\vabhinav\\Desktop\\GreenMatrix\\vite-project\\src\\components/**)",
+      "Read(/C:\\Users\\vabhinav\\Desktop\\GreenMatrix\\vite-project\\src\\components/**)",
+      "Read(/C:\\Users\\vabhinav\\Desktop\\GreenMatrix\\vite-project\\src\\components/**)",
+      "Read(/C:\\Users\\vabhinav\\Desktop\\GreenMatrix\\vite-project\\src\\components/**)",
+      "Read(/C:\\Users\\vabhinav\\Desktop\\GreenMatrix\\vite-project\\src\\components/**)",
+      "Read(/C:\\Users\\vabhinav\\Desktop\\GreenMatrix\\vite-project/**)",
+      "Read(/C:\\Users\\vabhinav\\Desktop\\GreenMatrix\\vite-project\\src\\components/**)",
+      "Read(/C:\\Users\\vabhinav\\Desktop\\GreenMatrix\\vite-project\\src\\components/**)",
+      "Read(/C:\\Users\\vabhinav\\Desktop\\GreenMatrix\\vite-project\\src\\components/**)",
+      "Read(/C:\\Users\\vabhinav\\Desktop\\GreenMatrix\\vite-project\\UI Changes/**)"
     ],
     "deny": []
   }
