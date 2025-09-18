@@ -254,7 +254,6 @@ const SimulateTab = () => {
 
   return (
     <div className="main">
-      <div className="txt5">GreenMatrix Panel</div>
       <div className="para">
 
 

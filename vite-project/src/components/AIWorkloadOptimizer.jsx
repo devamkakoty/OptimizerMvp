@@ -17,40 +17,39 @@ const AIWorkloadOptimizer = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
-      {/* Sidebar */}
-      <Sidebar 
-        activeSection={activeSection}
-        setActiveSection={setActiveSection}
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        isCollapsed={isCollapsed}
-        setIsCollapsed={setIsCollapsed}
-      />
-
-      {/* Main Content */}
-      <div className={`flex-1 flex flex-col transition-all duration-300 ${
-        isCollapsed ? 'lg:ml-16' : 'lg:ml-64'
-      }`}>
-        {/* Header */}
-        <header className="bg-white dark:bg-gray-800">
-          <div className="px-6 py-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <img src={logo} alt="GreenMatrix Logo" className="w-12" />
-              <span className="text-xl font-semibold text-gray-900 dark:text-white pt-1">
-                GreenMatrix
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <button 
-                onClick={toggleDarkMode}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-              >
-                {isDarkMode ? <Sun color="#fbbf24" /> : <Moon color="#6b7280" />}
-              </button>
-            </div>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
+      {/* Fixed Header */}
+      <header className="bg-white dark:bg-gray-800 w-full fixed top-0 z-50">
+        <div className="px-6 py-2 flex items-center justify-between">
+          <div className="flex items-center">
+            <img src={logo} alt="HPE Logo" className="w-10" />
           </div>
-        </header>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={toggleDarkMode}
+              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+            >
+              {isDarkMode ? <Sun color="#fbbf24" /> : <Moon color="#6b7280" />}
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <div className="flex flex-1 pt-16">
+        {/* Sidebar */}
+        <Sidebar
+          activeSection={activeSection}
+          setActiveSection={setActiveSection}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          isCollapsed={isCollapsed}
+          setIsCollapsed={setIsCollapsed}
+        />
+
+        {/* Main Content */}
+        <div className={`flex-1 flex flex-col transition-all duration-300 ${
+          isCollapsed ? 'lg:ml-16' : 'lg:ml-64'
+        }`}>
 
         {/* Content Area */}
         <div className="flex-1 overflow-auto">
@@ -142,6 +141,7 @@ const AIWorkloadOptimizer = () => {
               </div>
             </div>
           </footer>
+          </div>
         </div>
       </div>
     </div>

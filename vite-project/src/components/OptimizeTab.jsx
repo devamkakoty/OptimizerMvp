@@ -4,7 +4,6 @@ import apiClient from '../config/axios';
 import OptimizationResults from './OptimizationResults';
 import SimulationResults from './SimulationResults';
 import { useDropdownData } from '../hooks/useDropdownData';
-import '../styles/AdminDashboardNew.css';
 
 const OptimizeTab = () => {
   const [optimizationMode, setOptimizationMode] = useState('pre-deployment');
@@ -81,6 +80,11 @@ const OptimizeTab = () => {
   // Hardware data state
   const [isOverrideEnabled, setIsOverrideEnabled] = useState(false);
 
+  // Host metrics state for bare metal
+  const [isLoadingHostMetrics, setIsLoadingHostMetrics] = useState(false);
+  const [hostMetricsLastUpdated, setHostMetricsLastUpdated] = useState(null);
+  const [hostMetricsRefreshInterval, setHostMetricsRefreshInterval] = useState(null);
+
   // Loading and error states
   const [isLoadingModelData, setIsLoadingModelData] = useState(false);
   const [error, setError] = useState('');
@@ -105,6 +109,48 @@ const OptimizeTab = () => {
     } else {
       // Fallback
       return `Hardware Config ${hardware.id}`;
+    }
+  };
+
+  // Fetch host metrics for bare metal
+  const fetchHostMetrics = async () => {
+    setIsLoadingHostMetrics(true);
+
+    try {
+      const response = await apiClient.get('/host-overall-metrics?limit=1');
+      console.log('Host metrics response:', response.data);
+
+      if (response.data && response.data.data && response.data.data.length > 0) {
+        const hostMetrics = response.data.data[0];
+
+        // Map API fields to form state
+        setGpuUtilization(hostMetrics.host_gpu_utilization_percent?.toFixed(1) || '0');
+        setGpuMemoryUsage(hostMetrics.host_gpu_memory_utilization_percent?.toFixed(1) || '0');
+        setCpuUtilization(hostMetrics.host_cpu_usage_percent?.toFixed(1) || '0');
+        setCpuMemoryUsage(hostMetrics.host_ram_usage_percent?.toFixed(1) || '0');
+
+        // Note: host_disk_read_count and host_disk_write_count are cumulative counters
+        // To get actual IOPS, we need rate calculation over time interval, but for real-time
+        // display we'll show current utilization as placeholder. Proper IOPS calculation
+        // requires previous snapshot for rate computation.
+        const approximateIops = Math.round(((hostMetrics.host_disk_read_count || 0) + (hostMetrics.host_disk_write_count || 0)) / 1000);
+        setDiskIops(approximateIops.toString());
+
+        // Note: network bytes are cumulative counters, not rates.
+        // For real-time display, show utilization percentage or estimated bandwidth
+        // Proper bandwidth calculation requires rate computation over time interval
+        const estimatedBandwidthMbps = Math.round((hostMetrics.host_network_bytes_sent || 0) / (1024 * 1024 * 10)); // Rough estimate
+        setNetworkBandwidth(Math.min(estimatedBandwidthMbps, 1000).toString()); // Cap at 1000 Mbps
+
+        setHostMetricsLastUpdated(new Date());
+        console.log('Host metrics updated successfully');
+      } else {
+        console.log('No host metrics data available');
+      }
+    } catch (err) {
+      console.error('Error fetching host metrics:', err);
+    } finally {
+      setIsLoadingHostMetrics(false);
     }
   };
 
@@ -215,9 +261,14 @@ const OptimizeTab = () => {
   }, [dropdownError, hardwareData, isOverrideEnabled]);
 
   // Fetch VMs when switching to VM-level post-deployment mode
+  // Fetch host metrics when switching to bare-metal post-deployment mode
   useEffect(() => {
-    if (optimizationMode === 'post-deployment' && postDeploymentMode === 'vm-level') {
-      fetchActiveVMs();
+    if (optimizationMode === 'post-deployment') {
+      if (postDeploymentMode === 'vm-level') {
+        fetchActiveVMs();
+      } else if (postDeploymentMode === 'bare-metal') {
+        fetchHostMetrics();
+      }
     }
     // Clear results when switching between bare-metal and VM-level tabs
     setOptimizationResults(null);
@@ -293,7 +344,7 @@ const OptimizeTab = () => {
     // Set up new interval if VM is selected and not in override mode
     if (selectedVM && selectedVM.vm_name && !isVmOverrideEnabled) {
       console.log(`Starting auto-refresh for VM metrics: ${selectedVM.vm_name} (every 10 seconds)`);
-      
+
       const intervalId = setInterval(() => {
         console.log(`Auto-refreshing VM metrics for: ${selectedVM.vm_name}`);
         fetchVmMetrics(selectedVM.vm_name);
@@ -311,6 +362,36 @@ const OptimizeTab = () => {
       }
     };
   }, [selectedVM, isVmOverrideEnabled]);
+
+  // Auto-refresh host metrics every 2 seconds for bare metal mode when not in override mode
+  useEffect(() => {
+    // Clear any existing interval
+    if (hostMetricsRefreshInterval) {
+      clearInterval(hostMetricsRefreshInterval);
+      setHostMetricsRefreshInterval(null);
+    }
+
+    // Set up new interval if in bare metal mode and not in override mode
+    if (optimizationMode === 'post-deployment' && postDeploymentMode === 'bare-metal' && !isOverrideEnabled) {
+      console.log('Starting auto-refresh for host metrics (every 2 seconds)');
+
+      const intervalId = setInterval(() => {
+        console.log('Auto-refreshing host metrics');
+        fetchHostMetrics();
+      }, 2000); // 2 seconds
+
+      setHostMetricsRefreshInterval(intervalId);
+    }
+
+    // Cleanup function
+    return () => {
+      if (hostMetricsRefreshInterval) {
+        console.log('Cleaning up host metrics auto-refresh interval');
+        clearInterval(hostMetricsRefreshInterval);
+        setHostMetricsRefreshInterval(null);
+      }
+    };
+  }, [optimizationMode, postDeploymentMode, isOverrideEnabled]);
 
   // Clear form data when switching between pre/post deployment modes
   useEffect(() => {
@@ -360,10 +441,14 @@ const OptimizeTab = () => {
     setIsVmOverrideEnabled(false);
     setVmMetricsLastUpdated(null);
     
-    // Clear auto-refresh interval
+    // Clear auto-refresh intervals
     if (vmMetricsRefreshInterval) {
       clearInterval(vmMetricsRefreshInterval);
       setVmMetricsRefreshInterval(null);
+    }
+    if (hostMetricsRefreshInterval) {
+      clearInterval(hostMetricsRefreshInterval);
+      setHostMetricsRefreshInterval(null);
     }
     
     setError('');
@@ -587,6 +672,12 @@ const OptimizeTab = () => {
             "Precision": precision,
             "Vocabulary Size": parseInt(vocabularySize),
             "Activation Function": activationFunction,
+            // CRITICAL: Add missing fields needed by simulation PKL models
+            "Embedding Vector Dimension (Hidden Size)": parseInt(embeddingDimension) || 0,
+            "FFN (MLP) Dimension": parseInt(ffnDimension) || 0,
+            "Number of hidden Layers": parseInt(hiddenLayers) || 0,
+            "Number of Attention Layers": parseInt(attentionLayers) || 0,
+            "GFLOPs (Billions)": parseFloat(flops) || 0,
             // Resource metrics using direct field names (no aliases)
             gpu_memory_usage: parseFloat(gpuMemoryUsage),
             cpu_memory_usage: parseFloat(cpuMemoryUsage),
@@ -843,60 +934,60 @@ const OptimizeTab = () => {
           let considerations = [];
           
           if (recommendation.toLowerCase().includes('upgrade')) {
-            description = `ML Model Analysis: ${recommendation}\n\nBased on current ${currentHardware} performance metrics and workload analysis, the machine learning model (prediction confidence: ${response.data.raw_prediction}/10) recommends upgrading to ${recommendedHardware} for optimal performance.`;
+            description = `Hardware Recommendation: ${recommendation}\n\nBased on current ${currentHardware} performance metrics and AI workload analysis, upgrading to ${recommendedHardware} will provide better performance for your model deployment.`;
             strengths = [
-              'Significant performance improvement expected',
-              'Better resource utilization',
-              'Enhanced processing capabilities',
-              'Future-ready hardware specifications'
+              'Improved AI model inference performance',
+              'Better memory and compute resource utilization',
+              'Enhanced GPU capabilities for AI workloads',
+              'Future-ready hardware for scaling'
             ];
             considerations = [
-              'Hardware upgrade required',
-              'Migration planning needed',
-              'Cost-benefit analysis recommended',
-              'Performance gains validated by ML model'
+              'Hardware upgrade and migration required',
+              'Deployment planning and testing needed',
+              'Cost-benefit analysis for infrastructure',
+              'Model re-deployment and validation'
             ];
           } else if (recommendation.toLowerCase().includes('downgrade')) {
-            description = `ML Model Analysis: ${recommendation}\n\nCurrent ${currentHardware} appears to be over-provisioned for this workload. The ML model suggests ${recommendedHardware} would be more cost-effective while maintaining performance.`;
+            description = `Cost Optimization Recommendation: ${recommendation}\n\nCurrent ${currentHardware} appears to be over-provisioned for this AI workload. Moving to ${recommendedHardware} would be more cost-effective while maintaining performance.`;
             strengths = [
-              'Cost optimization opportunity',
-              'Right-sizing for current workload',
-              'Reduced operational expenses',
-              'Efficient resource allocation'
+              'Significant cost optimization opportunity',
+              'Right-sizing for current AI model requirements',
+              'Reduced operational and infrastructure expenses',
+              'Efficient resource allocation for workload'
             ];
             considerations = [
-              'Ensure performance requirements are met',
-              'Monitor workload changes',
-              'Cost savings potential',
-              'ML model confidence validated'
+              'Validate performance requirements are still met',
+              'Monitor model performance after transition',
+              'Plan cost savings allocation strategy',
+              'Test thoroughly before production deployment'
             ];
           } else if (recommendation.toLowerCase().includes('maintain')) {
-            description = `ML Model Analysis: Current ${currentHardware} is optimally configured for this workload. No hardware changes recommended at this time.`;
+            description = `Optimal Configuration: Current ${currentHardware} is well-suited for this AI workload. No hardware changes recommended at this time.`;
             strengths = [
-              'Current hardware is well-suited',
-              'Optimal price-performance ratio',
-              'No migration overhead',
-              'Stable performance expected'
+              'Current hardware meets AI model requirements',
+              'Optimal price-performance ratio achieved',
+              'No migration overhead or downtime',
+              'Stable inference performance maintained'
             ];
             considerations = [
-              'Continue monitoring performance',
-              'Re-evaluate if workload changes',
-              'Current configuration validated',
-              'ML model confirms optimal setup'
+              'Continue monitoring model performance metrics',
+              'Re-evaluate if workload patterns change',
+              'Current configuration validated for deployment',
+              'Consider scaling options for future growth'
             ];
           } else {
-            description = `ML Model Analysis: ${recommendation}\n\nThe machine learning model has analyzed workload running on ${currentHardware} and provided the above recommendation based on performance optimization patterns.`;
+            description = `Hardware Analysis: ${recommendation}\n\nBased on analysis of your AI workload running on ${currentHardware}, this recommendation optimizes for your specific deployment requirements.`;
             strengths = [
-              'ML-driven recommendation',
-              'Workload-specific analysis',
-              'Data-driven insights',
-              'Performance optimization focus'
+              'AI workload-specific recommendation',
+              'Resource utilization analysis completed',
+              'Performance optimization guidance',
+              'Deployment-ready configuration'
             ];
             considerations = [
-              'Review recommendation details',
-              'Consider implementation feasibility',
-              'Validate against requirements',
-              'ML model analysis completed'
+              'Review implementation requirements',
+              'Consider deployment timeline and feasibility',
+              'Validate against performance requirements',
+              'Plan testing and rollout strategy'
             ];
           }
           
@@ -993,6 +1084,32 @@ const OptimizeTab = () => {
 
   return (
     <>
+      {/* Optimization Mode Selector */}
+      <div className="mb-6 flex justify-center">
+        <div className="inline-flex items-center gap-4">
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Optimization Mode:</span>
+          <button
+            onClick={() => setOptimizationMode('pre-deployment')}
+            className={`px-4 py-2 rounded-lg font-medium transition-all ${
+              optimizationMode === 'pre-deployment'
+                ? 'bg-[#01a982] text-white'
+                : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+            }`}
+          >
+            Pre-Deployment
+          </button>
+          <button
+            onClick={() => setOptimizationMode('post-deployment')}
+            className={`px-4 py-2 rounded-lg font-medium transition-all ${
+              optimizationMode === 'post-deployment'
+                ? 'bg-[#01a982] text-white'
+                : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+            }`}
+          >
+            Post-Deployment
+          </button>
+        </div>
+      </div>
 
       {/* Post-Deployment Section with Sub-tabs */}
       {optimizationMode === 'post-deployment' && (
@@ -1015,14 +1132,24 @@ const OptimizeTab = () => {
                   </svg>
                   {isOverrideEnabled ? 'Exit Override' : 'Override'}
                 </button>
-                <button 
-                  onClick={() => window.location.reload()}
-                  className="flex items-center gap-2 text-sm text-[#01a982] hover:text-[#019670]"
+                <button
+                  onClick={fetchHostMetrics}
+                  disabled={isLoadingHostMetrics}
+                  className="flex items-center gap-2 text-sm text-[#01a982] hover:text-[#019670] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  Refresh
+                  {isLoadingHostMetrics ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-[#01a982] border-t-transparent rounded-full animate-spin"></div>
+                      Refreshing...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Refresh Host Metrics
+                    </>
+                  )}
                 </button>
               </div>
             </div>
@@ -1058,8 +1185,34 @@ const OptimizeTab = () => {
           {postDeploymentMode === 'bare-metal' && (
             <div>
               <div className="mb-4">
-                <p className="text-gray-600 dark:text-gray-300">Real-time resource utilization metrics from bare metal hardware API</p>
+                <p className="text-gray-600 dark:text-gray-300">Real-time resource utilization metrics of Bare Metal Host Machine</p>
               </div>
+
+              {/* Host Metrics Status Indicator */}
+              {hostMetricsLastUpdated && (
+                <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                    <div className="flex items-center gap-1">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Last updated: {hostMetricsLastUpdated.toLocaleTimeString()}
+                    </div>
+                    {!isOverrideEnabled && (
+                      <div className="flex items-center gap-1">
+                        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                        Auto-refreshing every 2s
+                      </div>
+                    )}
+                    {isOverrideEnabled && (
+                      <div className="flex items-center gap-1">
+                        <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                        Auto-refresh paused (Override mode)
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
           <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
             {/* GPU Utilization */}
@@ -1073,7 +1226,7 @@ const OptimizeTab = () => {
                   type="number"
                   value={gpuUtilization}
                   onChange={(e) => setGpuUtilization(e.target.value)}
-                  className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
                   placeholder="Enter %"
                   min="0"
                   max="100"
@@ -1098,7 +1251,7 @@ const OptimizeTab = () => {
                   type="number"
                   value={gpuMemoryUsage}
                   onChange={(e) => setGpuMemoryUsage(e.target.value)}
-                  className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
                   placeholder="Enter %"
                   min="0"
                   max="100"
@@ -1123,7 +1276,7 @@ const OptimizeTab = () => {
                   type="number"
                   value={cpuUtilization}
                   onChange={(e) => setCpuUtilization(e.target.value)}
-                  className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
                   placeholder="Enter %"
                   min="0"
                   max="100"
@@ -1148,7 +1301,7 @@ const OptimizeTab = () => {
                   type="number"
                   value={cpuMemoryUsage}
                   onChange={(e) => setCpuMemoryUsage(e.target.value)}
-                  className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
                   placeholder="Enter %"
                   min="0"
                   max="100"
@@ -1173,7 +1326,7 @@ const OptimizeTab = () => {
                   type="number"
                   value={diskIops}
                   onChange={(e) => setDiskIops(e.target.value)}
-                  className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
                   placeholder="Enter IOPS"
                 />
               ) : (
@@ -1196,7 +1349,7 @@ const OptimizeTab = () => {
                   type="number"
                   value={networkBandwidth}
                   onChange={(e) => setNetworkBandwidth(e.target.value)}
-                  className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
                   placeholder="Enter MB/s"
                 />
               ) : (
@@ -1423,7 +1576,7 @@ const OptimizeTab = () => {
                               type="number"
                               value={vmGpuUtilization}
                               onChange={(e) => setVmGpuUtilization(e.target.value)}
-                              className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                              className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
                               placeholder="Enter %"
                               min="0"
                               max="100"
@@ -1453,7 +1606,7 @@ const OptimizeTab = () => {
                               type="number"
                               value={vmGpuMemoryUsage}
                               onChange={(e) => setVmGpuMemoryUsage(e.target.value)}
-                              className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                              className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
                               placeholder="Enter %"
                               min="0"
                               max="100"
@@ -1483,7 +1636,7 @@ const OptimizeTab = () => {
                               type="number"
                               value={vmCpuUtilization}
                               onChange={(e) => setVmCpuUtilization(e.target.value)}
-                              className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                              className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
                               placeholder="Enter %"
                               min="0"
                               max="100"
@@ -1513,7 +1666,7 @@ const OptimizeTab = () => {
                               type="number"
                               value={vmCpuMemoryUsage}
                               onChange={(e) => setVmCpuMemoryUsage(e.target.value)}
-                              className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                              className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
                               placeholder="Enter %"
                               min="0"
                               max="100"
@@ -1543,7 +1696,7 @@ const OptimizeTab = () => {
                               type="number"
                               value={vmDiskIops}
                               onChange={(e) => setVmDiskIops(e.target.value)}
-                              className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                              className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
                               placeholder="Enter IOPS"
                             />
                           ) : (
@@ -1571,7 +1724,7 @@ const OptimizeTab = () => {
                               type="number"
                               value={vmNetworkBandwidth}
                               onChange={(e) => setVmNetworkBandwidth(e.target.value)}
-                              className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                              className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
                               placeholder="Enter MB/s"
                             />
                           ) : (
@@ -1631,57 +1784,24 @@ const OptimizeTab = () => {
         </div>
       )}
 
-      {/* Main Form Section - Only for Pre-Deployment */}
-      {optimizationMode === 'pre-deployment' && (
-        <>
-          <div className="txt5">GreenMatrix Panel</div>
-
-          {/* Main Form Section */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold text-[#01a982] mb-4 clr">Recommend Hardware</h2>
-
-          {/* Tabs */}
-          <div className="flex space-x-6 border-b border-gray-200 dark:border-gray-700">
-            <button
-              onClick={() => setOptimizationMode('pre-deployment')}
-              className={`flex items-center gap-2 pb-3 border-b-2 font-medium transition-colors ${
-                optimizationMode === 'pre-deployment'
-                  ? 'border-[#01a982] text-[#01a982]'
-                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-              }`}
-            >
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M12.316 3.051a1 1 0 01.633 1.265l-4 12a1 1 0 11-1.898-.632l4-12a1 1 0 011.265-.633zM5.707 6.293a1 1 0 010 1.414L3.414 10l2.293 2.293a1 1 0 11-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0zm8.586 0a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 11-1.414-1.414L16.586 10l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
-              </svg>
-              Pre-Deployment
-            </button>
-            <button
-              onClick={() => setOptimizationMode('post-deployment')}
-              className={`flex items-center gap-2 pb-3 border-b-2 font-medium transition-colors ${
-                optimizationMode === 'post-deployment'
-                  ? 'border-[#01a982] text-[#01a982]'
-                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-              }`}
-            >
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M12.316 3.051a1 1 0 01.633 1.265l-4 12a1 1 0 11-1.898-.632l4-12a1 1 0 011.265-.633zM5.707 6.293a1 1 0 010 1.414L3.414 10l2.293 2.293a1 1 0 11-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0zm8.586 0a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 11-1.414-1.414L16.586 10l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
-              </svg>
-              Post-Deployment
-            </button>
-          </div>
+      {/* Main Form Section */}
+      <div className="w-full max-w-6xl mx-auto bg-white rounded-lg shadow-sm border border-gray-200 p-6 para1">
+        <div className="paraetext-lg font-semibold text-gray-900 dark:text-white text7">
+          {optimizationMode === 'pre-deployment' ? 'Recommend Hardware' : 'Optimize Hardware'}
         </div>
 
-        {/* Content based on selected mode */}
-        <div className="mb-8">
-          <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">
-            {optimizationMode === 'pre-deployment' ? 'Workload Parameters' : 'Runtime Parameters'}
-          </h2>
-          <p className="text-gray-600 dark:text-gray-300">
-            {optimizationMode === 'pre-deployment'
-              ? 'Enter the details of your AI workload to get hardware recommendations'
-              : 'Enter the details of your running AI workload to optimize hardware configuration'}
-          </p>
+        {/* Inner Container */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 max-w-6xl mx-auto mt-4 bgr">
+          {/* Header Section */}
+          <div className="mb-4">
+            <h1 className="text-xl font-bold text-gray-900 dark:text-white mb-1 text6">
+              {optimizationMode === 'pre-deployment' ? 'Workload Parameters' : 'Runtime Parameters'}
+            </h1>
+            <p className="text-sm text-gray-600 dark:text-gray-300">
+              {optimizationMode === 'pre-deployment'
+                ? 'Enter the details of your AI workload to get hardware recommendations'
+                : 'Enter the details of your running AI workload to optimize hardware configuration'}
+            </p>
 
           {/* Error Message */}
           {error && (
@@ -1708,9 +1828,9 @@ const OptimizeTab = () => {
               </div>
             </div>
           )}
-        </div>
+      </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="simulate-form-grid">
           {/* Model Name */}
           <div>
             <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -1733,7 +1853,7 @@ const OptimizeTab = () => {
               <select
                 value={modelName}
                 onChange={(e) => setModelName(e.target.value)}
-                className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
                 disabled={isLoadingDropdowns}
               >
                 <option value="">
@@ -1775,7 +1895,7 @@ const OptimizeTab = () => {
               <select
                 value={framework}
                 onChange={(e) => setFramework(e.target.value)}
-                className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
                 disabled={isLoadingModelData}
               >
                 <option value="">Select framework</option>
@@ -1815,7 +1935,7 @@ const OptimizeTab = () => {
               <select
                 value={taskType}
                 onChange={(e) => setTaskType(e.target.value)}
-                className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
                 disabled={isLoadingDropdowns}
               >
                 <option value="">Select task type</option>
@@ -2117,7 +2237,7 @@ const OptimizeTab = () => {
                   <select
                     value={architectureType}
                     onChange={(e) => setArchitectureType(e.target.value)}
-                    className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
                     disabled={isLoadingModelData}
                   >
                     <option value="">Select architecture type</option>
@@ -2257,7 +2377,7 @@ const OptimizeTab = () => {
                   <select
                     value={precision}
                     onChange={(e) => setPrecision(e.target.value)}
-                    className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
                     disabled={isLoadingModelData}
                   >
                     <option value="">Select precision</option>
@@ -2297,7 +2417,7 @@ const OptimizeTab = () => {
                   <select
                     value={activationFunction}
                     onChange={(e) => setActivationFunction(e.target.value)}
-                    className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
                     disabled={isLoadingModelData}
                   >
                     <option value="">Select activation function</option>
@@ -2427,21 +2547,19 @@ const OptimizeTab = () => {
           </button>
         </div>
       </div>
+    </div>
 
-          {/* Results */}
-          {optimizationResults && (
-            <SimulationResults
-              results={optimizationResults}
-              title="Top 3 Hardware Recommendations"
-              subtitle="Hardware configurations sorted by cost per 1000 inferences"
-            />
-          )}
-        </>
-      )}
-
-      {/* Post-Deployment Results */}
-      {optimizationMode === 'post-deployment' && optimizationResults && (
-        <OptimizationResults results={optimizationResults} mode={optimizationMode} />
+      {/* Results */}
+      {optimizationResults && (
+        optimizationMode === 'pre-deployment' ? (
+          <SimulationResults 
+            results={optimizationResults} 
+            title="Top 3 Hardware Recommendations" 
+            subtitle="Hardware configurations sorted by cost per 1000 inferences" 
+          />
+        ) : (
+          <OptimizationResults results={optimizationResults} mode={optimizationMode} />
+        )
       )}
     </>
   );

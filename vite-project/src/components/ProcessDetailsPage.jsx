@@ -353,20 +353,9 @@ const ProcessDetailsPage = () => {
   };
 
   return (
-    <div className={`min-h-screen ${isDarkMode ? 'dark bg-gray-900' : 'bg-gray-50'}`}>
-      <div className="flex">
-        {/* Sidebar */}
-        <Sidebar 
-          activeSection={activeSection}
-          setActiveSection={setActiveSection}
-          isCollapsed={isCollapsed}
-          setIsCollapsed={setIsCollapsed}
-        />
-
-        {/* Main Content Area */}
-        <div className={`flex-1 transition-all duration-300 ${isCollapsed ? 'ml-16' : 'ml-64'}`}>
-          {/* Header */}
-          <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+    <div className={`min-h-screen ${isDarkMode ? 'dark bg-gray-900' : 'bg-gray-50'} flex flex-col`}>
+      {/* Full Width Header */}
+      <header className="bg-white dark:bg-gray-800 w-full z-10 border-b border-gray-200 dark:border-gray-700">
             <div className="px-6 py-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -407,40 +396,71 @@ const ProcessDetailsPage = () => {
                 </div>
               </div>
             </div>
-          </div>
+      </header>
 
+      <div className="flex flex-1">
+        {/* Sidebar */}
+        <Sidebar
+          activeSection={activeSection}
+          setActiveSection={setActiveSection}
+          isCollapsed={isCollapsed}
+          setIsCollapsed={setIsCollapsed}
+        />
+
+        {/* Main Content Area */}
+        <div className={`flex-1 w-0 transition-all duration-300 ${isCollapsed ? 'ml-16' : 'ml-64'}`}>
           {/* Content */}
           <div className="px-6 py-8">
         
         {/* Search and Stats */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="flex items-center space-x-6">
-              <div className="text-sm text-gray-600 dark:text-gray-400">
-                <span className="font-semibold text-2xl text-gray-900 dark:text-white">
-                  {filteredProcesses.length}
-                </span>
-                <span className="ml-1">processes</span>
-              </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">
-                Latest data timestamp: {latestTimestamp ? new Date(latestTimestamp).toLocaleString() : 'Unknown'}
-              </div>
-            </div>
-            
-            <div className="flex items-center space-x-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+              {/* Search Bar - Moved to left side */}
               <div className="relative">
                 <input
                   type="text"
-                  placeholder="Search processes..."
+                  placeholder="Search processes or users..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 pr-4 py-2 w-64 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-600 focus:border-green-600"
+                  className="pl-10 pr-4 py-2 w-80 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-600 focus:border-green-600"
                 />
                 <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
                   <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
                 </div>
+                {searchTerm && (
+                  <button
+                    onClick={() => setSearchTerm('')}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+
+              {/* Stats */}
+              <div className="flex items-center space-x-6">
+                <div className="text-sm text-gray-600 dark:text-gray-400">
+                  <span className="font-semibold text-2xl text-gray-900 dark:text-white">
+                    {filteredProcesses.length}
+                  </span>
+                  <span className="ml-1">processes</span>
+                </div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">
+                  Latest data timestamp: {latestTimestamp ? new Date(latestTimestamp).toLocaleString() : 'Unknown'}
+                </div>
+              </div>
+            </div>
+
+            {/* Scroll Indicator */}
+            <div className="flex items-center space-x-4">
+              <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center">
+                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
+                </svg>
+                Scroll to see more columns
               </div>
             </div>
           </div>
@@ -467,10 +487,38 @@ const ProcessDetailsPage = () => {
               </div>
             </div>
           ) : (
-            <div className="overflow-x-auto max-h-96 overflow-y-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
-                  <tr>
+            <div className="relative w-full">
+              {/* Table Container with Custom Scrollbars - Isolated Scrolling */}
+              <div
+                className="table-scroll-container overflow-x-auto overflow-y-auto max-h-96 w-full"
+                style={{
+                  scrollbarWidth: 'thin',
+                  scrollbarColor: isDarkMode ? '#4B5563 #1F2937' : '#D1D5DB #F9FAFB'
+                }}
+              >
+                <style jsx>{`
+                  .table-scroll-container::-webkit-scrollbar {
+                    width: 8px;
+                    height: 8px;
+                  }
+                  .table-scroll-container::-webkit-scrollbar-track {
+                    background: ${isDarkMode ? '#1F2937' : '#F9FAFB'};
+                    border-radius: 4px;
+                  }
+                  .table-scroll-container::-webkit-scrollbar-thumb {
+                    background: ${isDarkMode ? '#4B5563' : '#D1D5DB'};
+                    border-radius: 4px;
+                  }
+                  .table-scroll-container::-webkit-scrollbar-thumb:hover {
+                    background: ${isDarkMode ? '#6B7280' : '#9CA3AF'};
+                  }
+                  .table-scroll-container::-webkit-scrollbar-corner {
+                    background: ${isDarkMode ? '#1F2937' : '#F9FAFB'};
+                  }
+                `}</style>
+                <table className="w-[1800px]">
+                  <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
+                    <tr>
                     {[
                       { key: 'Process Name', label: 'Process' },
                       { key: 'Process ID', label: 'PID' },
@@ -569,7 +617,12 @@ const ProcessDetailsPage = () => {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+                </table>
+              </div>
+
+              {/* Scroll Indicators */}
+              <div className="absolute top-0 right-0 bg-gradient-to-l from-white dark:from-gray-800 to-transparent w-8 h-full pointer-events-none opacity-50"></div>
+              <div className="absolute bottom-0 left-0 bg-gradient-to-t from-white dark:from-gray-800 to-transparent w-full h-4 pointer-events-none opacity-50"></div>
             </div>
           )}
         </div>

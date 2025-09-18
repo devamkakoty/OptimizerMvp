@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Download } from 'lucide-react';
 
-const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode, hostMetrics }) => {
+const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode, hostMetrics, timeRangeDays = 7 }) => {
   const generateInsightsData = () => {
     const analysis = {
       cost: [],
@@ -44,10 +44,10 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode, 
     const underutilizedVMs = runningVMs.filter(vm => (vm.cpuUsage || 0) < 20 && (vm.ramUsagePercent || 0) < 30);
     const overutilizedVMs = runningVMs.filter(vm => (vm.cpuUsage || 0) > 80 || (vm.ramUsagePercent || 0) > 85);
 
-    // Determine analysis period for display
-    const analysisDescription = viewMode === 'week' ? 
-      'Weekly Average Analysis' : 
-      selectedDate === 'today' ? 'Latest Data Analysis' : `Analysis for ${new Date(selectedDate).toLocaleDateString()}`;
+    // Determine analysis period for display - default to 7-day analysis
+    const analysisDescription = viewMode === 'week' ?
+      `${timeRangeDays}-Day Average Analysis` :
+      selectedDate === 'today' ? `Last ${timeRangeDays} Days Analysis` : `Analysis for ${new Date(selectedDate).toLocaleDateString()}`;
 
     // Store summary metrics including GPU and host overall metrics
     analysis.summary = {
@@ -79,7 +79,8 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode, 
       analysisDate: new Date().toLocaleDateString(),
       analysisTime: new Date().toLocaleTimeString(),
       analysisDescription: analysisDescription,
-      viewMode: viewMode
+      viewMode: viewMode,
+      timeRangeDays: timeRangeDays
     };
 
     // Debug logging (can be removed in production)
@@ -821,22 +822,25 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode, 
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <div className="flex-1 min-w-0">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2 break-words">
             System Insights & Recommendations
           </h3>
           <p className="text-sm text-gray-600 dark:text-gray-300">
             AI-powered analysis with {totalRecommendations} actionable recommendations
           </p>
         </div>
-        <button
-          onClick={handleDownloadReport}
-          className="flex items-center gap-2 px-4 py-2 bg-[#01a982] hover:bg-[#019670] text-white rounded-lg transition-colors"
-        >
-          <Download className="w-4 h-4" />
-          Recommendations
-        </button>
+        <div className="flex-shrink-0">
+          <button
+            onClick={handleDownloadReport}
+            className="flex items-center gap-2 px-4 py-2 bg-[#01a982] hover:bg-[#019670] text-white rounded-lg transition-colors"
+          >
+            <Download className="w-4 h-4" />
+            <span className="hidden sm:inline">Recommendations</span>
+            <span className="sm:hidden">Report</span>
+          </button>
+        </div>
       </div>
       
       <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">

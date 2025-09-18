@@ -26,9 +26,9 @@ const ModelOptimizerResults = ({ results }) => {
         description: `Based on your model analysis, we recommend ${results.recommended_method || "optimization techniques"} for optimal performance.`
       },
       recommendedPrecision: {
-        precision: results.recommended_precision ? `${results.recommended_precision.toFixed(2)} precision score` : "Mixed Precision (FP16/INT8)",
+        precision: results.recommended_precision_name || (results.recommended_precision ? `${results.recommended_precision.toFixed(2)} precision score` : "Mixed Precision (FP16/INT8)"),
         benefits: "Improved performance and efficiency",
-        description: `The optimization analysis suggests a precision score of ${results.recommended_precision?.toFixed(2) || "high quality"} for your model configuration.`
+        description: `The optimization analysis suggests ${results.recommended_precision_name || (results.recommended_precision?.toFixed(2) + " precision score") || "high quality precision"} for your model configuration.`
       },
       prosAndCons: {
         pros: [
@@ -72,54 +72,54 @@ const ModelOptimizerResults = ({ results }) => {
       {/* Recommended Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         {/* Recommended Methods Card */}
-        <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl p-6 text-white">
+        <div className="bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl p-6">
           <div className="flex items-center gap-3 mb-4">
-            <div className="bg-white/20 rounded-lg p-2">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="bg-gray-100 dark:bg-gray-600 rounded-lg p-2">
+              <svg className="w-6 h-6 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
-            <h3 className="text-xl font-bold">Recommended Methods</h3>
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white">Recommended Methods</h3>
           </div>
-          
+
           <div className="space-y-3 mb-4">
             <div>
-              <span className="text-gray-600 dark:text-gray-300 text-sm">Primary Method:</span>
-              <p className="text-lg font-semibold">{recommendedMethods.primary}</p>
+              <span className="text-gray-500 dark:text-gray-400 text-sm">Primary Method:</span>
+              <p className="text-lg font-semibold text-gray-800 dark:text-gray-200">{recommendedMethods.primary}</p>
             </div>
             <div>
-              <span className="text-gray-600 dark:text-gray-300 text-sm">Secondary Method:</span>
-              <p className="text-lg font-semibold">{recommendedMethods.secondary}</p>
+              <span className="text-gray-500 dark:text-gray-400 text-sm">Secondary Method:</span>
+              <p className="text-lg font-semibold text-gray-800 dark:text-gray-200">{recommendedMethods.secondary}</p>
             </div>
           </div>
-          
+
           <p className="text-gray-600 dark:text-gray-300 text-sm">
             {recommendedMethods.description}
           </p>
         </div>
 
         {/* Recommended Precision Card */}
-        <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-xl p-6 text-white">
+        <div className="bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl p-6">
           <div className="flex items-center gap-3 mb-4">
-            <div className="bg-white/20 rounded-lg p-2">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="bg-gray-100 dark:bg-gray-600 rounded-lg p-2">
+              <svg className="w-6 h-6 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
             </div>
-            <h3 className="text-xl font-bold">Recommended Precision</h3>
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white">Recommended Precision</h3>
           </div>
-          
+
           <div className="space-y-3 mb-4">
             <div>
-              <span className="text-gray-600 dark:text-gray-300 text-sm">Precision:</span>
-              <p className="text-lg font-semibold">{recommendedPrecision.precision}</p>
+              <span className="text-gray-500 dark:text-gray-400 text-sm">Precision:</span>
+              <p className="text-lg font-semibold text-gray-800 dark:text-gray-200">{recommendedPrecision.precision}</p>
             </div>
             <div>
-              <span className="text-gray-600 dark:text-gray-300 text-sm">Expected Benefits:</span>
-              <p className="text-lg font-semibold">{recommendedPrecision.benefits}</p>
+              <span className="text-gray-500 dark:text-gray-400 text-sm">Expected Benefits:</span>
+              <p className="text-lg font-semibold text-gray-800 dark:text-gray-200">{recommendedPrecision.benefits}</p>
             </div>
           </div>
-          
+
           <p className="text-gray-600 dark:text-gray-300 text-sm">
             {recommendedPrecision.description}
           </p>
@@ -160,18 +160,18 @@ const ModelOptimizerResults = ({ results }) => {
           {/* Cons */}
           <div>
             <div className="flex items-center gap-2 mb-4">
-              <div className="bg-orange-100 dark:bg-orange-900/20 rounded-lg p-2">
-                <svg className="w-5 h-5 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="bg-gray-100 dark:bg-gray-600 rounded-lg p-2">
+                <svg className="w-5 h-5 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
                 </svg>
               </div>
-              <h4 className="text-lg font-semibold text-orange-700 dark:text-orange-400">Considerations</h4>
+              <h4 className="text-lg font-semibold text-gray-900 dark:text-white">Considerations</h4>
             </div>
             <ul className="space-y-3">
               {prosAndCons.cons.map((con, index) => (
                 <li key={index} className="flex items-start gap-3">
-                  <div className="bg-orange-100 dark:bg-orange-900/20 rounded-full p-1 mt-1">
-                    <svg className="w-3 h-3 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="bg-gray-100 dark:bg-gray-600 rounded-full p-1 mt-1">
+                    <svg className="w-3 h-3 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01" />
                     </svg>
                   </div>

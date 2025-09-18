@@ -3,11 +3,12 @@ import { Info, Loader2 } from 'lucide-react';
 import apiClient from '../config/axios';
 import ModelOptimizerResults from './ModelOptimizerResults';
 import { useDropdownData } from '../hooks/useDropdownData';
+import '../styles/AdminDashboardNew.css';
 
 const ModelTab = () => {
   // Primary fields - Model Name and Task Type (user fills these first)
   const [modelName, setModelName] = useState('');
-  const [taskType, setTaskType] = useState('');
+  const [taskType, setTaskType] = useState('Inference'); // Default to Inference for optimization
   const [scenario, setScenario] = useState('Single Stream');
   
   // Auto-filled fields from database (user can override)
@@ -152,15 +153,19 @@ const ModelTab = () => {
       const optimizationParams = {
         Model_Name: modelName,
         Framework: framework,
+        Task_Type: taskType || 'Inference', // Default to Inference if not specified
         Total_Parameters_Millions: parseFloat(parameters) || 0,
         Model_Size_MB: parseFloat(modelSize) || 0,
         Architecture_type: architectureType,
         Model_Type: modelType,
+        'Embedding Vector Dimension (Hidden Size)': parseFloat(embeddingDimension) || 0,
         Number_of_hidden_Layers: parseInt(hiddenLayers) || 0,
         Precision: precision || 'FP32',
         Vocabulary_Size: parseInt(vocabularySize) || 0,
+        'FFN (MLP) Dimension': parseFloat(ffnDimension) || 0,
         Number_of_Attention_Layers: parseInt(attentionLayers) || 0,
-        Activation_Function: activationFunction
+        Activation_Function: activationFunction,
+        'GFLOPs (Billions)': parseFloat(flops) || 0
       };
 
       console.log('Sending optimization request:', optimizationParams);
@@ -183,12 +188,23 @@ const ModelTab = () => {
 
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-8">
-      <div className="mb-8">
-        <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">Model Parameters</h2>
-        <p className="text-gray-600 dark:text-gray-300">
-          Configure your model optimization parameters
-        </p>
+    <div className="main">
+      <div className="para">
+
+        {/* Outer Container */}
+        <div className="w-full max-w-6xl mx-auto bg-white rounded-lg shadow-sm border border-gray-200 p-6 para1">
+          <div className="paraetext-lg font-semibold text-gray-900 dark:text-white text7">Model Optimizer</div>
+
+          {/* Inner Container */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 max-w-6xl mx-auto mt-4 bgr">
+            {/* Header Section */}
+            <div className="mb-4">
+              <h1 className="text-xl font-bold text-gray-900 dark:text-white mb-1 text6">
+                Model Optimizer Parameters
+              </h1>
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+                Enter your AI model details to get model optimization recommendations and improve model performance.
+              </p>
         
         {/* Error Message */}
         {error && (
@@ -215,10 +231,10 @@ const ModelTab = () => {
             </div>
           </div>
         )}
-      </div>
+            </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Model Name */}
+            <div className="simulate-form-grid">
+              {/* Model Name */}
         <div>
           <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             Model Name
@@ -316,21 +332,13 @@ const ModelTab = () => {
             </div>
           </label>
           <div className="relative">
-            <select
-              value={taskType}
-              onChange={(e) => setTaskType(e.target.value)}
-              className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={isLoadingDropdowns}
-            >
-              <option value="">Select task type</option>
-              <option value="Training">Training</option>
-              <option value="Inference">Inference</option>
-            </select>
-            <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-              <svg className="w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </div>
+            <input
+              type="text"
+              value="Inference (Optimizer)"
+              className="w-full px-4 py-3 bg-gray-100 dark:bg-gray-600 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg focus:outline-none cursor-not-allowed"
+              disabled
+              readOnly
+            />
           </div>
         </div>
 
@@ -877,6 +885,9 @@ const ModelTab = () => {
         <ModelOptimizerResults results={optimizationResults} />
       )}
     </div>
+  </div>
+</div>
+</div>
   );
 };
 

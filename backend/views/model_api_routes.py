@@ -227,6 +227,7 @@ class ModelTrainingRequest(BaseModel):
 class ModelOptimizationRequest(BaseModel):
     Model_Name: str
     Framework: str
+    Task_Type: Optional[str] = "Inference"
     Total_Parameters_Millions: float
     Model_Size_MB: float
     Architecture_type: Optional[str] = ""
@@ -236,6 +237,10 @@ class ModelOptimizationRequest(BaseModel):
     Vocabulary_Size: Optional[int] = 0
     Number_of_Attention_Layers: Optional[int] = 0
     Activation_Function: Optional[str] = ""
+
+    # Additional fields matching the sample data format
+    class Config:
+        extra = "allow"  # Allow additional fields like 'Embedding Vector Dimension (Hidden Size)'
 
 # Cost Management Pydantic models
 class CostModelRequest(BaseModel):
@@ -637,6 +642,7 @@ async def get_model_optimization_recommendation(
         optimizer_input = {
             'Model Name': request.Model_Name,
             'Framework': request.Framework,
+            'Task Type': request.Task_Type,
             'Total Parameters (Millions)': request.Total_Parameters_Millions,
             'Model Size (MB)': request.Model_Size_MB,
             'Architecture type': request.Architecture_type,
@@ -647,6 +653,12 @@ async def get_model_optimization_recommendation(
             'Number of Attention Layers': request.Number_of_Attention_Layers,
             'Activation Function': request.Activation_Function
         }
+
+        # Add additional fields if they exist in the request
+        if hasattr(request, '__dict__'):
+            for key, value in request.__dict__.items():
+                if key.startswith('Embedding') or key.startswith('FFN') or key.startswith('GFLOPs'):
+                    optimizer_input[key] = value
         
         # Use the inference controller to get optimization recommendations
         result = model_inference_controller.get_optimization_recommendation(

@@ -928,11 +928,11 @@ const AdminDashboardNew = ({
   };
 
   return (
-    <div className="space-y-6 max-w-full overflow-hidden">
+    <div className="space-y-4 max-w-full overflow-hidden">
 
       {/* Top Section: GreenMatrix Panel Header (Left) + Cost Calculation (Middle) + Calendar & Report (Right) */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-3 bag">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-center title-dash">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-2 bag">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 items-center title-dash">
 
           {/* GreenMatrix Panel Title (Left 1/3) */}
           <div className="flex items-center">
@@ -1440,6 +1440,9 @@ const AdminDashboardNew = ({
             setSelectedVMForRecommendations(null);
           }}
           vmName={selectedVMForRecommendations.name}
+          timeRangeDays={7}
+          selectedDate={dateRange.start ? dateRange.start.toISOString().split('T')[0] : 'today'}
+          endDate={dateRange.end ? dateRange.end.toISOString().split('T')[0] : null}
         />
       )}
     </div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, AlertCircle, TrendingUp, Zap, DollarSign, Settings, CheckCircle, Clock, AlertTriangle } from 'lucide-react';
 
-const VMRecommendationsModal = ({ isOpen, onClose, vmName, timeRangeDays = 7, selectedDate = 'today' }) => {
+const VMRecommendationsModal = ({ isOpen, onClose, vmName, timeRangeDays = 7, selectedDate = 'today', endDate = null }) => {
   const [recommendations, setRecommendations] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -25,19 +25,22 @@ const VMRecommendationsModal = ({ isOpen, onClose, vmName, timeRangeDays = 7, se
     if (isOpen && vmName) {
       fetchRecommendations();
     }
-  }, [isOpen, vmName, timeRangeDays, selectedDate]);
+  }, [isOpen, vmName, timeRangeDays, selectedDate, endDate]);
 
   const fetchRecommendations = async () => {
     setLoading(true);
     setError(null);
-    
+
     try {
-      // Build query parameters based on selected date
+      // Build query parameters for 7-day analysis by default
       let queryParams = `time_range_days=${timeRangeDays}`;
-      if (selectedDate !== 'today') {
-        queryParams = `start_date=${selectedDate}&end_date=${selectedDate}`;
+
+      // If specific date range provided, use it instead
+      if (selectedDate !== 'today' && selectedDate !== null && selectedDate !== undefined) {
+        const endDateParam = endDate || selectedDate;
+        queryParams = `start_date=${selectedDate}&end_date=${endDateParam}`;
       }
-      
+
       const response = await fetch(`/api/recommendations/vm/${encodeURIComponent(vmName)}?${queryParams}`);
       
       if (!response.ok) {
@@ -184,6 +187,183 @@ const VMRecommendationsModal = ({ isOpen, onClose, vmName, timeRangeDays = 7, se
         categories: [...new Set(demoRecommendations.map(r => r.category))]
       }
     };
+  };
+
+  // Download comprehensive VM report
+  const handleDownloadVMReport = async () => {
+    if (!recommendations) return;
+
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+    const filename = `GreenMatrix_VM_Report_${vmName.replace(/[^a-zA-Z0-9]/g, '_')}_${timestamp}.html`;
+
+    // Calculate statistics from VM analysis
+    const vmAnalysis = recommendations.vm_analysis || {};
+    const recs = recommendations.recommendations || [];
+
+    // Generate comprehensive HTML report
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>GreenMatrix VM Analysis Report - ${vmName}</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 20px; color: #1f2937; line-height: 1.5; }
+          .header { text-align: center; margin-bottom: 30px; border-bottom: 3px solid #10b981; padding-bottom: 20px; }
+          .header h1 { color: #111827; margin: 0; font-size: 32px; font-weight: 700; }
+          .header p { color: #6b7280; margin: 8px 0; font-size: 14px; }
+          .section { margin: 30px 0; }
+          .section h2 { color: #374151; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px; font-size: 20px; font-weight: 600; margin-bottom: 20px; }
+          .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 15px 0; }
+          .card { border: 1px solid #d1d5db; padding: 20px; border-radius: 8px; background: #ffffff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); }
+          .card h3 { margin: 0 0 15px 0; color: #111827; font-size: 16px; font-weight: 600; }
+          .metric { margin: 8px 0; color: #374151; }
+          .metric strong { color: #10b981; font-weight: 600; }
+          .recommendation { border: 1px solid #e5e7eb; padding: 20px; border-radius: 8px; margin: 15px 0; background: #f9fafb; }
+          .recommendation h4 { color: #111827; margin: 0 0 10px 0; font-size: 18px; font-weight: 600; }
+          .priority-high { border-left: 4px solid #ef4444; }
+          .priority-medium { border-left: 4px solid #f59e0b; }
+          .priority-low { border-left: 4px solid #10b981; }
+          .actions { margin: 15px 0; }
+          .actions ul { margin: 10px 0; padding-left: 20px; }
+          .actions li { margin: 5px 0; color: #4b5563; }
+          .table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+          .table th, .table td { border: 1px solid #e5e7eb; padding: 12px 8px; text-align: left; }
+          .table th { background-color: #f9fafb; color: #374151; font-weight: 600; }
+          .footer { text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 12px; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>GreenMatrix VM Analysis Report</h1>
+          <p><strong>Virtual Machine:</strong> ${vmName}</p>
+          <p><strong>Analysis Period:</strong> ${recommendations.analysis_period || `Last ${timeRangeDays} days`}</p>
+          <p><strong>Generated on:</strong> ${new Date().toLocaleString()}</p>
+        </div>
+
+        <div class="section">
+          <h2>Executive Summary</h2>
+          <div class="grid">
+            <div class="card">
+              <h3>Resource Utilization</h3>
+              <div class="metric"><strong>CPU:</strong> ${vmAnalysis.avg_cpu_percent || 'N/A'}%</div>
+              <div class="metric"><strong>Memory:</strong> ${vmAnalysis.avg_memory_mb ? (vmAnalysis.avg_memory_mb / 1024).toFixed(1) + 'GB' : 'N/A'}</div>
+              <div class="metric"><strong>GPU:</strong> ${vmAnalysis.avg_gpu_percent || 'N/A'}%</div>
+            </div>
+            <div class="card">
+              <h3>Power & Energy</h3>
+              <div class="metric"><strong>Average Power:</strong> ${vmAnalysis.avg_power_watts || 'N/A'}W</div>
+              <div class="metric"><strong>Peak Power:</strong> ${vmAnalysis.max_power_watts || 'N/A'}W</div>
+              <div class="metric"><strong>Total Energy:</strong> ${vmAnalysis.total_energy_kwh || 'N/A'} kWh</div>
+            </div>
+            <div class="card">
+              <h3>Performance Metrics</h3>
+              <div class="metric"><strong>IOPS:</strong> ${vmAnalysis.avg_iops || 'N/A'}</div>
+              <div class="metric"><strong>Processes:</strong> ${vmAnalysis.unique_processes || 'N/A'}</div>
+              <div class="metric"><strong>Data Points:</strong> ${vmAnalysis.data_points || 'N/A'}</div>
+            </div>
+            <div class="card">
+              <h3>Recommendations Summary</h3>
+              <div class="metric"><strong>Total:</strong> ${recommendations.summary?.total_recommendations || recs.length}</div>
+              <div class="metric"><strong>High Priority:</strong> ${recommendations.summary?.high_priority || recs.filter(r => r.priority === 'high').length}</div>
+              <div class="metric"><strong>Categories:</strong> ${recommendations.summary?.categories?.join(', ') || [...new Set(recs.map(r => r.category))].join(', ')}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Detailed Recommendations</h2>
+          ${recs.length > 0 ? recs.map((rec, index) => `
+            <div class="recommendation priority-${rec.priority}">
+              <h4>${rec.title}</h4>
+              <div class="metric"><strong>Category:</strong> ${rec.category.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</div>
+              <div class="metric"><strong>Priority:</strong> ${rec.priority.charAt(0).toUpperCase() + rec.priority.slice(1)}</div>
+              <p>${rec.description}</p>
+              ${rec.recommendations && rec.recommendations.length > 0 ? `
+                <div class="actions">
+                  <strong>Recommended Actions:</strong>
+                  <ul>
+                    ${rec.recommendations.map(action => `<li>${action}</li>`).join('')}
+                  </ul>
+                </div>
+              ` : ''}
+              ${rec.potential_savings ? `<div class="metric"><strong>Potential Savings:</strong> ${rec.potential_savings}</div>` : ''}
+              ${rec.cost_analysis ? `
+                <div class="actions">
+                  <strong>Cost Analysis:</strong>
+                  <div class="metric">Current Monthly Cost: $${rec.cost_analysis.current_monthly_cost}</div>
+                  <div class="metric">Target Monthly Cost: $${rec.cost_analysis.target_monthly_cost}</div>
+                  <div class="metric">Monthly Savings: $${rec.cost_analysis.monthly_savings}</div>
+                  <div class="metric">Annual Savings: $${rec.cost_analysis.annual_savings}</div>
+                </div>
+              ` : ''}
+              ${rec.environmental_impact ? `<div class="metric"><strong>Environmental Impact:</strong> ${rec.environmental_impact}</div>` : ''}
+            </div>
+          `).join('') : '<p>No specific recommendations generated. VM is operating within optimal parameters.</p>'}
+        </div>
+
+        ${vmAnalysis.top_processes && vmAnalysis.top_processes.length > 0 ? `
+          <div class="section">
+            <h2>Top Power Consuming Processes</h2>
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Process Name</th>
+                  <th>Average Power (W)</th>
+                  <th>Average CPU (%)</th>
+                  <th>Average Memory (MB)</th>
+                  <th>Occurrences</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${vmAnalysis.top_processes.map(process => `
+                  <tr>
+                    <td>${process.process_name}</td>
+                    <td>${process.avg_power_watts}</td>
+                    <td>${process.avg_cpu_percent}</td>
+                    <td>${process.avg_memory_mb}</td>
+                    <td>${process.occurrences}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        ` : ''}
+
+        <div class="section">
+          <h2>Methodology</h2>
+          <div class="card">
+            <h3>Analysis Details</h3>
+            <div class="metric"><strong>Data Collection Period:</strong> ${timeRangeDays} days</div>
+            <div class="metric"><strong>Data Points Analyzed:</strong> ${vmAnalysis.data_points || 'N/A'}</div>
+            <div class="metric"><strong>Sampling Method:</strong> Continuous monitoring with minute-level granularity</div>
+            <div class="metric"><strong>Recommendation Engine:</strong> AI-powered analysis based on historical patterns and industry best practices</div>
+            <p style="margin-top: 15px; color: #6b7280; font-size: 14px;">
+              This report is generated using GreenMatrix's advanced analytics engine, which analyzes historical performance data
+              to identify optimization opportunities and cost-saving potential. Recommendations are based on actual resource
+              consumption patterns and industry benchmarks.
+            </p>
+          </div>
+        </div>
+
+        <div class="footer">
+          <p>© ${new Date().getFullYear()} Hewlett Packard Enterprise Development LP</p>
+          <p>Generated by GreenMatrix VM Optimization Engine</p>
+          <p>Report ID: ${timestamp}</p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    // Create and trigger download
+    const blob = new Blob([htmlContent], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   if (!isOpen) return null;
@@ -431,12 +611,25 @@ const VMRecommendationsModal = ({ isOpen, onClose, vmName, timeRangeDays = 7, se
 
         {/* Footer */}
         <div className="flex items-center justify-between p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
-          <div className="text-sm text-gray-600 dark:text-gray-400">
-            Generated on {new Date().toLocaleString()}
+          <div className="flex items-center space-x-4">
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              Generated on {new Date().toLocaleString()}
+            </div>
+            {recommendations && !loading && !error && (
+              <button
+                onClick={handleDownloadVMReport}
+                className="px-4 py-2 bg-[#01a982] text-white rounded-lg hover:bg-[#019670] transition-colors flex items-center space-x-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <span>Download Report</span>
+              </button>
+            )}
           </div>
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-[#01a982] text-white rounded-lg hover:bg-[#019670] transition-colors"
+            className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
           >
             Close
           </button>

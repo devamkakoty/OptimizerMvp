@@ -295,15 +295,14 @@ const AdminPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
-      {/* Full Width Header */}
-      <header className="bg-white dark:bg-gray-800 w-full z-10">
-        <div className="px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img src={logo} alt="GreenMatrix Logo" className="w-10" />
-            <span className="text-xl font-semibold text-gray-900 dark:text-white">GreenMatrix</span>
+      {/* Fixed Header */}
+      <header className="bg-white dark:bg-gray-800 w-full fixed top-0 z-50">
+        <div className="px-6 py-1 flex items-center justify-between">
+          <div className="flex items-center">
+            <img src={logo} alt="HPE Logo" className="w-8" />
           </div>
           <div className="flex items-center gap-2">
-            <button 
+            <button
               onClick={toggleDarkMode}
               className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
             >
@@ -314,9 +313,9 @@ const AdminPage = () => {
       </header>
 
       {/* Content Area with Sidebar */}
-      <div className="flex flex-1">
+      <div className="flex flex-1 pt-12">
         {/* Sidebar */}
-        <Sidebar 
+        <Sidebar
           activeSection={activeSection}
           setActiveSection={setActiveSection}
           activeTab={activeAdminTab}
@@ -382,7 +381,7 @@ const AdminPage = () => {
 
 
               {/* Admin Content */}
-              <div className="max-w-6xl mx-auto px-6 mt-4 mb-8 flex-1">
+              <div className="max-w-6xl mx-auto px-6 mt-2 mb-8 flex-1">
                 {activeAdminTab === 'dashboard' && (
                   <AdminDashboardNew 
                     processData={processData} 
@@ -426,7 +425,7 @@ const AdminPage = () => {
 
           {/* Other sections content */}
           {activeSection !== 'administration' && (
-            <div className="max-w-6xl mx-auto px-6 mt-8 mb-8 flex-1">
+            <div className="max-w-6xl mx-auto px-6 mt-4 mb-8 flex-1">
               <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-12 text-center">
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
                   {activeSection.charAt(0).toUpperCase() + activeSection.slice(1)} Section

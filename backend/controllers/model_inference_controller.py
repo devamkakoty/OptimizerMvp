@@ -443,9 +443,10 @@ class ModelInferenceController:
             else:
                 logger.warning("Method label encoder not loaded")
             
-            # Convert precision prediction to double value  
+            # Convert precision prediction to double value
             recommended_precision = float(precision_prediction)
-            
+            recommended_precision_name = str(precision_prediction)
+
             # Try to decode precision as well
             if 'modeloptimizer_precision' in self.loaded_models:
                 try:
@@ -455,13 +456,16 @@ class ModelInferenceController:
                     logger.info(f"Decoded precision: {recommended_precision_name}")
                 except Exception as e:
                     logger.warning(f"Could not decode precision prediction: {str(e)}")
+                    recommended_precision_name = str(precision_prediction)
             else:
                 logger.warning("Precision label encoder not loaded")
-            
+                recommended_precision_name = str(precision_prediction)
+
             result = {
                 "status": "success",
                 "recommended_method": recommended_method,
-                "recommended_precision": recommended_precision
+                "recommended_precision": recommended_precision,
+                "recommended_precision_name": recommended_precision_name
             }
             logger.info(f"Optimization recommendation completed successfully: {result}")
             return result
@@ -683,53 +687,8 @@ class ModelInferenceController:
                     logger.error(f"DEBUG: VM-level path failed, falling back to bare-metal")
                     # Continue to bare-metal processing below
             
-            # For bare metal, calculate numerical metrics using simulation logic
-            try:
-                from .simulation_output_formatter import calculate_post_deployment_metrics
-                
-                # Prepare model parameters (same format as simulation input)
-                model_params = {
-                    'Model Name': optimization_input.get('Model Name', ''),
-                    'Framework': optimization_input.get('Framework', ''),
-                    'Total Parameters (Millions)': optimization_input.get('Total Parameters (Millions)', 0),
-                    'Model Size (MB)': optimization_input.get('Model Size (MB)', 0),
-                    'Task Type': 'Inference',  # Default for post-deployment
-                    'Architecture': optimization_input.get('Architecture type', ''),
-                    'Precision': optimization_input.get('Precision', 'FP32')
-                }
-                
-                # Prepare resource metrics
-                resource_metrics = {
-                    'gpu_utilization': optimization_input.get('gpu_utilization', 50),
-                    'cpu_utilization': optimization_input.get('cpu_utilization', 50),
-                    'gpu_memory_usage': optimization_input.get('gpu_memory_usage', 50),
-                    'cpu_memory_usage': optimization_input.get('cpu_memory_usage', 50)
-                }
-                
-                # Calculate numerical metrics
-                numerical_metrics = calculate_post_deployment_metrics(
-                    recommended_hardware_name=recommended_hardware,
-                    current_hardware_name=optimization_input.get('current_hardware_id', 'Unknown'),
-                    model_params=model_params,
-                    resource_metrics=resource_metrics,
-                    db=db,
-                    simulation_model=self.loaded_models.get('inference_simulation'),
-                    simulation_preprocessor=self.loaded_models.get('simulation_inference_preprocessor')
-                )
-            except ImportError as ie:
-                logger.warning(f"Simulation output formatter import failed: {ie}, using fallback metrics")
-                numerical_metrics = {
-                    "recommended_latency": "Unable to calculate",
-                    "recommended_cost": "Unable to calculate",
-                    "calculation_success": False
-                }
-            except Exception as e:
-                logger.error(f"Error calculating post-deployment metrics: {e}")
-                numerical_metrics = {
-                    "recommended_latency": "Unable to calculate",
-                    "recommended_cost": "Unable to calculate",
-                    "calculation_success": False
-                }
+            # For bare metal, calculate basic metrics using hardware-based estimates
+            numerical_metrics = self._calculate_bare_metal_metrics(recommended_hardware, optimization_input)
             
             # Determine recommendation type based on current vs recommended hardware
             current_gpu = optimization_input.get('current_hardware_id', 'Unknown')
@@ -768,3 +727,113 @@ class ModelInferenceController:
         except Exception as e:
             logger.error(f"Error in post-deployment optimization: {str(e)}")
             return {"error": f"Post-deployment optimization failed: {str(e)}"}
+
+    def _calculate_bare_metal_metrics(self, recommended_hardware: str, optimization_input: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Calculate latency and cost metrics for bare metal deployment using hardware-based estimates
+        Similar to VMLevelOptimizer approach that works for VM-level calculations
+        """
+        try:
+            # Extract model parameters
+            total_params_millions = float(optimization_input.get('Total Parameters (Millions)', 0))
+            precision = optimization_input.get('Precision', 'FP32')
+            model_size_mb = float(optimization_input.get('Model Size (MB)', 0))
+
+            # Bytes per parameter mapping (from VMLevelOptimizer)
+            bytes_per_param_dict = {
+                "FP64": 8, "FLOAT64": 8,
+                "FP32": 4, "FLOAT32": 4,
+                "FP16": 2, "FLOAT16": 2,
+                "BF16": 2, "BFLOAT16": 2,
+                "INT64": 8, "INT32": 4, "INT16": 2, "INT8": 1, "UINT8": 1,
+                "QINT32": 4, "QINT8": 1, "QUINT8": 1,
+                "COMPLEX128": 16, "COMPLEX64": 8,
+                "BOOL": 1
+            }
+
+            bytes_per_param = bytes_per_param_dict.get(precision, 4)  # Default FP32
+            total_params = total_params_millions * 1e6
+
+            # Calculate VRAM requirements
+            estimated_vram_gb = ((total_params * bytes_per_param) * 1.2) / 1e9  # 1.2x safety factor
+
+            # Hardware-based latency estimation
+            # Base latency depends on model size and hardware capability
+            base_latency = 50.0  # Base latency in ms
+
+            # Adjust based on model complexity
+            if total_params_millions > 100:  # Large models
+                latency_multiplier = 3.0
+            elif total_params_millions > 10:  # Medium models
+                latency_multiplier = 2.0
+            else:  # Small models
+                latency_multiplier = 1.0
+
+            # Adjust based on precision
+            if precision in ['FP16', 'BF16']:
+                precision_multiplier = 0.7  # Faster inference
+            elif precision in ['FP64']:
+                precision_multiplier = 1.5  # Slower inference
+            else:
+                precision_multiplier = 1.0  # FP32 baseline
+
+            estimated_latency_ms = base_latency * latency_multiplier * precision_multiplier
+
+            # Hardware-based power consumption estimation
+            # Estimate based on GPU type from recommended hardware
+            gpu_power = 250  # Default GPU power in watts
+            cpu_power = 185  # Default CPU power in watts
+
+            # Adjust power based on recommended hardware
+            if 'A100' in recommended_hardware:
+                gpu_power = 400
+            elif 'V100' in recommended_hardware:
+                gpu_power = 300
+            elif 'T4' in recommended_hardware:
+                gpu_power = 70
+            elif 'L4' in recommended_hardware:
+                gpu_power = 72
+
+            total_power = gpu_power + cpu_power
+
+            # Cost calculation (similar to VMLevelOptimizer)
+            def calculate_cost_per_1000_inferences(power_watts, latency_ms, cost_per_kwh=0.12, num_inferences=1000):
+                total_time_seconds = (latency_ms / 1000) * num_inferences
+                total_time_hours = total_time_seconds / 3600
+                power_kw = power_watts / 1000
+                total_cost = power_kw * total_time_hours * cost_per_kwh
+                return total_cost
+
+            estimated_cost_per_1000 = calculate_cost_per_1000_inferences(total_power, estimated_latency_ms)
+
+            # Calculate efficiency metrics
+            current_hardware = optimization_input.get('current_hardware_id', 'Unknown')
+            efficiency_score = 0.85  # Default efficiency
+
+            if 'MAINTAIN' in recommended_hardware.upper():
+                efficiency_score = 0.95  # High efficiency for maintain recommendation
+            elif 'UPGRADE' in recommended_hardware.upper():
+                efficiency_score = 0.75  # Lower efficiency indicating need for upgrade
+
+            return {
+                "calculation_success": True,
+                "latency_ms": round(estimated_latency_ms, 2),
+                "cost_per_1000_inferences": round(estimated_cost_per_1000, 4),
+                "estimated_vram_gb": round(estimated_vram_gb, 2),
+                "power_consumption_watts": total_power,
+                "efficiency_score": efficiency_score,
+                "model_params_millions": total_params_millions,
+                "precision": precision,
+                "recommended_hardware": recommended_hardware,
+                "calculation_method": "hardware_based_estimation"
+            }
+
+        except Exception as e:
+            logger.error(f"Error calculating bare metal metrics: {str(e)}")
+            return {
+                "calculation_success": False,
+                "latency_ms": 0,
+                "cost_per_1000_inferences": 0,
+                "error": str(e),
+                "calculation_method": "failed"
+            }
