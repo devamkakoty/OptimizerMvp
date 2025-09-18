@@ -77,51 +77,9 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode, 
     const topGpuProcess = validProcessData.reduce((max, p) =>
       (p['GPU Utilization (%)'] || 0) > (max['GPU Utilization (%)'] || 0) ? p : max, validProcessData[0] || {});
 
-    // Store comprehensive summary metrics including GPU and host overall metrics
+    // Store only accurate metrics from real data sources
     analysis.summary = {
-      // Basic process metrics
-      totalProcesses: validProcessData.length,
-      avgCpuUsage: avgCpuUsage.toFixed(1),
-      avgMemoryUsage: avgMemoryUsagePercent.toFixed(1),
-      totalMemoryMB: totalMemoryUsage.toFixed(0),
-      avgGpuMemoryUsage: avgGpuMemoryUsage.toFixed(1),
-      avgGpuUtilization: avgGpuUtilization.toFixed(1),
-
-      // Peak usage statistics
-      peakCpuUsage: cpuPeakUsage.toFixed(1),
-      peakMemoryUsage: memoryPeakUsage.toFixed(1),
-      peakGpuUsage: gpuPeakUsage.toFixed(1),
-
-      // Power and cost analysis
-      totalPowerConsumption: totalPowerConsumption.toFixed(1),
-      avgPowerConsumption: avgPowerConsumption.toFixed(1),
-      maxPowerConsumption: maxPowerConsumption.toFixed(1),
-      totalEnergyCost: totalEnergyCost.toFixed(4),
-      avgEnergyCost: avgEnergyCost.toFixed(4),
-
-      // Process efficiency counters
-      highCpuProcessCount: highCpuCount,
-      highMemoryProcessCount: highMemoryCount,
-      highGpuProcessCount: highGpuCount,
-      idleProcessCount: idleCount,
-
-      // Top consumers
-      topCpuProcessName: topCpuProcess['Process Name'] || 'N/A',
-      topCpuProcessUsage: (topCpuProcess['CPU Usage (%)'] || 0).toFixed(1),
-      topMemoryProcessName: topMemoryProcess['Process Name'] || 'N/A',
-      topMemoryProcessUsage: (topMemoryProcess['Memory Usage (MB)'] || 0).toFixed(1),
-      topGpuProcessName: topGpuProcess['Process Name'] || 'N/A',
-      topGpuProcessUsage: (topGpuProcess['GPU Utilization (%)'] || 0).toFixed(1),
-
-      // VM metrics
-      runningVMs: runningVMs.length,
-      stoppedVMs: validVmData.length - runningVMs.length,
-      vmCpuAvg: vmCpuAvg.toFixed(1),
-      vmRamAvg: vmRamAvg.toFixed(1),
-      underutilizedVMCount: underutilizedVMs.length,
-      overutilizedVMCount: overutilizedVMs.length,
-
-      // Host Overall Metrics - Current System State
+      // Host System Metrics - ACCURATE real-time data
       hostCpuUsage: (validHostMetrics.host_cpu_usage_percent || 0).toFixed(1),
       hostRamUsage: (validHostMetrics.host_ram_usage_percent || 0).toFixed(1),
       hostGpuUsage: (validHostMetrics.host_gpu_utilization_percent || 0).toFixed(1),
@@ -135,6 +93,15 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode, 
         ? Math.round((validHostMetrics.host_disk_read_bytes + validHostMetrics.host_disk_write_bytes) / 1024 / 1024 / 1024)
         : 0,
 
+      // VM metrics - ACCURATE from VM data
+      runningVMs: runningVMs.length,
+      stoppedVMs: validVmData.length - runningVMs.length,
+      vmCpuAvg: vmCpuAvg.toFixed(1),
+      vmRamAvg: vmRamAvg.toFixed(1),
+      underutilizedVMCount: underutilizedVMs.length,
+      overutilizedVMCount: overutilizedVMs.length,
+
+      // Analysis metadata
       analysisDate: new Date().toLocaleDateString(),
       analysisTime: new Date().toLocaleTimeString(),
       analysisDescription: analysisDescription,
@@ -813,60 +780,52 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode, 
                     <div class="value">${summary.hostGpuUsage}%</div>
                 </div>
                 <div class="summary-card">
-                    <h4>Total Active Processes</h4>
-                    <div class="value">${summary.totalProcesses}</div>
+                    <h4>Host GPU Memory</h4>
+                    <div class="value">${summary.hostGpuMemoryUsage}%</div>
                 </div>
                 <div class="summary-card">
-                    <h4>Average Power Consumption</h4>
-                    <div class="value">${summary.avgPowerConsumption}W</div>
+                    <h4>GPU Temperature</h4>
+                    <div class="value">${summary.hostGpuTemperature}°C</div>
                 </div>
                 <div class="summary-card">
-                    <h4>Peak Power Consumption</h4>
-                    <div class="value">${summary.maxPowerConsumption}W</div>
-                </div>
-                <div class="summary-card">
-                    <h4>Total Energy Cost</h4>
-                    <div class="value">$${summary.totalEnergyCost}</div>
+                    <h4>GPU Power Draw</h4>
+                    <div class="value">${summary.hostGpuPowerDraw}W</div>
                 </div>
                 <div class="summary-card">
                     <h4>Running Virtual Machines</h4>
                     <div class="value">${summary.runningVMs}</div>
                 </div>
+                <div class="summary-card">
+                    <h4>Total Virtual Machines</h4>
+                    <div class="value">${summary.runningVMs + summary.stoppedVMs}</div>
+                </div>
             </div>
         </section>
 
         <main class="report-content">
-            ${summary.totalProcesses > 0 ? `
+            ${validProcessData.length > 0 ? `
                 <div class="section">
                     <h2>Top Resource Consuming Processes</h2>
                     <table class="table">
                         <thead>
                             <tr>
                                 <th>Process Name</th>
-                                <th>Resource Type</th>
-                                <th>Usage</th>
-                                <th>Efficiency Rating</th>
+                                <th>CPU Usage (%)</th>
+                                <th>Memory Usage (MB)</th>
+                                <th>GPU Utilization (%)</th>
+                                <th>Status</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <tr>
-                                <td>${summary.topCpuProcessName}</td>
-                                <td>CPU</td>
-                                <td>${summary.topCpuProcessUsage}%</td>
-                                <td>${summary.topCpuProcessUsage > 80 ? 'Critical' : summary.topCpuProcessUsage > 50 ? 'High' : 'Normal'}</td>
-                            </tr>
-                            <tr>
-                                <td>${summary.topMemoryProcessName}</td>
-                                <td>Memory</td>
-                                <td>${summary.topMemoryProcessUsage}MB</td>
-                                <td>${summary.topMemoryProcessUsage > 2000 ? 'Critical' : summary.topMemoryProcessUsage > 1000 ? 'High' : 'Normal'}</td>
-                            </tr>
-                            <tr>
-                                <td>${summary.topGpuProcessName}</td>
-                                <td>GPU</td>
-                                <td>${summary.topGpuProcessUsage}%</td>
-                                <td>${summary.topGpuProcessUsage > 80 ? 'Critical' : summary.topGpuProcessUsage > 50 ? 'High' : 'Normal'}</td>
-                            </tr>
+                            ${validProcessData.map(process => `
+                                <tr>
+                                    <td>${process['Process Name'] || 'N/A'}</td>
+                                    <td>${(process['CPU Usage (%)'] || 0).toFixed(1)}</td>
+                                    <td>${(process['Memory Usage (MB)'] || 0).toFixed(0)}</td>
+                                    <td>${(process['GPU Util %'] || 0).toFixed(1)}</td>
+                                    <td>${process['Status'] || 'Unknown'}</td>
+                                </tr>
+                            `).join('')}
                         </tbody>
                     </table>
                 </div>
