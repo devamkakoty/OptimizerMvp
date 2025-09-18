@@ -213,10 +213,10 @@ const VMRecommendationsModal = ({ isOpen, onClose, vmName, timeRangeDays = 7, se
           .header p { color: #6b7280; margin: 8px 0; font-size: 14px; }
           .section { margin: 30px 0; }
           .section h2 { color: #374151; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px; font-size: 20px; font-weight: 600; margin-bottom: 20px; }
-          .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 15px 0; }
-          .card { border: 1px solid #d1d5db; padding: 20px; border-radius: 8px; background: #ffffff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); }
-          .card h3 { margin: 0 0 15px 0; color: #111827; font-size: 16px; font-weight: 600; }
-          .metric { margin: 8px 0; color: #374151; }
+          .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 12px 0; }
+          .card { border: 1px solid #d1d5db; padding: 15px; border-radius: 6px; background: #ffffff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); }
+          .card h3 { margin: 0 0 10px 0; color: #111827; font-size: 14px; font-weight: 600; }
+          .metric { margin: 6px 0; color: #374151; font-size: 13px; }
           .metric strong { color: #10b981; font-weight: 600; }
           .recommendation { border: 1px solid #e5e7eb; padding: 20px; border-radius: 8px; margin: 15px 0; background: #f9fafb; }
           .recommendation h4 { color: #111827; margin: 0 0 10px 0; font-size: 18px; font-weight: 600; }
@@ -370,7 +370,7 @@ const VMRecommendationsModal = ({ isOpen, onClose, vmName, timeRangeDays = 7, se
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
           <div>
@@ -390,7 +390,7 @@ const VMRecommendationsModal = ({ isOpen, onClose, vmName, timeRangeDays = 7, se
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+        <div className="flex-1 p-6 overflow-y-auto min-h-0">
           {loading && (
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#01a982]"></div>
@@ -610,7 +610,7 @@ const VMRecommendationsModal = ({ isOpen, onClose, vmName, timeRangeDays = 7, se
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
+        <div className="flex-shrink-0 flex items-center justify-between p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
           <div className="flex items-center space-x-4">
             <div className="text-sm text-gray-600 dark:text-gray-400">
               Generated on {new Date().toLocaleString()}

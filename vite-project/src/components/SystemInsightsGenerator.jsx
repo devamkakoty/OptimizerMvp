@@ -49,18 +49,77 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode, 
       `${timeRangeDays}-Day Average Analysis` :
       selectedDate === 'today' ? `Last ${timeRangeDays} Days Analysis` : `Analysis for ${new Date(selectedDate).toLocaleDateString()}`;
 
-    // Store summary metrics including GPU and host overall metrics
+    // Calculate peak usage and frequency statistics
+    const cpuPeakUsage = Math.max(...validProcessData.map(p => p['CPU Usage (%)'] || 0));
+    const memoryPeakUsage = Math.max(...validProcessData.map(p => p['Memory Usage (%)'] || 0));
+    const gpuPeakUsage = Math.max(...validProcessData.map(p => p['GPU Utilization (%)'] || 0));
+
+    // Power consumption analysis
+    const totalPowerConsumption = validProcessData.reduce((sum, p) => sum + (p['Power Consumption (W)'] || 0), 0);
+    const avgPowerConsumption = validProcessData.length > 0 ? totalPowerConsumption / validProcessData.length : 0;
+    const maxPowerConsumption = Math.max(...validProcessData.map(p => p['Power Consumption (W)'] || 0));
+
+    // Calculate cost metrics
+    const totalEnergyCost = validProcessData.reduce((sum, p) => sum + (p['Energy Cost ($)'] || 0), 0);
+    const avgEnergyCost = validProcessData.length > 0 ? totalEnergyCost / validProcessData.length : 0;
+
+    // Process efficiency metrics
+    const highCpuCount = highCpuProcesses.length;
+    const highMemoryCount = highMemoryProcesses.length;
+    const highGpuCount = highGpuUtilProcesses.length;
+    const idleCount = idleProcesses.length;
+
+    // Top resource consumers
+    const topCpuProcess = validProcessData.reduce((max, p) =>
+      (p['CPU Usage (%)'] || 0) > (max['CPU Usage (%)'] || 0) ? p : max, validProcessData[0] || {});
+    const topMemoryProcess = validProcessData.reduce((max, p) =>
+      (p['Memory Usage (MB)'] || 0) > (max['Memory Usage (MB)'] || 0) ? p : max, validProcessData[0] || {});
+    const topGpuProcess = validProcessData.reduce((max, p) =>
+      (p['GPU Utilization (%)'] || 0) > (max['GPU Utilization (%)'] || 0) ? p : max, validProcessData[0] || {});
+
+    // Store comprehensive summary metrics including GPU and host overall metrics
     analysis.summary = {
+      // Basic process metrics
       totalProcesses: validProcessData.length,
       avgCpuUsage: avgCpuUsage.toFixed(1),
       avgMemoryUsage: avgMemoryUsagePercent.toFixed(1),
       totalMemoryMB: totalMemoryUsage.toFixed(0),
       avgGpuMemoryUsage: avgGpuMemoryUsage.toFixed(1),
       avgGpuUtilization: avgGpuUtilization.toFixed(1),
+
+      // Peak usage statistics
+      peakCpuUsage: cpuPeakUsage.toFixed(1),
+      peakMemoryUsage: memoryPeakUsage.toFixed(1),
+      peakGpuUsage: gpuPeakUsage.toFixed(1),
+
+      // Power and cost analysis
+      totalPowerConsumption: totalPowerConsumption.toFixed(1),
+      avgPowerConsumption: avgPowerConsumption.toFixed(1),
+      maxPowerConsumption: maxPowerConsumption.toFixed(1),
+      totalEnergyCost: totalEnergyCost.toFixed(4),
+      avgEnergyCost: avgEnergyCost.toFixed(4),
+
+      // Process efficiency counters
+      highCpuProcessCount: highCpuCount,
+      highMemoryProcessCount: highMemoryCount,
+      highGpuProcessCount: highGpuCount,
+      idleProcessCount: idleCount,
+
+      // Top consumers
+      topCpuProcessName: topCpuProcess['Process Name'] || 'N/A',
+      topCpuProcessUsage: (topCpuProcess['CPU Usage (%)'] || 0).toFixed(1),
+      topMemoryProcessName: topMemoryProcess['Process Name'] || 'N/A',
+      topMemoryProcessUsage: (topMemoryProcess['Memory Usage (MB)'] || 0).toFixed(1),
+      topGpuProcessName: topGpuProcess['Process Name'] || 'N/A',
+      topGpuProcessUsage: (topGpuProcess['GPU Utilization (%)'] || 0).toFixed(1),
+
+      // VM metrics
       runningVMs: runningVMs.length,
       stoppedVMs: validVmData.length - runningVMs.length,
       vmCpuAvg: vmCpuAvg.toFixed(1),
       vmRamAvg: vmRamAvg.toFixed(1),
+      underutilizedVMCount: underutilizedVMs.length,
+      overutilizedVMCount: overutilizedVMs.length,
 
       // Host Overall Metrics - Current System State
       hostCpuUsage: (validHostMetrics.host_cpu_usage_percent || 0).toFixed(1),
@@ -230,9 +289,6 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode, 
     }
 
     // PERFORMANCE INSIGHTS
-    const topMemoryProcess = processData.reduce((max, p) => 
-      (p['Memory Usage (MB)'] || 0) > (max['Memory Usage (MB)'] || 0) ? p : max, processData[0] || {});
-    
     if (topMemoryProcess && topMemoryProcess['Memory Usage (MB)'] > 1000) {
       analysis.performance.push({
         type: 'info',
@@ -247,9 +303,6 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode, 
     }
     
     // GPU performance insights
-    const topGpuProcess = processData.reduce((max, p) => 
-      (p['GPU Memory (MB)'] || 0) > (max['GPU Memory (MB)'] || 0) ? p : max, processData[0] || {});
-    
     if (topGpuProcess && topGpuProcess['GPU Memory (MB)'] > 500) {
       analysis.performance.push({
         type: 'info',
@@ -349,9 +402,9 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode, 
       if (items.length === 0) {
         return `
           <div class="insight-section">
-            <h3><span class="${icon}"></span> ${title}</h3>
+            <h3>${title}</h3>
             <div class="no-issues">
-              <span class="checkmark">✓</span> All good! No issues detected in this category.
+              <span class="checkmark">✓</span> No issues detected in this category.
             </div>
           </div>
         `;
@@ -388,7 +441,7 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode, 
 
       return `
         <div class="insight-section">
-          <h3><span class="${icon}"></span> ${title} <span class="count">(${items.length})</span></h3>
+          <h3>${title} <span class="count">(${items.length})</span></h3>
           ${itemsHTML}
         </div>
       `;
@@ -405,106 +458,166 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode, 
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 20px;
+            color: #1f2937;
+            line-height: 1.5;
         }
-        
+
         .report-container {
             max-width: 1200px;
             margin: 0 auto;
             background: white;
-            border-radius: 15px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
             overflow: hidden;
         }
-        
+
         .report-header {
-            background: linear-gradient(135deg, #01a982 0%, #00d4aa 100%);
-            color: white;
-            padding: 40px;
             text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 3px solid #10b981;
+            padding-bottom: 20px;
+            background: white;
+            padding: 40px;
         }
-        
+
         .report-header h1 {
-            font-size: 2.5em;
-            margin-bottom: 10px;
+            color: #111827;
+            margin: 0;
+            font-size: 32px;
             font-weight: 700;
         }
-        
+
         .report-header .subtitle {
-            font-size: 1.2em;
-            opacity: 0.9;
-            margin-bottom: 20px;
+            color: #6b7280;
+            margin: 8px 0;
+            font-size: 16px;
+            opacity: 1;
         }
         
         .report-meta {
             display: flex;
             justify-content: center;
-            gap: 40px;
+            gap: 30px;
             margin-top: 20px;
             flex-wrap: wrap;
         }
-        
+
         .meta-item {
             text-align: center;
-            background: rgba(255,255,255,0.1);
-            padding: 15px 25px;
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            padding: 12px 20px;
             border-radius: 8px;
-            backdrop-filter: blur(10px);
         }
-        
+
         .meta-label {
-            font-size: 0.9em;
-            opacity: 0.8;
-            margin-bottom: 5px;
-        }
-        
-        .meta-value {
-            font-size: 1.4em;
-            font-weight: 600;
-        }
-        
-        .report-summary {
-            padding: 40px;
-            background: #f8fafc;
-            border-bottom: 1px solid #e2e8f0;
-        }
-        
-        .summary-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-        
-        .summary-card {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            border-left: 4px solid #01a982;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-        }
-        
-        .summary-card h4 {
-            color: #2d3748;
-            margin-bottom: 10px;
-            font-size: 0.9em;
+            font-size: 12px;
+            color: #6b7280;
+            margin-bottom: 4px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
+
+        .meta-value {
+            font-size: 16px;
+            font-weight: 600;
+            color: #111827;
+        }
         
+        .report-summary {
+            padding: 30px 40px;
+            background: white;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }
+
+        .summary-card {
+            border: 1px solid #d1d5db;
+            padding: 20px;
+            border-radius: 8px;
+            background: #ffffff;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .summary-card h4 {
+            margin: 0 0 15px 0;
+            color: #111827;
+            font-size: 16px;
+            font-weight: 600;
+        }
+
         .summary-card .value {
-            font-size: 1.8em;
+            font-size: 28px;
             font-weight: 700;
-            color: #01a982;
+            color: #10b981;
         }
         
         .report-content {
             padding: 40px;
+        }
+
+        .section {
+            margin: 30px 0;
+        }
+
+        .section h2 {
+            color: #374151;
+            border-bottom: 2px solid #e5e7eb;
+            padding-bottom: 8px;
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            border: 1px solid #d1d5db;
+            padding: 20px;
+            border-radius: 8px;
+            background: #ffffff;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .card h3 {
+            margin: 0 0 15px 0;
+            color: #111827;
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .metric {
+            margin: 8px 0;
+            color: #374151;
+        }
+
+        .metric strong {
+            color: #10b981;
+            font-weight: 600;
+        }
+
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        .table th, .table td {
+            border: 1px solid #e5e7eb;
+            padding: 12px 8px;
+            text-align: left;
+        }
+
+        .table th {
+            background-color: #f9fafb;
+            color: #374151;
+            font-weight: 600;
         }
         
         .insight-section {
@@ -656,8 +769,8 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode, 
 <body>
     <div class="report-container">
         <header class="report-header">
-            <h1>HPE GreenMatrix</h1>
-            <div class="subtitle">System Insights & Optimization Report</div>
+            <h1>GreenMatrix System Analysis Report</h1>
+            <div class="subtitle">Host Infrastructure Performance & Optimization Analysis</div>
             <div class="report-meta">
                 <div class="meta-item">
                     <div class="meta-label">Analysis Date</div>
@@ -685,34 +798,14 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode, 
         </header>
 
         <section class="report-summary">
-            <h2 style="margin-bottom: 20px; color: #2d3748;">System Overview</h2>
-            ${summary.viewMode === 'week' ? `
-            <div style="background: #e0f7fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #01a982;">
-                <h4 style="color: #00695c; margin-bottom: 10px;">📊 Weekly Analysis Methodology</h4>
-                <p style="color: #004d40; font-size: 14px; margin: 0;">
-                    This report analyzes aggregated data over a 7-day period. Process metrics represent averages across all days, 
-                    providing insights into consistent patterns and persistent issues. Weekly analysis offers more reliable 
-                    recommendations for infrastructure changes as it smooths out daily variations.
-                </p>
-            </div>
-            ` : `
-            <div style="background: #fff3e0; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #ff9800;">
-                <h4 style="color: #e65100; margin-bottom: 10px;">📊 Daily Analysis Methodology</h4>
-                <p style="color: #bf360c; font-size: 14px; margin: 0;">
-                    This report analyzes system data from a single day snapshot. Insights reflect current system state 
-                    and immediate optimization opportunities. For infrastructure decisions, consider weekly analysis 
-                    for more stable patterns.
-                </p>
-            </div>
-            `}
-            <h3 style="margin-bottom: 15px; color: #2d3748;">Current Host System Metrics</h3>
+            <h2 style="margin-bottom: 20px; color: #374151;">Executive Summary</h2>
             <div class="summary-grid">
                 <div class="summary-card">
                     <h4>Host CPU Utilization</h4>
                     <div class="value">${summary.hostCpuUsage}%</div>
                 </div>
                 <div class="summary-card">
-                    <h4>Host RAM Utilization</h4>
+                    <h4>Host Memory Utilization</h4>
                     <div class="value">${summary.hostRamUsage}%</div>
                 </div>
                 <div class="summary-card">
@@ -720,75 +813,93 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode, 
                     <div class="value">${summary.hostGpuUsage}%</div>
                 </div>
                 <div class="summary-card">
-                    <h4>Host GPU Memory Utilization</h4>
-                    <div class="value">${summary.hostGpuMemoryUsage}%</div>
-                </div>
-                <div class="summary-card">
-                    <h4>GPU Temperature</h4>
-                    <div class="value">${summary.hostGpuTemperature}°C</div>
-                </div>
-                <div class="summary-card">
-                    <h4>GPU Power Consumption</h4>
-                    <div class="value">${summary.hostGpuPowerDraw}W</div>
-                </div>
-                <div class="summary-card">
-                    <h4>Network I/O Total</h4>
-                    <div class="value">${summary.hostNetworkTotal}GB</div>
-                </div>
-                <div class="summary-card">
-                    <h4>Disk I/O Total</h4>
-                    <div class="value">${summary.hostDiskTotal}GB</div>
-                </div>
-            </div>
-
-            <h3 style="margin: 30px 0 15px 0; color: #2d3748;">Process and Virtual Machine Analysis</h3>
-            <div class="summary-grid">
-                <div class="summary-card">
                     <h4>Total Active Processes</h4>
                     <div class="value">${summary.totalProcesses}</div>
                 </div>
                 <div class="summary-card">
-                    <h4>Average Process CPU Usage</h4>
-                    <div class="value">${summary.avgCpuUsage}%</div>
+                    <h4>Average Power Consumption</h4>
+                    <div class="value">${summary.avgPowerConsumption}W</div>
                 </div>
                 <div class="summary-card">
-                    <h4>Average Process Memory Usage</h4>
-                    <div class="value">${summary.avgMemoryUsage}%</div>
+                    <h4>Peak Power Consumption</h4>
+                    <div class="value">${summary.maxPowerConsumption}W</div>
+                </div>
+                <div class="summary-card">
+                    <h4>Total Energy Cost</h4>
+                    <div class="value">$${summary.totalEnergyCost}</div>
                 </div>
                 <div class="summary-card">
                     <h4>Running Virtual Machines</h4>
                     <div class="value">${summary.runningVMs}</div>
                 </div>
-                <div class="summary-card">
-                    <h4>VM CPU Average</h4>
-                    <div class="value">${summary.vmCpuAvg}%</div>
-                </div>
-                <div class="summary-card">
-                    <h4>VM RAM Average</h4>
-                    <div class="value">${summary.vmRamAvg}%</div>
-                </div>
-                <div class="summary-card">
-                    <h4>Average Process GPU Memory</h4>
-                    <div class="value">${summary.avgGpuMemoryUsage}MB</div>
-                </div>
-                <div class="summary-card">
-                    <h4>Average Process GPU Utilization</h4>
-                    <div class="value">${summary.avgGpuUtilization}%</div>
-                </div>
             </div>
         </section>
 
         <main class="report-content">
-            ${generateSectionHTML('💰 Cost Optimization', cost, 'dollar-icon', '#01a982')}
-            ${generateSectionHTML('📈 Scaling Recommendations', scaling, 'scale-icon', '#2563eb')}
-            ${generateSectionHTML('⚡ Performance Insights', performance, 'performance-icon', '#7c3aed')}
-            ${generateSectionHTML('🔒 Security & Maintenance', security, 'security-icon', '#dc2626')}
+            ${summary.totalProcesses > 0 ? `
+                <div class="section">
+                    <h2>Top Resource Consuming Processes</h2>
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Process Name</th>
+                                <th>Resource Type</th>
+                                <th>Usage</th>
+                                <th>Efficiency Rating</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>${summary.topCpuProcessName}</td>
+                                <td>CPU</td>
+                                <td>${summary.topCpuProcessUsage}%</td>
+                                <td>${summary.topCpuProcessUsage > 80 ? 'Critical' : summary.topCpuProcessUsage > 50 ? 'High' : 'Normal'}</td>
+                            </tr>
+                            <tr>
+                                <td>${summary.topMemoryProcessName}</td>
+                                <td>Memory</td>
+                                <td>${summary.topMemoryProcessUsage}MB</td>
+                                <td>${summary.topMemoryProcessUsage > 2000 ? 'Critical' : summary.topMemoryProcessUsage > 1000 ? 'High' : 'Normal'}</td>
+                            </tr>
+                            <tr>
+                                <td>${summary.topGpuProcessName}</td>
+                                <td>GPU</td>
+                                <td>${summary.topGpuProcessUsage}%</td>
+                                <td>${summary.topGpuProcessUsage > 80 ? 'Critical' : summary.topGpuProcessUsage > 50 ? 'High' : 'Normal'}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            ` : ''}
+
+            ${generateSectionHTML('Cost Optimization', cost, 'dollar-icon', '#10b981')}
+            ${generateSectionHTML('Scaling Recommendations', scaling, 'scale-icon', '#2563eb')}
+            ${generateSectionHTML('Performance Insights', performance, 'performance-icon', '#7c3aed')}
+            ${generateSectionHTML('Security & Maintenance', security, 'security-icon', '#dc2626')}
+
+            <div class="section">
+                <h2>Methodology</h2>
+                <div class="card">
+                    <h3>Analysis Details</h3>
+                    <div class="metric"><strong>Data Collection Period:</strong> ${summary.analysisDescription}</div>
+                    <div class="metric"><strong>Processes Analyzed:</strong> ${summary.totalProcesses}</div>
+                    <div class="metric"><strong>Virtual Machines Monitored:</strong> ${summary.runningVMs + summary.stoppedVMs}</div>
+                    <div class="metric"><strong>Sampling Method:</strong> Real-time monitoring with comprehensive resource tracking</div>
+                    <div class="metric"><strong>Recommendation Engine:</strong> AI-powered analysis based on current patterns and industry best practices</div>
+                    <p style="margin-top: 15px; color: #6b7280; font-size: 14px;">
+                        This report is generated using GreenMatrix's advanced analytics engine, which analyzes real-time performance data
+                        from host infrastructure to identify optimization opportunities and cost-saving potential. Recommendations are based on actual resource
+                        consumption patterns, process efficiency metrics, and infrastructure utilization benchmarks.
+                    </p>
+                </div>
+            </div>
         </main>
 
-        <footer class="report-footer">
-            <p>Generated by HPE GreenMatrix System Intelligence</p>
+        <div style="text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 12px;">
             <p>© ${new Date().getFullYear()} Hewlett Packard Enterprise Development LP</p>
-        </footer>
+            <p>Generated by GreenMatrix System Intelligence Engine</p>
+            <p>Report ID: SYS-${new Date().toISOString().slice(0, 19).replace(/:/g, '')}</p>
+        </div>
     </div>
 </body>
 </html>
