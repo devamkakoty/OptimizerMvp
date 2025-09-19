@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Info, Loader2 } from 'lucide-react';
+import { Info, Loader2, CodeXml } from 'lucide-react';
 import apiClient from '../config/axios';
 import OptimizationResults from './OptimizationResults';
 import SimulationResults from './SimulationResults';
@@ -7,12 +7,12 @@ import { useDropdownData } from '../hooks/useDropdownData';
 
 const OptimizeTab = () => {
   const [optimizationMode, setOptimizationMode] = useState('pre-deployment');
-  
+
   // Primary fields - Model Name and Task Type (user fills these first)
   const [modelName, setModelName] = useState('');
   const [taskType, setTaskType] = useState('');
   const [scenario, setScenario] = useState('Single Stream');
-  
+
   // Auto-filled fields from database (user can override)
   const [framework, setFramework] = useState('');
   const [modelSize, setModelSize] = useState('');
@@ -40,12 +40,12 @@ const OptimizeTab = () => {
   const [precision, setPrecision] = useState('');
 
   // Use custom hook for dropdown data with caching
-  const { 
-    modelNames: availableModelNames, 
+  const {
+    modelNames: availableModelNames,
     taskTypes: availableTaskTypes,
     hardwareData,
-    isLoading: isLoadingDropdowns, 
-    error: dropdownError 
+    isLoading: isLoadingDropdowns,
+    error: dropdownError
   } = useDropdownData();
 
   // Post-deployment specific state - using the specific fields provided
@@ -88,7 +88,7 @@ const OptimizeTab = () => {
   // Loading and error states
   const [isLoadingModelData, setIsLoadingModelData] = useState(false);
   const [error, setError] = useState('');
-  
+
   // Optimization results state
   const [optimizationResults, setOptimizationResults] = useState(null);
   const [isRunningOptimization, setIsRunningOptimization] = useState(false);
@@ -158,11 +158,11 @@ const OptimizeTab = () => {
   const fetchActiveVMs = async () => {
     setIsLoadingVMs(true);
     setVmError('');
-    
+
     try {
       const response = await apiClient.get('/v1/metrics/vms/active-with-memory');
       console.log('Active VMs response:', response.data);
-      
+
       if (response.data && response.data.success) {
         setActiveVMs(response.data.active_vms || []);
       } else {
@@ -181,17 +181,17 @@ const OptimizeTab = () => {
   // Fetch VM metrics for selected VM
   const fetchVmMetrics = async (vmName) => {
     if (!vmName) return;
-    
+
     setIsLoadingVmMetrics(true);
     setVmError('');
-    
+
     try {
       const response = await apiClient.get(`/v1/metrics/vm/${encodeURIComponent(vmName)}/latest`);
       console.log('VM metrics response:', response.data);
-      
+
       if (response.data && response.data.success && response.data.metrics) {
         const metrics = response.data.metrics;
-        
+
         // Populate the VM metrics fields
         setVmGpuUtilization(metrics.gpu_utilization?.toString() || '0');
         setVmGpuMemoryUsage(metrics.gpu_memory_usage?.toString() || '0');
@@ -199,7 +199,7 @@ const OptimizeTab = () => {
         setVmCpuMemoryUsage(metrics.cpu_memory_usage?.toString() || '0');
         setVmDiskIops(metrics.disk_iops?.toString() || '0');
         setVmNetworkBandwidth(metrics.network_bandwidth?.toString() || '0');
-        
+
         console.log('VM metrics populated:', {
           gpu_util: metrics.gpu_utilization,
           gpu_mem: metrics.gpu_memory_usage,
@@ -243,14 +243,14 @@ const OptimizeTab = () => {
     if (dropdownError) {
       setError(dropdownError);
     }
-    
+
     // Set default values from first hardware if available and not in override mode
     if (!isOverrideEnabled && hardwareData?.length > 0) {
       const firstHardware = hardwareData[0];
       const hardwareName = getHardwareName(firstHardware);
       setCurrentHardwareId(hardwareName);
     }
-    
+
     // Set default values for resource metrics if they're empty
     if (!gpuUtilization) setGpuUtilization('75');
     if (!gpuMemoryUsage) setGpuMemoryUsage('80');
@@ -289,10 +289,10 @@ const OptimizeTab = () => {
         setSelectedVM(null);
         setIsVmOverrideEnabled(false);
         setVmMetricsLastUpdated(null);
-        
+
         // Clear shared state to start fresh for bare-metal
         setCurrentHardwareId('');
-        
+
       } else if (postDeploymentMode === 'vm-level') {
         // Clear bare-metal specific metrics when switching to VM-level
         setGpuMemoryUsage('');
@@ -304,7 +304,7 @@ const OptimizeTab = () => {
         setCurrentHardwareId('');
         setIsOverrideEnabled(false);
       }
-      
+
       // Clear model parameters when switching between modes for fresh start
       setModelName('');
       setFramework('');
@@ -315,11 +315,11 @@ const OptimizeTab = () => {
       setPrecision('');
       setVocabularySize('');
       setActivationFunction('');
-      
+
       // Reset advanced parameters visibility
       setShowAdvancedParamsBare(false);
       setShowAdvancedParamsVM(false);
-      
+
       // Always clear results when switching post-deployment tabs
       setOptimizationResults(null);
       setError('');
@@ -413,7 +413,7 @@ const OptimizeTab = () => {
     setAttentionLayers('');
     setActivationFunction('');
     setPrecision('');
-    
+
     // Clear post-deployment specific fields
     setGpuMemoryUsage('');
     setCpuMemoryUsage('');
@@ -424,13 +424,13 @@ const OptimizeTab = () => {
     setCurrentHardwareId('');
     setOptimizationPriority('balanced');
     setIsOverrideEnabled(false);
-    
+
     // Clear VM-specific fields
     setPostDeploymentMode('bare-metal');
     setActiveVMs([]);
     setSelectedVM(null);
     setVmError('');
-    
+
     // Clear VM metrics fields
     setVmGpuUtilization('');
     setVmGpuMemoryUsage('');
@@ -440,7 +440,7 @@ const OptimizeTab = () => {
     setVmNetworkBandwidth('');
     setIsVmOverrideEnabled(false);
     setVmMetricsLastUpdated(null);
-    
+
     // Clear auto-refresh intervals
     if (vmMetricsRefreshInterval) {
       clearInterval(vmMetricsRefreshInterval);
@@ -450,7 +450,7 @@ const OptimizeTab = () => {
       clearInterval(hostMetricsRefreshInterval);
       setHostMetricsRefreshInterval(null);
     }
-    
+
     setError('');
     setOptimizationResults(null);
     setShowMoreParams(false);
@@ -468,25 +468,25 @@ const OptimizeTab = () => {
 
       try {
         console.log(`Fetching model data for: ${modelName} - ${taskType}`);
-        
+
         // Call the backend API to get model data using model name
         const response = await apiClient.post('/model/get-model-data', {
           model_name: modelName,
           task_type: taskType
         });
-        
+
         console.log('Model data response:', response.data);
-        
+
         // Check if the response is successful
         if (response.data.status === 'success' && response.data.model_data) {
           const modelData = response.data.model_data;
-          
+
           console.log('Auto-filling model data:', modelData);
-          
+
           // Auto-fill the form with model data from backend
           setModelSize(modelData.model_size_mb?.toString() || '');
           setParameters(modelData.total_parameters_millions?.toString() || '');
-          
+
           // For Training task type, keep GFLOPs empty (user must input)
           // For Inference task type, prefill GFLOPs from database
           if (taskType === 'Training') {
@@ -494,10 +494,10 @@ const OptimizeTab = () => {
           } else {
             setFlops(modelData.gflops_billions?.toString() || '');
           }
-          
+
           setFramework(modelData.framework || '');
           setModelType(modelData.model_type || '');
-          
+
           // Auto-fill additional parameters if available - map fields correctly based on CSV columns
           setArchitectureType(modelData.architecture_type || '');
           setHiddenLayers(modelData.number_of_hidden_layers?.toString() || '');
@@ -507,12 +507,12 @@ const OptimizeTab = () => {
           setVocabularySize(modelData.vocabulary_size?.toString() || '');
           setActivationFunction(modelData.activation_function || '');
           setPrecision(modelData.precision || '');
-          
+
         } else {
           console.warn('Model data not found:', response.data);
           setError('Model data not found for the selected model and task type.');
         }
-        
+
       } catch (err) {
         console.error('Error fetching model data:', err);
         if (err.response?.status === 404) {
@@ -579,7 +579,7 @@ const OptimizeTab = () => {
         ];
 
         const missingFields = requiredFields.filter(field => !field.value || field.value === '');
-        
+
         if (missingFields.length > 0) {
           setError(`Please fill in the following fields: ${missingFields.map(f => f.name).join(', ')}. Click "Override" to enter all values.`);
           return;
@@ -601,7 +601,7 @@ const OptimizeTab = () => {
         ];
 
         const missingVmFields = vmRequiredFields.filter(field => !field.value || field.value === '');
-        
+
         if (missingVmFields.length > 0) {
           setError(`Please ensure all VM metrics are loaded: ${missingVmFields.map(f => f.name).join(', ')}. Click "Refresh Metrics" or enable "Override" to enter values manually.`);
           return;
@@ -629,7 +629,7 @@ const OptimizeTab = () => {
 
     try {
       let optimizationParams;
-      
+
       if (optimizationMode === 'pre-deployment') {
         // Pre-deployment: Use /api/model/recommend-hardware endpoint (same format as simulate-performance)
         optimizationParams = {
@@ -650,7 +650,7 @@ const OptimizeTab = () => {
           Number_of_Attention_Layers: parseInt(attentionLayers) || 0,
           GFLOPs_Billions: parseFloat(flops)
         };
-        
+
         // Add Training-specific fields if task type is Training
         if (taskType === 'Training') {
           optimizationParams.Batch_Size = parseInt(batchSize);
@@ -709,7 +709,7 @@ const OptimizeTab = () => {
             network_bandwidth: parseFloat(vmNetworkBandwidth) || 0,
             // Core VM-level fields that the pickle model actually uses
             gpu_utilization: parseFloat(vmGpuUtilization),
-            gpu_memory_usage: parseFloat(vmGpuMemoryUsage), 
+            gpu_memory_usage: parseFloat(vmGpuMemoryUsage),
             current_hardware_id: currentHardwareId,
             deployment_type: 'vm-level'
           };
@@ -717,71 +717,71 @@ const OptimizeTab = () => {
       }
 
       // Use the correct endpoint based on mode
-      const endpoint = optimizationMode === 'pre-deployment' 
-        ? '/model/recommend-hardware' 
+      const endpoint = optimizationMode === 'pre-deployment'
+        ? '/model/recommend-hardware'
         : '/deployment/post-deployment-optimization';
-      
+
       // Debug logging
       console.log('Optimization mode:', optimizationMode);
       console.log('Endpoint:', endpoint);
       console.log('Request params:', optimizationParams);
       console.log('Request JSON:', JSON.stringify(optimizationParams, null, 2));
       const response = await apiClient.post(endpoint, optimizationParams);
-      
+
       console.log('Full backend response:', response.data);
       console.log('Response keys:', Object.keys(response.data || {}));
-      
+
       // Process and format optimization results
       console.log('Full response received:', response);
       console.log('Response data:', response.data);
       console.log('Response status:', response.data?.status);
-      
+
       if (response.data && response.data.status === 'success') {
         console.log('Found optimization response:', response.data);
-        
+
         if (optimizationMode === 'pre-deployment') {
           // Handle pre-deployment hardware recommendation response (same format as simulate-performance)
           if (response.data.performance_results && response.data.performance_results.length > 0) {
             console.log('Raw Hardware Recommendations:', response.data.performance_results);
-            
+
             // Format hardware recommendation results (top 3 sorted by cost per 1000)
             const hardwareComparison = response.data.performance_results.map(result => {
-                console.log(`Processing hardware recommendation:`, result);
-                
-                return {
-                  name: result.GPU || result['Hardware Name'] || 'Unknown Hardware',
-                  fullName: `${result.CPU || 'Unknown CPU'} + ${result.GPU || 'Unknown GPU'}`,
-                  latency: result['Latency (ms)'] !== 'N/A' ? `${parseFloat(result['Latency (ms)']).toFixed(2)} ms` : 'N/A',
-                  throughput: '0.00 QPS', // Hide throughput as requested
-                  costPer1000: result['Total Cost'] !== 'N/A' && result['Total Cost'] !== '0' ? `$${parseFloat(result['Total Cost']).toFixed(4)}` : '$0.0000',
-                  memory: `${result['Recommended RAM'] || 0} GB`,
-                  status: result.Status || 'Unknown',
-                  confidence: `${parseFloat(result['Confidence Score'] || 0).toFixed(1)}%`,
-                  recommendedStorage: result['Recommended Storage'] || 'N/A',
-                  estimatedVRAM: result['Estimated_VRAM (GB)'] || 'N/A',
-                  estimatedRAM: result['Estimated_RAM (GB)'] || 'N/A',
-                  powerConsumption: result['Total power consumption'] || 'N/A'
-                };
-              });
-            
+              console.log(`Processing hardware recommendation:`, result);
+
+              return {
+                name: result.GPU || result['Hardware Name'] || 'Unknown Hardware',
+                fullName: `${result.CPU || 'Unknown CPU'} + ${result.GPU || 'Unknown GPU'}`,
+                latency: result['Latency (ms)'] !== 'N/A' ? `${parseFloat(result['Latency (ms)']).toFixed(2)} ms` : 'N/A',
+                throughput: '0.00 QPS', // Hide throughput as requested
+                costPer1000: result['Total Cost'] !== 'N/A' && result['Total Cost'] !== '0' ? `$${parseFloat(result['Total Cost']).toFixed(4)}` : '$0.0000',
+                memory: `${result['Recommended RAM'] || 0} GB`,
+                status: result.Status || 'Unknown',
+                confidence: `${parseFloat(result['Confidence Score'] || 0).toFixed(1)}%`,
+                recommendedStorage: result['Recommended Storage'] || 'N/A',
+                estimatedVRAM: result['Estimated_VRAM (GB)'] || 'N/A',
+                estimatedRAM: result['Estimated_RAM (GB)'] || 'N/A',
+                powerConsumption: result['Total power consumption'] || 'N/A'
+              };
+            });
+
             // Calculate minimum VRAM from the formatted results
             const vramValues = hardwareComparison
               .map(hw => parseFloat(hw.estimatedVRAM))
               .filter(vram => !isNaN(vram)); // Filter out 'N/A' values
-            
+
             const minimumVRAM = vramValues.length > 0 ? Math.min(...vramValues) : 0;
-            
+
             const formattedResults = {
               minimumVRAM: minimumVRAM,
               hardwareComparison: hardwareComparison
             };
-            
+
             console.log('Formatted hardware recommendation results:', formattedResults);
             setOptimizationResults(formattedResults);
           } else {
             setError('Hardware recommendations completed but no results were returned.');
           }
-          
+
         } else {
           // Check if this is a VM-level response with new format
           if (response.data.analysis_type === 'vm_level_optimization') {
@@ -793,16 +793,16 @@ const OptimizeTab = () => {
             const costAnalysis = vmAnalysis.cost_analysis || {};
             const recommendation = vmAnalysis.recommendation || {};
             const optimizationSummary = vmAnalysis.optimization_summary || {};
-            
+
             // Create VM-specific description
             const primaryRecommendation = recommendation.primary_recommendation || 'No recommendation';
             const actionRequired = recommendation.action_required || 'No action specified';
             const reason = recommendation.reason || 'Analysis completed';
-            
+
             let vmDescription = '';
             let vmStrengths = [];
             let vmConsiderations = [];
-            
+
             if (recommendation.recommendation_type === 'vertical_scaling') {
               vmDescription = `VM Vertical Scaling Required\n\n${actionRequired}\n\n${reason}`;
               vmStrengths = [
@@ -874,7 +874,7 @@ const OptimizeTab = () => {
                 'Performance monitoring post-implementation'
               ];
             }
-            
+
             // Format results for VM-level optimization
             const vmFormattedResults = {
               recommendedConfiguration: {
@@ -914,7 +914,7 @@ const OptimizeTab = () => {
                 costImpactFactor: optimizationSummary.cost_impact_factor || costAnalysis.cost_increase_factor
               }
             };
-            
+
             console.log('VM-level optimization results:', vmFormattedResults);
             setOptimizationResults(vmFormattedResults);
           } else {
@@ -922,139 +922,139 @@ const OptimizeTab = () => {
             const recommendation = response.data.recommendation || 'No recommendation available';
             const currentHardware = response.data.current_hardware || 'Unknown';
             const analysisData = response.data.analysis_summary || {};
-          
-          // Extract hardware name from recommendation text
-          const recommendedHardware = recommendation.includes('Upgrade to') 
-            ? recommendation.replace('Upgrade to ', '').trim()
-            : recommendation;
-          
-          // Create elaborative description based on recommendation type
-          let description = '';
-          let strengths = [];
-          let considerations = [];
-          
-          if (recommendation.toLowerCase().includes('upgrade')) {
-            description = `Hardware Recommendation: ${recommendation}\n\nBased on current ${currentHardware} performance metrics and AI workload analysis, upgrading to ${recommendedHardware} will provide better performance for your model deployment.`;
-            strengths = [
-              'Improved AI model inference performance',
-              'Better memory and compute resource utilization',
-              'Enhanced GPU capabilities for AI workloads',
-              'Future-ready hardware for scaling'
-            ];
-            considerations = [
-              'Hardware upgrade and migration required',
-              'Deployment planning and testing needed',
-              'Cost-benefit analysis for infrastructure',
-              'Model re-deployment and validation'
-            ];
-          } else if (recommendation.toLowerCase().includes('downgrade')) {
-            description = `Cost Optimization Recommendation: ${recommendation}\n\nCurrent ${currentHardware} appears to be over-provisioned for this AI workload. Moving to ${recommendedHardware} would be more cost-effective while maintaining performance.`;
-            strengths = [
-              'Significant cost optimization opportunity',
-              'Right-sizing for current AI model requirements',
-              'Reduced operational and infrastructure expenses',
-              'Efficient resource allocation for workload'
-            ];
-            considerations = [
-              'Validate performance requirements are still met',
-              'Monitor model performance after transition',
-              'Plan cost savings allocation strategy',
-              'Test thoroughly before production deployment'
-            ];
-          } else if (recommendation.toLowerCase().includes('maintain')) {
-            description = `Optimal Configuration: Current ${currentHardware} is well-suited for this AI workload. No hardware changes recommended at this time.`;
-            strengths = [
-              'Current hardware meets AI model requirements',
-              'Optimal price-performance ratio achieved',
-              'No migration overhead or downtime',
-              'Stable inference performance maintained'
-            ];
-            considerations = [
-              'Continue monitoring model performance metrics',
-              'Re-evaluate if workload patterns change',
-              'Current configuration validated for deployment',
-              'Consider scaling options for future growth'
-            ];
-          } else {
-            description = `Hardware Analysis: ${recommendation}\n\nBased on analysis of your AI workload running on ${currentHardware}, this recommendation optimizes for your specific deployment requirements.`;
-            strengths = [
-              'AI workload-specific recommendation',
-              'Resource utilization analysis completed',
-              'Performance optimization guidance',
-              'Deployment-ready configuration'
-            ];
-            considerations = [
-              'Review implementation requirements',
-              'Consider deployment timeline and feasibility',
-              'Validate against performance requirements',
-              'Plan testing and rollout strategy'
-            ];
-          }
-          
-          // Extract numerical metrics from the API response
-          const metrics = response.data.metrics || {};
-          const recommendedLatency = metrics.recommended_latency || 'Calculating...';
-          const recommendedCost = metrics.recommended_cost || 'Calculating...';
-          
-          // Format results for post-deployment
-          const formattedResults = {
-            recommendedConfiguration: {
-              description: description,
-              recommendedInstance: recommendedHardware,
-              expectedInferenceTime: recommendedLatency,
-              costPer1000: recommendedCost
-            },
-            hardwareAnalysis: {
-              name: recommendedHardware,
-              memory: 'Hardware-appropriate specifications',
-              fp16Performance: 'Supported where available',
-              architecture: 'ML-validated configuration',
-              strengths: strengths,
-              considerations: considerations,
-              useCase: `Post-deployment optimization for ${optimizationMode} workload`
-            },
-            alternativeOptions: [{
-              hardware: recommendedHardware,
-              fullName: recommendedHardware,
-              inferenceTime: recommendedLatency,
-              costPer1000: recommendedCost,
-              status: 'ML Model Recommended',
-              recommended: true,
-              memory: 'Appropriate sizing',
-              architecture: 'Validated',
-              improvement: recommendation.includes('Upgrade') ? 'Performance boost expected' : 
-                          recommendation.includes('Downgrade') ? 'Cost savings expected' : 
-                          'Current setup validated',
-              mlDetails: {
-                rawPrediction: response.data.raw_prediction,
-                predictionValue: response.data.prediction_value,
+
+            // Extract hardware name from recommendation text
+            const recommendedHardware = recommendation.includes('Upgrade to')
+              ? recommendation.replace('Upgrade to ', '').trim()
+              : recommendation;
+
+            // Create elaborative description based on recommendation type
+            let description = '';
+            let strengths = [];
+            let considerations = [];
+
+            if (recommendation.toLowerCase().includes('upgrade')) {
+              description = `Hardware Recommendation: ${recommendation}\n\nBased on current ${currentHardware} performance metrics and AI workload analysis, upgrading to ${recommendedHardware} will provide better performance for your model deployment.`;
+              strengths = [
+                'Improved AI model inference performance',
+                'Better memory and compute resource utilization',
+                'Enhanced GPU capabilities for AI workloads',
+                'Future-ready hardware for scaling'
+              ];
+              considerations = [
+                'Hardware upgrade and migration required',
+                'Deployment planning and testing needed',
+                'Cost-benefit analysis for infrastructure',
+                'Model re-deployment and validation'
+              ];
+            } else if (recommendation.toLowerCase().includes('downgrade')) {
+              description = `Cost Optimization Recommendation: ${recommendation}\n\nCurrent ${currentHardware} appears to be over-provisioned for this AI workload. Moving to ${recommendedHardware} would be more cost-effective while maintaining performance.`;
+              strengths = [
+                'Significant cost optimization opportunity',
+                'Right-sizing for current AI model requirements',
+                'Reduced operational and infrastructure expenses',
+                'Efficient resource allocation for workload'
+              ];
+              considerations = [
+                'Validate performance requirements are still met',
+                'Monitor model performance after transition',
+                'Plan cost savings allocation strategy',
+                'Test thoroughly before production deployment'
+              ];
+            } else if (recommendation.toLowerCase().includes('maintain')) {
+              description = `Optimal Configuration: Current ${currentHardware} is well-suited for this AI workload. No hardware changes recommended at this time.`;
+              strengths = [
+                'Current hardware meets AI model requirements',
+                'Optimal price-performance ratio achieved',
+                'No migration overhead or downtime',
+                'Stable inference performance maintained'
+              ];
+              considerations = [
+                'Continue monitoring model performance metrics',
+                'Re-evaluate if workload patterns change',
+                'Current configuration validated for deployment',
+                'Consider scaling options for future growth'
+              ];
+            } else {
+              description = `Hardware Analysis: ${recommendation}\n\nBased on analysis of your AI workload running on ${currentHardware}, this recommendation optimizes for your specific deployment requirements.`;
+              strengths = [
+                'AI workload-specific recommendation',
+                'Resource utilization analysis completed',
+                'Performance optimization guidance',
+                'Deployment-ready configuration'
+              ];
+              considerations = [
+                'Review implementation requirements',
+                'Consider deployment timeline and feasibility',
+                'Validate against performance requirements',
+                'Plan testing and rollout strategy'
+              ];
+            }
+
+            // Extract numerical metrics from the API response
+            const metrics = response.data.metrics || {};
+            const recommendedLatency = metrics.recommended_latency || 'Calculating...';
+            const recommendedCost = metrics.recommended_cost || 'Calculating...';
+
+            // Format results for post-deployment
+            const formattedResults = {
+              recommendedConfiguration: {
+                description: description,
+                recommendedInstance: recommendedHardware,
+                expectedInferenceTime: recommendedLatency,
+                costPer1000: recommendedCost
+              },
+              hardwareAnalysis: {
+                name: recommendedHardware,
+                memory: 'Hardware-appropriate specifications',
+                fp16Performance: 'Supported where available',
+                architecture: 'ML-validated configuration',
+                strengths: strengths,
+                considerations: considerations,
+                useCase: `Post-deployment optimization for ${optimizationMode} workload`
+              },
+              alternativeOptions: [{
+                hardware: recommendedHardware,
+                fullName: recommendedHardware,
+                inferenceTime: recommendedLatency,
+                costPer1000: recommendedCost,
+                status: 'ML Model Recommended',
+                recommended: true,
+                memory: 'Appropriate sizing',
+                architecture: 'Validated',
+                improvement: recommendation.includes('Upgrade') ? 'Performance boost expected' :
+                  recommendation.includes('Downgrade') ? 'Cost savings expected' :
+                    'Current setup validated',
+                mlDetails: {
+                  rawPrediction: response.data.raw_prediction,
+                  predictionValue: response.data.prediction_value,
+                  currentHardware: currentHardware,
+                  recommendationType: analysisData.recommendation_type
+                }
+              }],
+              // Add post-deployment specific data
+              isPostDeployment: true,
+              analysisSummary: {
+                ...analysisData,
                 currentHardware: currentHardware,
-                recommendationType: analysisData.recommendation_type
-              }
-            }],
-            // Add post-deployment specific data
-            isPostDeployment: true,
-            analysisSummary: {
-              ...analysisData,
-              currentHardware: currentHardware,
-              mlModelConfidence: `${response.data.raw_prediction}/10`,
-              recommendationText: recommendation,
-              workflowType: 'Post-deployment optimization'
-            },
-            rawOptimizationResults: response.data // Store full response for debugging
-          };
-          
-          setOptimizationResults(formattedResults);
-        
-           } 
+                mlModelConfidence: `${response.data.raw_prediction}/10`,
+                recommendationText: recommendation,
+                workflowType: 'Post-deployment optimization'
+              },
+              rawOptimizationResults: response.data // Store full response for debugging
+            };
+
+            setOptimizationResults(formattedResults);
+
+          }
         }
-    } 
-      
+      }
+
     } catch (err) {
       console.error('Error getting recommendations:', err);
       console.error('Error response data:', err.response?.data);
       console.error('Error status:', err.response?.status);
-      
+
       let errorMessage = 'Failed to get recommendations. Please try again.';
       if (err.response?.data?.detail) {
         // Pydantic validation error details
@@ -1074,7 +1074,7 @@ const OptimizeTab = () => {
       } else if (err.response?.data?.message) {
         errorMessage = err.response.data.message;
       }
-      
+
       setError(errorMessage);
     } finally {
       setIsRunningOptimization(false);
@@ -1085,31 +1085,29 @@ const OptimizeTab = () => {
   return (
     <>
       {/* Optimization Mode Selector */}
-      <div className="mb-6 flex justify-center">
+      {/* <div className="mb-6 flex justify-center">
         <div className="inline-flex items-center gap-4">
           <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Optimization Mode:</span>
           <button
             onClick={() => setOptimizationMode('pre-deployment')}
-            className={`px-4 py-2 rounded-lg font-medium transition-all ${
-              optimizationMode === 'pre-deployment'
+            className={`px-4 py-2 rounded-lg font-medium transition-all ${optimizationMode === 'pre-deployment'
                 ? 'bg-[#01a982] text-white'
                 : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
-            }`}
+              }`}
           >
             Pre-Deployment
           </button>
           <button
             onClick={() => setOptimizationMode('post-deployment')}
-            className={`px-4 py-2 rounded-lg font-medium transition-all ${
-              optimizationMode === 'post-deployment'
+            className={`px-4 py-2 rounded-lg font-medium transition-all ${optimizationMode === 'post-deployment'
                 ? 'bg-[#01a982] text-white'
                 : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
-            }`}
+              }`}
           >
             Post-Deployment
           </button>
         </div>
-      </div>
+      </div> */}
 
       {/* Post-Deployment Section with Sub-tabs */}
       {optimizationMode === 'post-deployment' && (
@@ -1119,13 +1117,12 @@ const OptimizeTab = () => {
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">Post-Deployment Optimization</h2>
               <div className="flex gap-4">
-                <button 
+                <button
                   onClick={() => setIsOverrideEnabled(!isOverrideEnabled)}
-                  className={`flex items-center gap-2 text-sm transition-colors ${
-                    isOverrideEnabled 
-                      ? 'text-orange-600 hover:text-orange-700' 
-                      : 'text-[#01a982] hover:text-[#019670]'
-                  }`}
+                  className={`flex items-center gap-2 text-sm transition-colors ${isOverrideEnabled
+                    ? 'text-orange-600 hover:text-orange-700'
+                    : 'text-[#01a982] hover:text-[#019670]'
+                    }`}
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
@@ -1153,27 +1150,25 @@ const OptimizeTab = () => {
                 </button>
               </div>
             </div>
-            
+
             {/* Sub-tabs for Post-Deployment */}
             <div className="flex justify-center mb-6">
               <div className="inline-flex items-center gap-2 bg-gray-100 dark:bg-gray-700 p-1 rounded-lg">
                 <button
                   onClick={() => setPostDeploymentMode('bare-metal')}
-                  className={`px-4 py-2 rounded-md font-medium text-sm transition-all ${
-                    postDeploymentMode === 'bare-metal'
-                      ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
-                      : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-                  }`}
+                  className={`px-4 py-2 rounded-md font-medium text-sm transition-all ${postDeploymentMode === 'bare-metal'
+                    ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
+                    : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+                    }`}
                 >
                   Bare Metal Level Recommendation
                 </button>
                 <button
                   onClick={() => setPostDeploymentMode('vm-level')}
-                  className={`px-4 py-2 rounded-md font-medium text-sm transition-all ${
-                    postDeploymentMode === 'vm-level'
-                      ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
-                      : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-                  }`}
+                  className={`px-4 py-2 rounded-md font-medium text-sm transition-all ${postDeploymentMode === 'vm-level'
+                    ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
+                    : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+                    }`}
                 >
                   VM Level Recommendation
                 </button>
@@ -1214,181 +1209,181 @@ const OptimizeTab = () => {
                 </div>
               )}
 
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-            {/* GPU Utilization */}
-            <div>
-              <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                GPU Utilization
-                <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-              </label>
-              {isOverrideEnabled ? (
-                <input
-                  type="number"
-                  value={gpuUtilization}
-                  onChange={(e) => setGpuUtilization(e.target.value)}
-                  className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
-                  placeholder="Enter %"
-                  min="0"
-                  max="100"
-                />
-              ) : (
-                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                  <div className="text-lg font-semibold text-gray-500 dark:text-gray-400">
-                    {gpuUtilization}%
-                  </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+                {/* GPU Utilization */}
+                <div>
+                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    GPU Utilization
+                    <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                  </label>
+                  {isOverrideEnabled ? (
+                    <input
+                      type="number"
+                      value={gpuUtilization}
+                      onChange={(e) => setGpuUtilization(e.target.value)}
+                      className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
+                      placeholder="Enter %"
+                      min="0"
+                      max="100"
+                    />
+                  ) : (
+                    <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                      <div className="text-lg font-semibold text-gray-500 dark:text-gray-400">
+                        {gpuUtilization}%
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
 
-            {/* GPU Memory Usage */}
-            <div>
-              <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                GPU Memory Usage
-                <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-              </label>
-              {isOverrideEnabled ? (
-                <input
-                  type="number"
-                  value={gpuMemoryUsage}
-                  onChange={(e) => setGpuMemoryUsage(e.target.value)}
-                  className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
-                  placeholder="Enter %"
-                  min="0"
-                  max="100"
-                />
-              ) : (
-                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                  <div className="text-lg font-semibold text-gray-500 dark:text-gray-400">
-                    {gpuMemoryUsage}%
-                  </div>
+                {/* GPU Memory Usage */}
+                <div>
+                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    GPU Memory Usage
+                    <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                  </label>
+                  {isOverrideEnabled ? (
+                    <input
+                      type="number"
+                      value={gpuMemoryUsage}
+                      onChange={(e) => setGpuMemoryUsage(e.target.value)}
+                      className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
+                      placeholder="Enter %"
+                      min="0"
+                      max="100"
+                    />
+                  ) : (
+                    <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                      <div className="text-lg font-semibold text-gray-500 dark:text-gray-400">
+                        {gpuMemoryUsage}%
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
 
-            {/* CPU Utilization */}
-            <div>
-              <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                CPU Utilization
-                <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-              </label>
-              {isOverrideEnabled ? (
-                <input
-                  type="number"
-                  value={cpuUtilization}
-                  onChange={(e) => setCpuUtilization(e.target.value)}
-                  className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
-                  placeholder="Enter %"
-                  min="0"
-                  max="100"
-                />
-              ) : (
-                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                  <div className="text-lg font-semibold text-gray-500 dark:text-gray-400">
-                    {cpuUtilization}%
-                  </div>
+                {/* CPU Utilization */}
+                <div>
+                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    CPU Utilization
+                    <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                  </label>
+                  {isOverrideEnabled ? (
+                    <input
+                      type="number"
+                      value={cpuUtilization}
+                      onChange={(e) => setCpuUtilization(e.target.value)}
+                      className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
+                      placeholder="Enter %"
+                      min="0"
+                      max="100"
+                    />
+                  ) : (
+                    <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                      <div className="text-lg font-semibold text-gray-500 dark:text-gray-400">
+                        {cpuUtilization}%
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
 
-            {/* CPU Memory Usage */}
-            <div>
-              <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                CPU Memory Usage
-                <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-              </label>
-              {isOverrideEnabled ? (
-                <input
-                  type="number"
-                  value={cpuMemoryUsage}
-                  onChange={(e) => setCpuMemoryUsage(e.target.value)}
-                  className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
-                  placeholder="Enter %"
-                  min="0"
-                  max="100"
-                />
-              ) : (
-                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                  <div className="text-lg font-semibold text-gray-500 dark:text-gray-400">
-                    {cpuMemoryUsage}%
-                  </div>
+                {/* CPU Memory Usage */}
+                <div>
+                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    CPU Memory Usage
+                    <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                  </label>
+                  {isOverrideEnabled ? (
+                    <input
+                      type="number"
+                      value={cpuMemoryUsage}
+                      onChange={(e) => setCpuMemoryUsage(e.target.value)}
+                      className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
+                      placeholder="Enter %"
+                      min="0"
+                      max="100"
+                    />
+                  ) : (
+                    <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                      <div className="text-lg font-semibold text-gray-500 dark:text-gray-400">
+                        {cpuMemoryUsage}%
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
 
-            {/* Disk IOPS */}
-            <div>
-              <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Disk IOPS
-                <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-              </label>
-              {isOverrideEnabled ? (
-                <input
-                  type="number"
-                  value={diskIops}
-                  onChange={(e) => setDiskIops(e.target.value)}
-                  className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
-                  placeholder="Enter IOPS"
-                />
-              ) : (
-                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                  <div className="text-lg font-semibold text-gray-500 dark:text-gray-400">
-                    {diskIops} IOPS
-                  </div>
+                {/* Disk IOPS */}
+                <div>
+                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Disk IOPS
+                    <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                  </label>
+                  {isOverrideEnabled ? (
+                    <input
+                      type="number"
+                      value={diskIops}
+                      onChange={(e) => setDiskIops(e.target.value)}
+                      className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
+                      placeholder="Enter IOPS"
+                    />
+                  ) : (
+                    <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                      <div className="text-lg font-semibold text-gray-500 dark:text-gray-400">
+                        {diskIops} IOPS
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
 
-            {/* Network Bandwidth */}
-            <div>
-              <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Network Bandwidth
-                <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-              </label>
-              {isOverrideEnabled ? (
-                <input
-                  type="number"
-                  value={networkBandwidth}
-                  onChange={(e) => setNetworkBandwidth(e.target.value)}
-                  className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
-                  placeholder="Enter MB/s"
-                />
-              ) : (
-                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                  <div className="text-lg font-semibold text-gray-500 dark:text-gray-400">
-                    {networkBandwidth} MB/s
-                  </div>
+                {/* Network Bandwidth */}
+                <div>
+                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Network Bandwidth
+                    <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                  </label>
+                  {isOverrideEnabled ? (
+                    <input
+                      type="number"
+                      value={networkBandwidth}
+                      onChange={(e) => setNetworkBandwidth(e.target.value)}
+                      className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
+                      placeholder="Enter MB/s"
+                    />
+                  ) : (
+                    <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                      <div className="text-lg font-semibold text-gray-500 dark:text-gray-400">
+                        {networkBandwidth} MB/s
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
 
-            {/* Current Hardware ID */}
-            <div>
-              <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Current Hardware
-                <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-              </label>
-              <select
-                value={currentHardwareId}
-                onChange={(e) => setCurrentHardwareId(e.target.value)}
-                className="w-full px-3 py-2 border text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600"
-              >
-                <option value="">Select hardware ({hardwareData.length} available)</option>
-                {hardwareData.length > 0 ? (
-                  hardwareData.map((hw) => {
-                    const hardwareName = getHardwareName(hw);
-                    return (
-                      <option key={hw.id} value={hardwareName}>
-                        {hardwareName}
-                      </option>
-                    );
-                  })
-                ) : (
-                  <option disabled>No hardware data loaded</option>
-                )}
-              </select>
-            </div>
+                {/* Current Hardware ID */}
+                <div>
+                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Current Hardware
+                    <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                  </label>
+                  <select
+                    value={currentHardwareId}
+                    onChange={(e) => setCurrentHardwareId(e.target.value)}
+                    className="w-full px-3 py-2 border text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600"
+                  >
+                    <option value="">Select hardware ({hardwareData.length} available)</option>
+                    {hardwareData.length > 0 ? (
+                      hardwareData.map((hw) => {
+                        const hardwareName = getHardwareName(hw);
+                        return (
+                          <option key={hw.id} value={hardwareName}>
+                            {hardwareName}
+                          </option>
+                        );
+                      })
+                    ) : (
+                      <option disabled>No hardware data loaded</option>
+                    )}
+                  </select>
+                </div>
 
-            </div>
+              </div>
             </div>
           )}
 
@@ -1397,7 +1392,7 @@ const OptimizeTab = () => {
             <div>
               <div className="mb-6">
                 <p className="text-gray-600 dark:text-gray-300">Select a VM instance to analyze and optimize its hardware configuration</p>
-                
+
                 {/* VM Error Display */}
                 {vmError && (
                   <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
@@ -1411,18 +1406,18 @@ const OptimizeTab = () => {
                     Select VM Instance
                     <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                   </label>
-                  
+
                   <select
                     value={selectedVM?.vm_name || ''}
                     onChange={(e) => {
                       const vm = activeVMs.find(vm => vm.vm_name === e.target.value);
                       setSelectedVM(vm || null);
-                      
+
                       // Immediately populate VM Resource Metrics with VM's current usage
                       if (vm) {
                         setVmCpuMemoryUsage(vm.ram_usage_percent?.toString() || '0');
                         setVmGpuMemoryUsage(vm.vram_usage_percent?.toString() || '0');
-                        
+
                         // Also fetch live metrics from API
                         fetchVmMetrics(vm.vm_name);
                       } else {
@@ -1435,9 +1430,9 @@ const OptimizeTab = () => {
                     className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <option value="">
-                      {isLoadingVMs ? 'Loading VM instances...' : 
-                       activeVMs.length === 0 ? 'No active VM instances found' : 
-                       `Select VM instance (${activeVMs.length} available)`}
+                      {isLoadingVMs ? 'Loading VM instances...' :
+                        activeVMs.length === 0 ? 'No active VM instances found' :
+                          `Select VM instance (${activeVMs.length} available)`}
                     </option>
                     {activeVMs.map((vm) => (
                       <option key={vm.vm_name} value={vm.vm_name}>
@@ -1500,20 +1495,19 @@ const OptimizeTab = () => {
                       <div className="flex items-center justify-between mb-4">
                         <h4 className="font-semibold text-gray-900 dark:text-white">VM Resource Metrics</h4>
                         <div className="flex gap-4">
-                          <button 
+                          <button
                             onClick={() => setIsVmOverrideEnabled(!isVmOverrideEnabled)}
-                            className={`flex items-center gap-2 text-sm transition-colors ${
-                              isVmOverrideEnabled 
-                                ? 'text-orange-600 hover:text-orange-700' 
-                                : 'text-[#01a982] hover:text-[#019670]'
-                            }`}
+                            className={`flex items-center gap-2 text-sm transition-colors ${isVmOverrideEnabled
+                              ? 'text-orange-600 hover:text-orange-700'
+                              : 'text-[#01a982] hover:text-[#019670]'
+                              }`}
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                             </svg>
                             {isVmOverrideEnabled ? 'Exit Override' : 'Override'}
                           </button>
-                          <button 
+                          <button
                             onClick={() => fetchVmMetrics(selectedVM.vm_name)}
                             disabled={isLoadingVmMetrics}
                             className="flex items-center gap-2 text-sm text-[#01a982] hover:text-[#019670] disabled:opacity-50"
@@ -1785,777 +1779,811 @@ const OptimizeTab = () => {
       )}
 
       {/* Main Form Section */}
-      <div className="w-full max-w-6xl mx-auto bg-white rounded-lg shadow-sm border border-gray-200 p-6 para1">
-        <div className="paraetext-lg font-semibold text-gray-900 dark:text-white text7">
+      <h1 className="text-4xl font-medium mb-6" style={{ color: '#16a34a' }}>
+        GreenMatrix Panel
+      </h1>
+      <div className="w-full bg-white rounded-lg shadow-sm border border-gray-200 p-6 para1">
+        <div className="text-[24px] font-normal text-gray-900 dark:text-white">
           {optimizationMode === 'pre-deployment' ? 'Recommend Hardware' : 'Optimize Hardware'}
         </div>
 
-        {/* Inner Container */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 max-w-6xl mx-auto mt-4 bgr">
-          {/* Header Section */}
-          <div className="mb-4">
-            <h1 className="text-xl font-bold text-gray-900 dark:text-white mb-1 text6">
+        {/* Tabs */}
+        <div className="mt-6">
+          <div className="dark:bg-gray-800 shadow-sm dark:border-gray-700 overflow-hidden">
+            <div className="flex space-x-6">
+              {/* Pre-Deployment Tab */}
+              <button
+                onClick={() => setOptimizationMode('pre-deployment')}
+                className={`flex items-center gap-2 pb-2 text-base font-medium border-b-2 transition-all ${optimizationMode === 'pre-deployment'
+                    ? 'text-emerald-700 border-emerald-700 text-xl'
+                    : 'text-gray-600 dark:text-gray-300 border-transparent hover:text-emerald-700 hover:border-emerald-700 text-xl'
+                  }`}
+              >
+                <CodeXml className="w-4 h-4" />
+                <span>Pre-Deployment</span>
+              </button>
+
+              {/* Post-Deployment Tab */}
+              <button
+                onClick={() => setOptimizationMode('post-deployment')}
+                className={`flex items-center gap-2 pb-2 text-base font-medium border-b-2 transition-all ${optimizationMode === 'post-deployment'
+                    ? 'text-emerald-700 border-emerald-700 text-xl'
+                    : 'text-gray-600 dark:text-gray-300 border-transparent hover:text-emerald-700 hover:border-emerald-700 text-xl'
+                  }`}
+              >
+                <CodeXml className="w-4 h-4" />
+                <span>Post-Deployment</span>
+              </button>
+            </div>
+          </div>
+        </div>
+        <h1 className="text-lg font-medium text-gray-900 dark:text-white my-2 mt-6">
               {optimizationMode === 'pre-deployment' ? 'Workload Parameters' : 'Runtime Parameters'}
             </h1>
-            <p className="text-sm text-gray-600 dark:text-gray-300">
+            <p className="text-md text-gray-500 dark:text-gray-300">
               {optimizationMode === 'pre-deployment'
                 ? 'Enter the details of your AI workload to get hardware recommendations'
                 : 'Enter the details of your running AI workload to optimize hardware configuration'}
             </p>
 
-          {/* Error Message */}
-          {error && (
-            <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-              <p className="text-red-600 dark:text-red-400 text-sm">{error}</p>
-            </div>
-          )}
-          
-          {/* Loading Indicators */}
-          {isLoadingDropdowns && (
-            <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-              <div className="flex items-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin text-blue-600 dark:text-blue-400" />
-                <p className="text-blue-600 dark:text-blue-400 text-sm">Loading model names and task types from database...</p>
+            {/* Error Message */}
+            {error && (
+              <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                <p className="text-red-600 dark:text-red-400 text-sm">{error}</p>
               </div>
-            </div>
-          )}
-          
-          {isLoadingModelData && (
-            <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-              <div className="flex items-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin text-blue-600 dark:text-blue-400" />
-                <p className="text-blue-600 dark:text-blue-400 text-sm">Loading model data and auto-filling fields...</p>
-              </div>
-            </div>
-          )}
-      </div>
+            )}
 
-      <div className="simulate-form-grid">
-          {/* Model Name */}
-          <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Model Name
-              <div className="relative">
-                <Info 
-                  className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" 
-                  onMouseEnter={() => setShowTooltip('modelName')}
-                  onMouseLeave={() => setShowTooltip('')}
-                />
-                {showTooltip === 'modelName' && (
-                  <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
-                    <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
-                    Select the specific AI model from the database. Other fields will auto-populate.
-                  </div>
-                )}
+
+        {/* Inner Container */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mt-4 bgr">
+          {/* Header Section */}
+          <div className="mb-4">
+            {/* Loading Indicators */}
+            {isLoadingDropdowns && (
+              <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin text-blue-600 dark:text-blue-400" />
+                  <p className="text-blue-600 dark:text-blue-400 text-sm">Loading model names and task types from database...</p>
+                </div>
               </div>
-            </label>
-            <div className="relative">
-              <select
-                value={modelName}
-                onChange={(e) => setModelName(e.target.value)}
-                className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
-                disabled={isLoadingDropdowns}
-              >
-                <option value="">
-                  {isLoadingDropdowns ? 'Loading model names...' : 'Select model name'}
-                </option>
-                {availableModelNames.map((name) => (
-                  <option key={name} value={name}>
-                    {name}
+            )}
+
+            {isLoadingModelData && (
+              <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin text-blue-600 dark:text-blue-400" />
+                  <p className="text-blue-600 dark:text-blue-400 text-sm">Loading model data and auto-filling fields...</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="simulate-form-grid">
+            {/* Model Name */}
+            <div>
+              <label className="flex items-center gap-2 text-md font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Model Name
+                <div className="relative">
+                  <Info
+                    className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help"
+                    onMouseEnter={() => setShowTooltip('modelName')}
+                    onMouseLeave={() => setShowTooltip('')}
+                  />
+                  {showTooltip === 'modelName' && (
+                    <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
+                      <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
+                      Select the specific AI model from the database. Other fields will auto-populate.
+                    </div>
+                  )}
+                </div>
+              </label>
+              <div className="relative">
+                <select
+                  value={modelName}
+                  onChange={(e) => setModelName(e.target.value)}
+                  className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
+                  disabled={isLoadingDropdowns}
+                >
+                  <option value="">
+                    {isLoadingDropdowns ? 'Loading model names...' : 'Select model name'}
                   </option>
-                ))}
-              </select>
-              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                <svg className="w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
+                  {availableModelNames.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                  <svg className="w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Framework */}
-          <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Framework
-              <div className="relative">
-                <Info 
-                  className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" 
-                  onMouseEnter={() => setShowTooltip('framework')}
-                  onMouseLeave={() => setShowTooltip('')}
-                />
-                {showTooltip === 'framework' && (
-                  <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
-                    <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
-                    Choose the deep learning framework for your workload.
-                  </div>
-                )}
-              </div>
-            </label>
-            <div className="relative">
-              <select
-                value={framework}
-                onChange={(e) => setFramework(e.target.value)}
-                className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
-                disabled={isLoadingModelData}
-              >
-                <option value="">Select framework</option>
-                <option value="PyTorch">PyTorch</option>
-                <option value="TensorFlow">TensorFlow</option>
-                <option value="JAX">JAX</option>
-                <option value="ONNX">ONNX</option>
-                <option value="TensorRT">TensorRT</option>
-              </select>
-              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                <svg className="w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          {/* Task Type */}
-          <div className="relative">
-            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Task Type
-              <div className="relative">
-                <Info 
-                  className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" 
-                  onMouseEnter={() => setShowTooltip('taskType')}
-                  onMouseLeave={() => setShowTooltip('')}
-                />
-                {showTooltip === 'taskType' && (
-                  <div className="absolute z-10 w-80 p-3 -top-20 left-6 bg-gray-800 text-white text-sm rounded-lg shadow-lg">
-                    <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
-                    Training requires more computational resources than inference. This significantly impacts hardware recommendations.
-                  </div>
-                )}
-              </div>
-            </label>
-            <div className="relative">
-              <select
-                value={taskType}
-                onChange={(e) => setTaskType(e.target.value)}
-                className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
-                disabled={isLoadingDropdowns}
-              >
-                <option value="">Select task type</option>
-                <option value="Training">Training</option>
-                <option value="Inference">Inference</option>
-              </select>
-              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                <svg className="w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          {/* Scenario */}
-          <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Scenario
-              <div className="relative">
-                <Info 
-                  className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" 
-                  onMouseEnter={() => setShowTooltip('scenario')}
-                  onMouseLeave={() => setShowTooltip('')}
-                />
-                {showTooltip === 'scenario' && (
-                  <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
-                    <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
-                    Single Stream for single inference requests, Server for batch processing.
-                  </div>
-                )}
-              </div>
-            </label>
-            <div className="relative">
-              <select
-                value={scenario}
-                onChange={(e) => setScenario(e.target.value)}
-                className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
-              >
-                <option value="Single Stream">Single Stream</option>
-                <option value="Server">Server</option>
-              </select>
-              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                <svg className="w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          {/* Model Size */}
-          <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Model Size (MB)
-              <div className="relative">
-                <Info 
-                  className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" 
-                  onMouseEnter={() => setShowTooltip('modelSize')}
-                  onMouseLeave={() => setShowTooltip('')}
-                />
-                {showTooltip === 'modelSize' && (
-                  <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
-                    <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
-                    The total size of your model weights in megabytes.
-                  </div>
-                )}
-              </div>
-            </label>
-            <input
-              type="number"
-              value={modelSize}
-              onChange={(e) => setModelSize(e.target.value)}
-              placeholder="Enter model size in MB"
-              className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={isLoadingModelData}
-            />
-          </div>
-
-          {/* Parameters */}
-          <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Parameters (Millions)
-              <div className="relative">
-                <Info 
-                  className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" 
-                  onMouseEnter={() => setShowTooltip('parameters')}
-                  onMouseLeave={() => setShowTooltip('')}
-                />
-                {showTooltip === 'parameters' && (
-                  <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
-                    <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
-                    Total number of trainable parameters in millions.
-                  </div>
-                )}
-              </div>
-            </label>
-            <input
-              type="number"
-              value={parameters}
-              onChange={(e) => setParameters(e.target.value)}
-              placeholder="Enter parameters in millions"
-              className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={isLoadingModelData}
-            />
-          </div>
-
-          {/* FLOPs */}
-          <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              GFLOPs (Billions)
-              <div className="relative">
-                <Info 
-                  className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" 
-                  onMouseEnter={() => setShowTooltip('flops')}
-                  onMouseLeave={() => setShowTooltip('')}
-                />
-                {showTooltip === 'flops' && (
-                  <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
-                    <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
-                    Floating-point operations per second in billions.
-                  </div>
-                )}
-              </div>
-            </label>
-            <input
-              type="number"
-              value={flops}
-              onChange={(e) => setFlops(e.target.value)}
-              placeholder="Enter GFLOPs in billions"
-              className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={isLoadingModelData}
-            />
-          </div>
-
-          {/* Batch Size - Only for Training task type in pre-deployment */}
-          {optimizationMode === 'pre-deployment' && taskType === 'Training' && (
+            {/* Framework */}
             <div>
-              <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Batch Size
+              <label className="flex items-center gap-2 text-md font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Framework
                 <div className="relative">
-                  <Info 
-                    className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" 
-                    onMouseEnter={() => setShowTooltip('batchSize')}
+                  <Info
+                    className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help"
+                    onMouseEnter={() => setShowTooltip('framework')}
                     onMouseLeave={() => setShowTooltip('')}
                   />
-                  {showTooltip === 'batchSize' && (
+                  {showTooltip === 'framework' && (
                     <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
                       <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
-                      Number of samples processed in parallel.
+                      Choose the deep learning framework for your workload.
+                    </div>
+                  )}
+                </div>
+              </label>
+              <div className="relative">
+                <select
+                  value={framework}
+                  onChange={(e) => setFramework(e.target.value)}
+                  className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
+                  disabled={isLoadingModelData}
+                >
+                  <option value="">Select framework</option>
+                  <option value="PyTorch">PyTorch</option>
+                  <option value="TensorFlow">TensorFlow</option>
+                  <option value="JAX">JAX</option>
+                  <option value="ONNX">ONNX</option>
+                  <option value="TensorRT">TensorRT</option>
+                </select>
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                  <svg className="w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            {/* Task Type */}
+            <div className="relative">
+              <label className="flex items-center gap-2 text-md font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Task Type
+                <div className="relative">
+                  <Info
+                    className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help"
+                    onMouseEnter={() => setShowTooltip('taskType')}
+                    onMouseLeave={() => setShowTooltip('')}
+                  />
+                  {showTooltip === 'taskType' && (
+                    <div className="absolute z-10 w-80 p-3 -top-20 left-6 bg-gray-800 text-white text-sm rounded-lg shadow-lg">
+                      <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
+                      Training requires more computational resources than inference. This significantly impacts hardware recommendations.
+                    </div>
+                  )}
+                </div>
+              </label>
+              <div className="relative">
+                <select
+                  value={taskType}
+                  onChange={(e) => setTaskType(e.target.value)}
+                  className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
+                  disabled={isLoadingDropdowns}
+                >
+                  <option value="">Select task type</option>
+                  <option value="Training">Training</option>
+                  <option value="Inference">Inference</option>
+                </select>
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                  <svg className="w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            {/* Scenario */}
+            <div>
+              <label className="flex items-center gap-2 text-md font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Scenario
+                <div className="relative">
+                  <Info
+                    className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help"
+                    onMouseEnter={() => setShowTooltip('scenario')}
+                    onMouseLeave={() => setShowTooltip('')}
+                  />
+                  {showTooltip === 'scenario' && (
+                    <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
+                      <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
+                      Single Stream for single inference requests, Server for batch processing.
+                    </div>
+                  )}
+                </div>
+              </label>
+              <div className="relative">
+                <select
+                  value={scenario}
+                  onChange={(e) => setScenario(e.target.value)}
+                  className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                >
+                  <option value="Single Stream">Single Stream</option>
+                  <option value="Server">Server</option>
+                </select>
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                  <svg className="w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            {/* Model Size */}
+            <div>
+              <label className="flex items-center gap-2 text-md font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Model Size (MB)
+                <div className="relative">
+                  <Info
+                    className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help"
+                    onMouseEnter={() => setShowTooltip('modelSize')}
+                    onMouseLeave={() => setShowTooltip('')}
+                  />
+                  {showTooltip === 'modelSize' && (
+                    <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
+                      <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
+                      The total size of your model weights in megabytes.
                     </div>
                   )}
                 </div>
               </label>
               <input
                 type="number"
-                value={batchSize}
-                onChange={(e) => setBatchSize(e.target.value)}
-                placeholder="Enter batch size"
+                value={modelSize}
+                onChange={(e) => setModelSize(e.target.value)}
+                placeholder="Enter model size in MB"
                 className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={isLoadingModelData}
               />
             </div>
-          )}
 
-          {/* Input Size - Only for Training task type in pre-deployment */}
-          {optimizationMode === 'pre-deployment' && taskType === 'Training' && (
+            {/* Parameters */}
             <div>
-              <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Input Size
+              <label className="flex items-center gap-2 text-md font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Parameters (Millions)
                 <div className="relative">
-                  <Info 
-                    className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" 
-                    onMouseEnter={() => setShowTooltip('inputSize')}
+                  <Info
+                    className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help"
+                    onMouseEnter={() => setShowTooltip('parameters')}
                     onMouseLeave={() => setShowTooltip('')}
                   />
-                  {showTooltip === 'inputSize' && (
+                  {showTooltip === 'parameters' && (
                     <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
                       <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
-                      Input size for training data.
+                      Total number of trainable parameters in millions.
                     </div>
                   )}
                 </div>
               </label>
               <input
                 type="number"
-                value={inputSize}
-                onChange={(e) => setInputSize(e.target.value)}
-                placeholder="Enter input size for training"
+                value={parameters}
+                onChange={(e) => setParameters(e.target.value)}
+                placeholder="Enter parameters in millions"
                 className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={isLoadingModelData}
               />
             </div>
-          )}
 
-          {/* Is Full Training field - Only for Training task type in pre-deployment */}
-          {optimizationMode === 'pre-deployment' && taskType === 'Training' && (
+            {/* FLOPs */}
             <div>
-              <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Is Full Training
+              <label className="flex items-center gap-2 text-md font-medium text-gray-700 dark:text-gray-300 mb-2">
+                GFLOPs (Billions)
                 <div className="relative">
-                  <Info 
-                    className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" 
-                    onMouseEnter={() => setShowTooltip('isFullTraining')}
+                  <Info
+                    className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help"
+                    onMouseEnter={() => setShowTooltip('flops')}
                     onMouseLeave={() => setShowTooltip('')}
                   />
-                  {showTooltip === 'isFullTraining' && (
+                  {showTooltip === 'flops' && (
                     <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
                       <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
-                      Whether this is full training or fine-tuning.
+                      Floating-point operations per second in billions.
                     </div>
                   )}
                 </div>
               </label>
-              <select
-                value={isFullTraining}
-                onChange={(e) => setIsFullTraining(e.target.value)}
+              <input
+                type="number"
+                value={flops}
+                onChange={(e) => setFlops(e.target.value)}
+                placeholder="Enter GFLOPs in billions"
                 className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={isLoadingModelData}
+              />
+            </div>
+
+            {/* Batch Size - Only for Training task type in pre-deployment */}
+            {optimizationMode === 'pre-deployment' && taskType === 'Training' && (
+              <div>
+                <label className="flex items-center gap-2 text-md font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Batch Size
+                  <div className="relative">
+                    <Info
+                      className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help"
+                      onMouseEnter={() => setShowTooltip('batchSize')}
+                      onMouseLeave={() => setShowTooltip('')}
+                    />
+                    {showTooltip === 'batchSize' && (
+                      <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
+                        <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
+                        Number of samples processed in parallel.
+                      </div>
+                    )}
+                  </div>
+                </label>
+                <input
+                  type="number"
+                  value={batchSize}
+                  onChange={(e) => setBatchSize(e.target.value)}
+                  placeholder="Enter batch size"
+                  className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={isLoadingModelData}
+                />
+              </div>
+            )}
+
+            {/* Input Size - Only for Training task type in pre-deployment */}
+            {optimizationMode === 'pre-deployment' && taskType === 'Training' && (
+              <div>
+                <label className="flex items-center gap-2 text-md font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Input Size
+                  <div className="relative">
+                    <Info
+                      className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help"
+                      onMouseEnter={() => setShowTooltip('inputSize')}
+                      onMouseLeave={() => setShowTooltip('')}
+                    />
+                    {showTooltip === 'inputSize' && (
+                      <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
+                        <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
+                        Input size for training data.
+                      </div>
+                    )}
+                  </div>
+                </label>
+                <input
+                  type="number"
+                  value={inputSize}
+                  onChange={(e) => setInputSize(e.target.value)}
+                  placeholder="Enter input size for training"
+                  className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={isLoadingModelData}
+                />
+              </div>
+            )}
+
+            {/* Is Full Training field - Only for Training task type in pre-deployment */}
+            {optimizationMode === 'pre-deployment' && taskType === 'Training' && (
+              <div>
+                <label className="flex items-center gap-2 text-md font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Is Full Training
+                  <div className="relative">
+                    <Info
+                      className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help"
+                      onMouseEnter={() => setShowTooltip('isFullTraining')}
+                      onMouseLeave={() => setShowTooltip('')}
+                    />
+                    {showTooltip === 'isFullTraining' && (
+                      <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
+                        <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
+                        Whether this is full training or fine-tuning.
+                      </div>
+                    )}
+                  </div>
+                </label>
+                <select
+                  value={isFullTraining}
+                  onChange={(e) => setIsFullTraining(e.target.value)}
+                  className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={isLoadingModelData}
+                >
+                  <option value="No">No</option>
+                  <option value="Yes">Yes</option>
+                </select>
+              </div>
+            )}
+
+          </div>
+
+
+          {/* Load More Parameters Button */}
+          {modelName && taskType && !showMoreParams && optimizationMode === 'pre-deployment' && (
+            <div className="mt-6 flex justify-center">
+              <button
+                onClick={() => setShowMoreParams(true)}
+                disabled={isLoadingModelData}
+                className="px-6 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <option value="No">No</option>
-                <option value="Yes">Yes</option>
-              </select>
+                Load More Parameters
+              </button>
             </div>
           )}
 
-        </div>
-
-
-        {/* Load More Parameters Button */}
-        {modelName && taskType && !showMoreParams && optimizationMode === 'pre-deployment' && (
-          <div className="mt-6 flex justify-center">
-            <button 
-              onClick={() => setShowMoreParams(true)}
-              disabled={isLoadingModelData}
-              className="px-6 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Load More Parameters
-            </button>
-          </div>
-        )}
-
-        {/* Load More Parameters Button for Post-Deployment Bare-Metal */}
-        {optimizationMode === 'post-deployment' && postDeploymentMode === 'bare-metal' && modelName && taskType && !showAdvancedParamsBare && (
-          <div className="mt-6 flex justify-center">
-            <button 
-              onClick={() => setShowAdvancedParamsBare(true)}
-              disabled={isLoadingModelData}
-              className="px-6 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Load Advanced Parameters
-            </button>
-          </div>
-        )}
-
-        {/* Load More Parameters Button for Post-Deployment VM-Level */}
-        {optimizationMode === 'post-deployment' && postDeploymentMode === 'vm-level' && modelName && taskType && !showAdvancedParamsVM && (
-          <div className="mt-6 flex justify-center">
-            <button 
-              onClick={() => setShowAdvancedParamsVM(true)}
-              disabled={isLoadingModelData}
-              className="px-6 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Load Advanced Parameters
-            </button>
-          </div>
-        )}
-
-        {/* Additional Parameters - Show based on mode */}
-        {(showMoreParams || 
-          (optimizationMode === 'post-deployment' && postDeploymentMode === 'bare-metal' && showAdvancedParamsBare) ||
-          (optimizationMode === 'post-deployment' && postDeploymentMode === 'vm-level' && showAdvancedParamsVM)) && (
-          <div className="mt-6 p-6 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Advanced Parameters</h3>
-            {optimizationMode === 'post-deployment' && (
-              <p className="text-sm text-orange-600 dark:text-orange-400 mb-4">
-                ⚠️ These fields are required for post-deployment optimization
-              </p>
-            )}
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Architecture Type */}
-              <div>
-                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Architecture Type
-                  <div className="relative">
-                    <Info 
-                      className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" 
-                      onMouseEnter={() => setShowTooltip('architectureType')}
-                      onMouseLeave={() => setShowTooltip('')}
-                    />
-                    {showTooltip === 'architectureType' && (
-                      <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
-                        <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
-                        Specific architecture variant or implementation type.
-                      </div>
-                    )}
-                  </div>
-                </label>
-                <div className="relative">
-                  <select
-                    value={architectureType}
-                    onChange={(e) => setArchitectureType(e.target.value)}
-                    className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
-                    disabled={isLoadingModelData}
-                  >
-                    <option value="">Select architecture type</option>
-                    <option value="LlamaForCausalLM">LlamaForCausalLM</option>
-                    <option value="Qwen2ForCausalLM">Qwen2ForCausalLM</option>
-                    <option value="Phi3ForCausalLM">Phi3ForCausalLM</option>
-                    <option value="MistralForCausalLM">MistralForCausalLM</option>
-                    <option value="GemmaForCausalLM">GemmaForCausalLM</option>
-                    <option value="PhiForCausalLM">PhiForCausalLM</option>
-                    <option value="GPT2LMHeadModel">GPT2LMHeadModel</option>
-                    <option value="BertForMaskedLM">BertForMaskedLM</option>
-                    <option value="RobertaForMaskedLM">RobertaForMaskedLM</option>
-                    <option value="AlbertForMaskedLM">AlbertForMaskedLM</option>
-                    <option value="DistilBertForMaskedLM">DistilBertForMaskedLM</option>
-                    <option value="resnet18">resnet18</option>
-                    <option value="resnet34">resnet34</option>
-                    <option value="resnet50">resnet50</option>
-                    <option value="vgg16">vgg16</option>
-                    <option value="vgg19">vgg19</option>
-                    <option value="inception_v3">inception_v3</option>
-                    <option value="efficientnet_b0">efficientnet_b0</option>
-                    <option value="ViTForImageClassification">ViTForImageClassification</option>
-                    <option value="DeiTForImageClassificationWithTeacher">DeiTForImageClassificationWithTeacher</option>
-                    <option value="SwinForImageClassification">SwinForImageClassification</option>
-                  </select>
-                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                    <svg className="w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </div>
-                </div>
-              </div>
-
-              {/* Number of Hidden Layers */}
-              <div>
-                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Number of Hidden Layers
-                  <div className="relative">
-                    <Info 
-                      className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" 
-                      onMouseEnter={() => setShowTooltip('hiddenLayers')}
-                      onMouseLeave={() => setShowTooltip('')}
-                    />
-                    {showTooltip === 'hiddenLayers' && (
-                      <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
-                        <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
-                        Total number of hidden layers in the neural network.
-                      </div>
-                    )}
-                  </div>
-                </label>
-                <input
-                  type="number"
-                  value={hiddenLayers}
-                  onChange={(e) => setHiddenLayers(e.target.value)}
-                  placeholder="Enter number of hidden layers"
-                  className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={isLoadingModelData}
-                />
-              </div>
-
-              {/* Vocabulary Size */}
-              <div>
-                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Vocabulary Size
-                  <div className="relative">
-                    <Info 
-                      className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" 
-                      onMouseEnter={() => setShowTooltip('vocabularySize')}
-                      onMouseLeave={() => setShowTooltip('')}
-                    />
-                    {showTooltip === 'vocabularySize' && (
-                      <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
-                        <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
-                        Size of the vocabulary used by the model (for NLP models).
-                      </div>
-                    )}
-                  </div>
-                </label>
-                <input
-                  type="number"
-                  value={vocabularySize}
-                  onChange={(e) => setVocabularySize(e.target.value)}
-                  placeholder="Enter vocabulary size"
-                  className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={isLoadingModelData}
-                />
-              </div>
-
-              {/* Number of Attention Layers */}
-              <div>
-                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Number of Attention Layers
-                  <div className="relative">
-                    <Info 
-                      className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" 
-                      onMouseEnter={() => setShowTooltip('attentionLayers')}
-                      onMouseLeave={() => setShowTooltip('')}
-                    />
-                    {showTooltip === 'attentionLayers' && (
-                      <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
-                        <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
-                        Number of attention/transformer layers in the model.
-                      </div>
-                    )}
-                  </div>
-                </label>
-                <input
-                  type="number"
-                  value={attentionLayers}
-                  onChange={(e) => setAttentionLayers(e.target.value)}
-                  placeholder="Enter number of attention layers"
-                  className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={isLoadingModelData}
-                />
-              </div>
-
-              {/* Precision */}
-              <div>
-                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Precision
-                  <div className="relative">
-                    <Info 
-                      className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" 
-                      onMouseEnter={() => setShowTooltip('precision')}
-                      onMouseLeave={() => setShowTooltip('')}
-                    />
-                    {showTooltip === 'precision' && (
-                      <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
-                        <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
-                        Numerical precision used for model computations (FP16, FP32, etc.).
-                      </div>
-                    )}
-                  </div>
-                </label>
-                <div className="relative">
-                  <select
-                    value={precision}
-                    onChange={(e) => setPrecision(e.target.value)}
-                    className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
-                    disabled={isLoadingModelData}
-                  >
-                    <option value="">Select precision</option>
-                    <option value="FP16">FP16 (Half Precision)</option>
-                    <option value="FP32">FP32 (Single Precision)</option>
-                    <option value="FP64">FP64 (Double Precision)</option>
-                    <option value="INT8">INT8 (8-bit Integer)</option>
-                    <option value="INT4">INT4 (4-bit Integer)</option>
-                  </select>
-                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                    <svg className="w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </div>
-                </div>
-              </div>
-
-              {/* Activation Function */}
-              <div>
-                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Activation Function
-                  <div className="relative">
-                    <Info 
-                      className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" 
-                      onMouseEnter={() => setShowTooltip('activationFunction')}
-                      onMouseLeave={() => setShowTooltip('')}
-                    />
-                    {showTooltip === 'activationFunction' && (
-                      <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
-                        <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
-                        Primary activation function used in the model layers.
-                      </div>
-                    )}
-                  </div>
-                </label>
-                <div className="relative">
-                  <select
-                    value={activationFunction}
-                    onChange={(e) => setActivationFunction(e.target.value)}
-                    className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
-                    disabled={isLoadingModelData}
-                  >
-                    <option value="">Select activation function</option>
-                    <option value="silu">SiLU</option>
-                    <option value="gelu">GELU</option>
-                    <option value="gelu_new">GELU New</option>
-                    <option value="gelu_pytorch_tanh">GELU PyTorch Tanh</option>
-                    <option value="relu">ReLU</option>
-                    <option value="swish">Swish</option>
-                    <option value="tanh">Tanh</option>
-                    <option value="sigmoid">Sigmoid</option>
-                    <option value="leaky_relu">Leaky ReLU</option>
-                    <option value="elu">ELU</option>
-                  </select>
-                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                    <svg className="w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </div>
-                </div>
-              </div>
-
-              {/* Embedding Vector Dimension */}
-              <div>
-                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Embedding Vector Dimension
-                  <div className="relative">
-                    <Info 
-                      className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" 
-                      onMouseEnter={() => setShowTooltip('embeddingDimension')}
-                      onMouseLeave={() => setShowTooltip('')}
-                    />
-                    {showTooltip === 'embeddingDimension' && (
-                      <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
-                        <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
-                        Dimension of the embedding vectors (hidden size).
-                      </div>
-                    )}
-                  </div>
-                </label>
-                <input
-                  type="number"
-                  value={embeddingDimension}
-                  onChange={(e) => setEmbeddingDimension(e.target.value)}
-                  className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={isLoadingModelData}
-                />
-              </div>
-
-              {/* FFN (MLP) Dimension */}
-              <div>
-                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  FFN (MLP) Dimension
-                  <div className="relative">
-                    <Info 
-                      className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" 
-                      onMouseEnter={() => setShowTooltip('ffnDimension')}
-                      onMouseLeave={() => setShowTooltip('')}
-                    />
-                    {showTooltip === 'ffnDimension' && (
-                      <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
-                        <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
-                        Dimension of the feed-forward network (MLP) layers.
-                      </div>
-                    )}
-                  </div>
-                </label>
-                <input
-                  type="number"
-                  value={ffnDimension}
-                  onChange={(e) => setFfnDimension(e.target.value)}
-                  className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={isLoadingModelData}
-                />
-              </div>
+          {/* Load More Parameters Button for Post-Deployment Bare-Metal */}
+          {optimizationMode === 'post-deployment' && postDeploymentMode === 'bare-metal' && modelName && taskType && !showAdvancedParamsBare && (
+            <div className="mt-6 flex justify-center">
+              <button
+                onClick={() => setShowAdvancedParamsBare(true)}
+                disabled={isLoadingModelData}
+                className="px-6 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Load Advanced Parameters
+              </button>
             </div>
+          )}
 
-            {/* Collapse Buttons */}
-            {optimizationMode === 'pre-deployment' && (
-              <div className="mt-4 flex justify-center">
-                <button 
-                  onClick={() => setShowMoreParams(false)}
-                  className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
-                >
-                  Show Less Parameters
-                </button>
+          {/* Load More Parameters Button for Post-Deployment VM-Level */}
+          {optimizationMode === 'post-deployment' && postDeploymentMode === 'vm-level' && modelName && taskType && !showAdvancedParamsVM && (
+            <div className="mt-6 flex justify-center">
+              <button
+                onClick={() => setShowAdvancedParamsVM(true)}
+                disabled={isLoadingModelData}
+                className="px-6 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Load Advanced Parameters
+              </button>
+            </div>
+          )}
+
+          {/* Additional Parameters - Show based on mode */}
+          {(showMoreParams ||
+            (optimizationMode === 'post-deployment' && postDeploymentMode === 'bare-metal' && showAdvancedParamsBare) ||
+            (optimizationMode === 'post-deployment' && postDeploymentMode === 'vm-level' && showAdvancedParamsVM)) && (
+              <div className="mt-6 p-6 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Advanced Parameters</h3>
+                {optimizationMode === 'post-deployment' && (
+                  <p className="text-sm text-orange-600 dark:text-orange-400 mb-4">
+                    ⚠️ These fields are required for post-deployment optimization
+                  </p>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Architecture Type */}
+                  <div>
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Architecture Type
+                      <div className="relative">
+                        <Info
+                          className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help"
+                          onMouseEnter={() => setShowTooltip('architectureType')}
+                          onMouseLeave={() => setShowTooltip('')}
+                        />
+                        {showTooltip === 'architectureType' && (
+                          <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
+                            <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
+                            Specific architecture variant or implementation type.
+                          </div>
+                        )}
+                      </div>
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={architectureType}
+                        onChange={(e) => setArchitectureType(e.target.value)}
+                        className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
+                        disabled={isLoadingModelData}
+                      >
+                        <option value="">Select architecture type</option>
+                        <option value="LlamaForCausalLM">LlamaForCausalLM</option>
+                        <option value="Qwen2ForCausalLM">Qwen2ForCausalLM</option>
+                        <option value="Phi3ForCausalLM">Phi3ForCausalLM</option>
+                        <option value="MistralForCausalLM">MistralForCausalLM</option>
+                        <option value="GemmaForCausalLM">GemmaForCausalLM</option>
+                        <option value="PhiForCausalLM">PhiForCausalLM</option>
+                        <option value="GPT2LMHeadModel">GPT2LMHeadModel</option>
+                        <option value="BertForMaskedLM">BertForMaskedLM</option>
+                        <option value="RobertaForMaskedLM">RobertaForMaskedLM</option>
+                        <option value="AlbertForMaskedLM">AlbertForMaskedLM</option>
+                        <option value="DistilBertForMaskedLM">DistilBertForMaskedLM</option>
+                        <option value="resnet18">resnet18</option>
+                        <option value="resnet34">resnet34</option>
+                        <option value="resnet50">resnet50</option>
+                        <option value="vgg16">vgg16</option>
+                        <option value="vgg19">vgg19</option>
+                        <option value="inception_v3">inception_v3</option>
+                        <option value="efficientnet_b0">efficientnet_b0</option>
+                        <option value="ViTForImageClassification">ViTForImageClassification</option>
+                        <option value="DeiTForImageClassificationWithTeacher">DeiTForImageClassificationWithTeacher</option>
+                        <option value="SwinForImageClassification">SwinForImageClassification</option>
+                      </select>
+                      <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                        <svg className="w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Number of Hidden Layers */}
+                  <div>
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Number of Hidden Layers
+                      <div className="relative">
+                        <Info
+                          className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help"
+                          onMouseEnter={() => setShowTooltip('hiddenLayers')}
+                          onMouseLeave={() => setShowTooltip('')}
+                        />
+                        {showTooltip === 'hiddenLayers' && (
+                          <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
+                            <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
+                            Total number of hidden layers in the neural network.
+                          </div>
+                        )}
+                      </div>
+                    </label>
+                    <input
+                      type="number"
+                      value={hiddenLayers}
+                      onChange={(e) => setHiddenLayers(e.target.value)}
+                      placeholder="Enter number of hidden layers"
+                      className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={isLoadingModelData}
+                    />
+                  </div>
+
+                  {/* Vocabulary Size */}
+                  <div>
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Vocabulary Size
+                      <div className="relative">
+                        <Info
+                          className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help"
+                          onMouseEnter={() => setShowTooltip('vocabularySize')}
+                          onMouseLeave={() => setShowTooltip('')}
+                        />
+                        {showTooltip === 'vocabularySize' && (
+                          <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
+                            <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
+                            Size of the vocabulary used by the model (for NLP models).
+                          </div>
+                        )}
+                      </div>
+                    </label>
+                    <input
+                      type="number"
+                      value={vocabularySize}
+                      onChange={(e) => setVocabularySize(e.target.value)}
+                      placeholder="Enter vocabulary size"
+                      className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={isLoadingModelData}
+                    />
+                  </div>
+
+                  {/* Number of Attention Layers */}
+                  <div>
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Number of Attention Layers
+                      <div className="relative">
+                        <Info
+                          className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help"
+                          onMouseEnter={() => setShowTooltip('attentionLayers')}
+                          onMouseLeave={() => setShowTooltip('')}
+                        />
+                        {showTooltip === 'attentionLayers' && (
+                          <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
+                            <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
+                            Number of attention/transformer layers in the model.
+                          </div>
+                        )}
+                      </div>
+                    </label>
+                    <input
+                      type="number"
+                      value={attentionLayers}
+                      onChange={(e) => setAttentionLayers(e.target.value)}
+                      placeholder="Enter number of attention layers"
+                      className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={isLoadingModelData}
+                    />
+                  </div>
+
+                  {/* Precision */}
+                  <div>
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Precision
+                      <div className="relative">
+                        <Info
+                          className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help"
+                          onMouseEnter={() => setShowTooltip('precision')}
+                          onMouseLeave={() => setShowTooltip('')}
+                        />
+                        {showTooltip === 'precision' && (
+                          <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
+                            <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
+                            Numerical precision used for model computations (FP16, FP32, etc.).
+                          </div>
+                        )}
+                      </div>
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={precision}
+                        onChange={(e) => setPrecision(e.target.value)}
+                        className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
+                        disabled={isLoadingModelData}
+                      >
+                        <option value="">Select precision</option>
+                        <option value="FP16">FP16 (Half Precision)</option>
+                        <option value="FP32">FP32 (Single Precision)</option>
+                        <option value="FP64">FP64 (Double Precision)</option>
+                        <option value="INT8">INT8 (8-bit Integer)</option>
+                        <option value="INT4">INT4 (4-bit Integer)</option>
+                      </select>
+                      <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                        <svg className="w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Activation Function */}
+                  <div>
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Activation Function
+                      <div className="relative">
+                        <Info
+                          className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help"
+                          onMouseEnter={() => setShowTooltip('activationFunction')}
+                          onMouseLeave={() => setShowTooltip('')}
+                        />
+                        {showTooltip === 'activationFunction' && (
+                          <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
+                            <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
+                            Primary activation function used in the model layers.
+                          </div>
+                        )}
+                      </div>
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={activationFunction}
+                        onChange={(e) => setActivationFunction(e.target.value)}
+                        className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
+                        disabled={isLoadingModelData}
+                      >
+                        <option value="">Select activation function</option>
+                        <option value="silu">SiLU</option>
+                        <option value="gelu">GELU</option>
+                        <option value="gelu_new">GELU New</option>
+                        <option value="gelu_pytorch_tanh">GELU PyTorch Tanh</option>
+                        <option value="relu">ReLU</option>
+                        <option value="swish">Swish</option>
+                        <option value="tanh">Tanh</option>
+                        <option value="sigmoid">Sigmoid</option>
+                        <option value="leaky_relu">Leaky ReLU</option>
+                        <option value="elu">ELU</option>
+                      </select>
+                      <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                        <svg className="w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Embedding Vector Dimension */}
+                  <div>
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Embedding Vector Dimension
+                      <div className="relative">
+                        <Info
+                          className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help"
+                          onMouseEnter={() => setShowTooltip('embeddingDimension')}
+                          onMouseLeave={() => setShowTooltip('')}
+                        />
+                        {showTooltip === 'embeddingDimension' && (
+                          <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
+                            <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
+                            Dimension of the embedding vectors (hidden size).
+                          </div>
+                        )}
+                      </div>
+                    </label>
+                    <input
+                      type="number"
+                      value={embeddingDimension}
+                      onChange={(e) => setEmbeddingDimension(e.target.value)}
+                      className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={isLoadingModelData}
+                    />
+                  </div>
+
+                  {/* FFN (MLP) Dimension */}
+                  <div>
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      FFN (MLP) Dimension
+                      <div className="relative">
+                        <Info
+                          className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help"
+                          onMouseEnter={() => setShowTooltip('ffnDimension')}
+                          onMouseLeave={() => setShowTooltip('')}
+                        />
+                        {showTooltip === 'ffnDimension' && (
+                          <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
+                            <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
+                            Dimension of the feed-forward network (MLP) layers.
+                          </div>
+                        )}
+                      </div>
+                    </label>
+                    <input
+                      type="number"
+                      value={ffnDimension}
+                      onChange={(e) => setFfnDimension(e.target.value)}
+                      className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={isLoadingModelData}
+                    />
+                  </div>
+                </div>
+
+                {/* Collapse Buttons */}
+                {optimizationMode === 'pre-deployment' && (
+                  <div className="mt-4 flex justify-center">
+                    <button
+                      onClick={() => setShowMoreParams(false)}
+                      className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+                    >
+                      Show Less Parameters
+                    </button>
+                  </div>
+                )}
+                {optimizationMode === 'post-deployment' && postDeploymentMode === 'bare-metal' && showAdvancedParamsBare && (
+                  <div className="mt-4 flex justify-center">
+                    <button
+                      onClick={() => setShowAdvancedParamsBare(false)}
+                      className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+                    >
+                      Hide Advanced Parameters
+                    </button>
+                  </div>
+                )}
+                {optimizationMode === 'post-deployment' && postDeploymentMode === 'vm-level' && showAdvancedParamsVM && (
+                  <div className="mt-4 flex justify-center">
+                    <button
+                      onClick={() => setShowAdvancedParamsVM(false)}
+                      className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+                    >
+                      Hide Advanced Parameters
+                    </button>
+                  </div>
+                )}
               </div>
             )}
-            {optimizationMode === 'post-deployment' && postDeploymentMode === 'bare-metal' && showAdvancedParamsBare && (
-              <div className="mt-4 flex justify-center">
-                <button 
-                  onClick={() => setShowAdvancedParamsBare(false)}
-                  className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
-                >
-                  Hide Advanced Parameters
-                </button>
-              </div>
-            )}
-            {optimizationMode === 'post-deployment' && postDeploymentMode === 'vm-level' && showAdvancedParamsVM && (
-              <div className="mt-4 flex justify-center">
-                <button 
-                  onClick={() => setShowAdvancedParamsVM(false)}
-                  className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
-                >
-                  Hide Advanced Parameters
-                </button>
-              </div>
-            )}
+
+          {/* Action Buttons */}
+          <div className="mt-8 flex justify-end gap-4 my-3">
+            <button
+              onClick={handleGetRecommendations}
+              disabled={isLoadingModelData || isLoadingDropdowns || isRunningOptimization || !modelName || !taskType}
+          className="px-5 py-2.5 bg-gray-100 hover:bg-gray-300 text-emerald-700 rounded-full border text-lg font-medium flex items-center gap-2 h-11 transition-colors"
+            >
+              {isRunningOptimization ? (
+                <div className="flex items-center gap-2">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Getting Recommendations...
+                </div>
+              ) : (
+                optimizationMode === 'pre-deployment' ? 'Configuration' : 'Configuration'
+              )}
+            </button>
           </div>
-        )}
-
-        {/* Action Buttons */}
-        <div className="mt-8 flex justify-center gap-4">
-          <button 
-            onClick={handleGetRecommendations}
-            disabled={isLoadingModelData || isLoadingDropdowns || isRunningOptimization || !modelName || !taskType}
-            className="px-8 py-3 bg-gradient-to-r from-[#01a982] to-[#00d4aa] text-white font-medium rounded-lg hover:from-[#019670] hover:to-[#00c299] transform hover:scale-105 transition-all duration-200 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-          >
-            {isRunningOptimization ? (
-              <div className="flex items-center gap-2">
-                <Loader2 className="w-5 h-5 animate-spin" />
-                Getting Recommendations...
-              </div>
-            ) : (
-              optimizationMode === 'pre-deployment' ? 'Get Recommended Configuration' : 'Get Optimized Configuration'
-            )}
-          </button>
         </div>
       </div>
-    </div>
 
       {/* Results */}
       {optimizationResults && (
         optimizationMode === 'pre-deployment' ? (
-          <SimulationResults 
-            results={optimizationResults} 
-            title="Top 3 Hardware Recommendations" 
-            subtitle="Hardware configurations sorted by cost per 1000 inferences" 
+          <SimulationResults
+            results={optimizationResults}
+            title="Top 3 Hardware Recommendations"
+            subtitle="Hardware configurations sorted by cost per 1000 inferences"
           />
         ) : (
           <OptimizationResults results={optimizationResults} mode={optimizationMode} />

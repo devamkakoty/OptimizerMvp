@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import DatePicker from 'react-datepicker';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../config/axios';
-import { ChevronLeft, ChevronRight, BarChart3, Calendar, DollarSign, Zap, Cpu, HardDrive, Monitor, MemoryStick, Server } from 'lucide-react';
+import { ChevronLeft, ChevronRight, BarChart3, Calendar, DollarSign, Zap, Cpu, HardDrive, Monitor, MemoryStick, Server, Download, Search, Funnel, BatteryCharging, Factory, Lightbulb } from 'lucide-react';
 import SystemInsightsGenerator from './SystemInsightsGenerator';
 import "../styles/AdminDashboardNew.css"
 import {
@@ -71,7 +71,7 @@ const AdminDashboardNew = ({
   const [metricsLoading, setMetricsLoading] = useState(true);
 
   // State for scrollable sections
-  const [performanceCardIndex, setPerformanceCardIndex] = useState(0);
+  const [costCardIndex, setCostCardIndex] = useState(0);
   const [hardwareCardIndex, setHardwareCardIndex] = useState(0);
 
   // Hardware details popup state
@@ -113,9 +113,8 @@ const AdminDashboardNew = ({
       recommendations.push({
         type: 'power-optimization',
         title: `${category === 'critical' ? 'Critical' : 'High'} Power Consumption Alert`,
-        description: `${processName} is consuming ${powerValue.toFixed(1)}W. ${
-          category === 'critical' ? 'Immediate optimization required.' : 'Consider power throttling or task rescheduling.'
-        } AI suggests ${cpuUsage > 80 ? 'CPU frequency scaling' : 'workload distribution'}.`,
+        description: `${processName} is consuming ${powerValue.toFixed(1)}W. ${category === 'critical' ? 'Immediate optimization required.' : 'Consider power throttling or task rescheduling.'
+          } AI suggests ${cpuUsage > 80 ? 'CPU frequency scaling' : 'workload distribution'}.`,
         priority: category === 'critical' ? 'high' : 'medium',
         savings: category === 'critical' ? '25-40%' : '15-25%'
       });
@@ -126,13 +125,12 @@ const AdminDashboardNew = ({
       recommendations.push({
         type: 'cpu-optimization',
         title: 'CPU Bottleneck Detected',
-        description: `${processName} is using ${cpuUsage.toFixed(1)}% CPU. AI recommends ${
-          processName.toLowerCase().includes('chrome') || processName.toLowerCase().includes('browser')
-            ? 'tab management and extension optimization'
-            : processName.toLowerCase().includes('python') || processName.toLowerCase().includes('node')
+        description: `${processName} is using ${cpuUsage.toFixed(1)}% CPU. AI recommends ${processName.toLowerCase().includes('chrome') || processName.toLowerCase().includes('browser')
+          ? 'tab management and extension optimization'
+          : processName.toLowerCase().includes('python') || processName.toLowerCase().includes('node')
             ? 'code profiling and algorithm optimization'
             : 'process priority adjustment and multi-threading'
-        }.`,
+          }.`,
         priority: 'high',
         savings: '20-35%'
       });
@@ -143,12 +141,11 @@ const AdminDashboardNew = ({
       recommendations.push({
         type: 'memory-optimization',
         title: 'High Memory Usage',
-        description: `Memory usage at ${(memoryUsage/1024).toFixed(1)}GB. ${
-          processName.toLowerCase().includes('chrome') ? 'Consider closing unused tabs or using lightweight alternatives.'
+        description: `Memory usage at ${(memoryUsage / 1024).toFixed(1)}GB. ${processName.toLowerCase().includes('chrome') ? 'Consider closing unused tabs or using lightweight alternatives.'
           : processName.toLowerCase().includes('python') ? 'Implement memory profiling and garbage collection optimization.'
-          : processName.toLowerCase().includes('video') || processName.toLowerCase().includes('media') ? 'Reduce video quality or buffer size.'
-          : 'Consider memory cleanup routines or increasing virtual memory.'
-        }`,
+            : processName.toLowerCase().includes('video') || processName.toLowerCase().includes('media') ? 'Reduce video quality or buffer size.'
+              : 'Consider memory cleanup routines or increasing virtual memory.'
+          }`,
         priority: memoryUsage > 2000 ? 'high' : 'medium',
         savings: '10-20%'
       });
@@ -159,12 +156,11 @@ const AdminDashboardNew = ({
       recommendations.push({
         type: 'gpu-optimization',
         title: 'GPU Intensive Process',
-        description: `GPU utilization at ${gpuUsage.toFixed(1)}%. ${
-          processName.toLowerCase().includes('game') ? 'Optimize graphics settings for better efficiency.'
+        description: `GPU utilization at ${gpuUsage.toFixed(1)}%. ${processName.toLowerCase().includes('game') ? 'Optimize graphics settings for better efficiency.'
           : processName.toLowerCase().includes('python') || processName.toLowerCase().includes('ml') ? 'Consider batch processing or model quantization.'
-          : processName.toLowerCase().includes('video') ? 'Use hardware-accelerated encoding with lower bitrates.'
-          : 'Implement GPU workload scheduling or distributed processing.'
-        }`,
+            : processName.toLowerCase().includes('video') ? 'Use hardware-accelerated encoding with lower bitrates.'
+              : 'Implement GPU workload scheduling or distributed processing.'
+          }`,
         priority: 'medium',
         savings: '15-30%'
       });
@@ -189,10 +185,9 @@ const AdminDashboardNew = ({
       recommendations.push({
         type: 'smart-scheduling',
         title: 'AI-Powered Workload Scheduling',
-        description: `${isPeakHour ? 'Peak hours detected.' : 'Off-peak optimization available.'} AI suggests ${
-          isPeakHour ? 'deferring non-critical tasks to 10 PM - 6 AM for 40% cost reduction'
+        description: `${isPeakHour ? 'Peak hours detected.' : 'Off-peak optimization available.'} AI suggests ${isPeakHour ? 'deferring non-critical tasks to 10 PM - 6 AM for 40% cost reduction'
           : 'current timing is optimal, but consider load balancing during 2-4 AM window'
-        }. Predictive analysis shows 23% efficiency gain.`,
+          }. Predictive analysis shows 23% efficiency gain.`,
         priority: isPeakHour ? 'medium' : 'low',
         savings: isPeakHour ? '25-40%' : '10-15%'
       });
@@ -414,6 +409,35 @@ const AdminDashboardNew = ({
     }
   ];
 
+  // Power and Cost details cards data
+  const powerCostDetails = [
+    {
+      label: 'Total Energy Cost',
+      value: '$10',
+      icon: DollarSign,
+      details: ['Processes analyzed', 'Real-time calculation']
+    },
+    {
+      label: 'Power Consumption',
+      value: '0 W',
+      icon: BatteryCharging,
+      details: ['Processes analyzed', 'Real-time calculation']
+    },
+    {
+      label: 'Top Energy Consumer',
+      value: 'lxd',
+      icon: Factory,
+      details: ['0.00W', 'Current power usage']
+    },
+    {
+      label: 'Cost Saving',
+      value: '0%',
+      icon: Lightbulb,
+      details:
+        ['Potential savings Via region optimization']
+    },
+  ];
+
   // Graph options for performance analytics
   const graphOptions = [
     { value: 'memory', label: 'Memory Usage by Process (Top 5)' },
@@ -507,8 +531,8 @@ const AdminDashboardNew = ({
                 id: vm.vm_name,
                 name: vm.vm_name,
                 type: vm.vm_name.includes('Web') ? 'Web Server' :
-                      vm.vm_name.includes('DB') ? 'Database' :
-                      vm.vm_name.includes('App') ? 'Application' : 'Virtual Machine',
+                  vm.vm_name.includes('DB') ? 'Database' :
+                    vm.vm_name.includes('App') ? 'Application' : 'Virtual Machine',
                 status: 'Running',
                 cpuUsage: summaryData.success ? summaryData.metrics?.avg_cpu_usage || 0 : 0,
                 ramUsagePercent: summaryData.success ? summaryData.metrics?.avg_memory_usage || 0 : 0,
@@ -830,11 +854,10 @@ const AdminDashboardNew = ({
             <div class="card">
               <h3>Storage</h3>
               <div class="metric"><strong>Total:</strong> ${hardwareSpecs?.total_storage_gb ? `${hardwareSpecs.total_storage_gb}GB` : 'N/A'}</div>
-              <div class="metric"><strong>I/O:</strong> ${
-                hostMetrics?.host_disk_read_bytes && hostMetrics?.host_disk_write_bytes
-                  ? `${Math.round((hostMetrics.host_disk_read_bytes + hostMetrics.host_disk_write_bytes) / 1024 / 1024)} MB`
-                  : 'N/A'
-              }</div>
+              <div class="metric"><strong>I/O:</strong> ${hostMetrics?.host_disk_read_bytes && hostMetrics?.host_disk_write_bytes
+        ? `${Math.round((hostMetrics.host_disk_read_bytes + hostMetrics.host_disk_write_bytes) / 1024 / 1024)} MB`
+        : 'N/A'
+      }</div>
             </div>
           </div>
         </div>
@@ -929,54 +952,48 @@ const AdminDashboardNew = ({
 
   return (
     <div className="space-y-4 max-w-full overflow-hidden">
+      {/* Top Right-Aligned Toolbar */}
+      <div className="bg-gray-50 dark:bg-gray-800 px-3 py-2">
+        <div className="flex justify-end">
+          <div className="flex flex-nowrap items-center space-x-4">
 
-      {/* Top Section: GreenMatrix Panel Header (Left) + Cost Calculation (Middle) + Calendar & Report (Right) */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-2 bag">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 items-center title-dash">
-
-          {/* GreenMatrix Panel Title (Left 1/3) */}
-          <div className="flex items-center">
-            <h1 className="text-xl font-bold text-gray-900 dark:text-white font">GreenMatrix Panel</h1>
-          </div>
-
-          {/* Cost Calculation Region (Middle 1/3) */}
-          <div className="flex items-center justify-start pl-2">
+            {/* Cost Calculation Region */}
             <select
               value={selectedRegion}
               onChange={(e) => setSelectedRegion(e.target.value)}
-              className="px-2 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg border border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] text-sm w-36"
+              className="px-6 py-2.5 bg-gray-50 dark:bg-gray-700 text-xl font-lite text-gray-500 dark:text-white rounded-lg border border-gray-400 dark:border-gray-600 text-sm w-90 h-12 focus:ring-2 focus:ring-[#01a982]"
             >
-              <option value="">Cost Region</option>
+              <option default value="">Cost Calculation Region</option>
               {availableRegions.map(region => (
                 <option key={region.code} value={region.code}>
                   {region.code} - {region.currency}
                 </option>
               ))}
             </select>
-          </div>
 
-          {/* Date Selection & Report Button (Right 1/3) */}
-          <div className="flex items-center justify-end gap-1">
+            {/* View Mode Dropdown */}
             <select
               value={viewMode}
               onChange={(e) => setViewMode(e.target.value)}
-              className="px-2 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg border border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-blue-600 focus:border-blue-600 text-sm w-20"
+              className="px-4 py-2.5 bg-gray-50 dark:bg-gray-700 text-xl font-lite text-gray-500 dark:text-white rounded-lg border border-gray-400 dark:border-gray-600 text-xl w-85 h-12 focus:ring-2 focus:ring-[#01a982]"
             >
               <option value="day">Daily</option>
               <option value="week">Weekly</option>
               <option value="month">Monthly</option>
             </select>
 
+            {/* Start Date Picker */}
             <DatePicker
               selected={dateRange.start}
               onChange={(date) => setDateRange(prev => ({ ...prev, start: date }))}
               minDate={minDate}
               maxDate={maxDate}
-              className="px-1 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded border border-gray-300 dark:border-gray-600 focus:ring-1 focus:ring-blue-600 focus:border-blue-600 text-xs w-16"
-              placeholderText="Start"
-              dateFormat="M/d"
+              className="max-w-32 px-4 py-2.5 bg-gray-50 dark:bg-gray-700 text-xl font-lite text-gray-500 dark:text-white rounded-lg border border-gray-400 dark:border-gray-600 text-xl h-12 focus:ring-2 focus:ring-[#01a982]"
+              placeholderText="mm/dd/yyyy"
+              dateFormat="MM/dd/yyyy"
             />
 
+            {/* End Date Picker */}
             <DatePicker
               selected={dateRange.end}
               onChange={(date) => setDateRange(prev => ({ ...prev, end: date }))}
@@ -985,33 +1002,31 @@ const AdminDashboardNew = ({
               endDate={dateRange.end}
               minDate={dateRange.start || minDate}
               maxDate={maxDate}
-              className="px-1 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded border border-gray-300 dark:border-gray-600 focus:ring-1 focus:ring-blue-600 focus:border-blue-600 text-xs w-16"
-              placeholderText="End"
-              dateFormat="M/d"
+              className="max-w-32 px-4 py-2.5 bg-gray-50 dark:bg-gray-700 text-xl font-lite text-gray-500 dark:text-white rounded-lg border border-gray-400 dark:border-gray-600 text-xl h-12 focus:ring-2 focus:ring-[#01a982]"
+              placeholderText="mm/dd/yyyy"
+              dateFormat="MM/dd/yyyy"
             />
-
+            {/* Report Button */}
             <button
               onClick={handleDownloadReport}
-              className="px-2 py-2 bg-[#01a982] hover:bg-[#019670] text-white rounded-lg font-medium text-xs flex items-center gap-1 transition-colors btn1"
+              className="px-6 py-2.5 bg-[#008060] hover:bg-[#00694d] text-white rounded-full text-base font-medium flex items-center gap-2 h-11 transition-colors"
             >
               Report
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
+              <Download className="w-5 h-5" />
             </button>
           </div>
-
         </div>
       </div>
 
+
       {/* System Overview Section */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+      {/* <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
         <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">System Overview</h2>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6"> */}
 
-          {/* Live Performance Metrics (Left) */}
-          <div className="relative">
+      {/* Live Performance Metrics (Left) */}
+      {/* <div className="relative">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Live Performance Metrics</h3>
               <div className="flex items-center gap-2">
@@ -1042,16 +1057,16 @@ const AdminDashboardNew = ({
                   <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2 mt-2">
                     <div
                       className={`bg-${metric.color}-500 h-2 rounded-full transition-all duration-300`}
-                      style={{width: `${Math.min(100, metric.value)}%`}}
+                      style={{ width: `${Math.min(100, metric.value)}%` }}
                     />
                   </div>
                 </div>
               ))}
             </div>
-          </div>
+          </div> */}
 
-          {/* Hardware Details (Right) */}
-          <div className="relative">
+      {/* Hardware Details (Right) */}
+      {/* <div className="relative">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Hardware Details</h3>
               <div className="flex items-center gap-2">
@@ -1092,22 +1107,167 @@ const AdminDashboardNew = ({
                   </div>
                 );
               })}
+            </div> */}
+      {/* </div>
+        </div>
+      </div> */}
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        {/* Hardware Overview (Left, wider card) */}
+        <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 flex flex-col h-full">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-[24px] font-normal text-gray-900 dark:text-white">Hardware Overview</h3>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setHardwareCardIndex(Math.max(0, hardwareCardIndex - 1))}
+                disabled={hardwareCardIndex === 0}
+                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setHardwareCardIndex(Math.min(hardwareDetails.length - 2, hardwareCardIndex + 1))}
+                disabled={hardwareCardIndex >= hardwareDetails.length - 2}
+                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
           </div>
+
+          <div className="grid grid-cols-3 gap-4 flex-grow">
+            {hardwareDetails
+              .slice(hardwareCardIndex, hardwareCardIndex + 3)
+              .map((detail, index) => {
+                const IconComponent = detail.icon;
+
+                // Optional: Assign colors dynamically by type or index
+                const bgColor =
+                  detail.label === 'CPU Model'
+                    ? 'bg-pink-100 dark:bg-pink-900'
+                    : detail.type === 'GPU Model'
+                      ? 'bg-orange-100 dark:bg-orange-900'
+                      : detail.type === 'Memory'
+                        ? 'bg-teal-100 dark:bg-teal-900'
+                        : detail.type === 'Storage'
+                          ? 'bg-indigo-100 dark:bg-indigo-900'
+                          : detail.label === 'Operating System'
+                            ? 'bg-yellow-100 dark:bg-yellow-900'
+                            : ['bg-gray-100 dark:bg-gray-700', 'bg-purple-100 dark:bg-purple-900', 'bg-green-100 dark:bg-green-900'][index % 3]; // fallback colors
+
+                return (
+                  <div
+                    key={index}
+                    className={`${bgColor} rounded-lg p-4 text-center cursor-pointer hover:brightness-95 transition-colors`}
+                    onClick={() => handleHardwareCardClick(detail)}
+                    title={`Click for detailed ${detail.label} information`}
+                  >
+                    <div className="flex justify-left mb-2">
+                      <IconComponent className="w-8 h-8 text-gray-600 dark:text-gray-600" />
+                    </div>
+                    <div className="flex flex-col items-start">
+                      <div className="text-lg text-gray-900 font-medium dark:text-gray-400 py-2">
+                        {detail.label}
+                      </div>
+                      <div className="text-sm font-semibold text-gray-500 dark:text-white truncate">
+                        {hardwareLoading ? 'Loading...' : detail.value}
+                      </div>
+                    </div>
+
+                  </div>
+                );
+              })}
+          </div>
         </div>
+
+        {/* Power & Cost Overview (Right, narrower card) */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 flex flex-col h-full">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-[24px] font-normal text-gray-900 dark:text-white">
+              Power & Cost Overview
+            </h3>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCostCardIndex(Math.max(0, costCardIndex - 2))}
+                disabled={costCardIndex === 0}
+                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() =>
+                  setCostCardIndex(
+                    Math.min(powerCostDetails.length - 2, costCardIndex + 2)
+                  )
+                }
+                disabled={costCardIndex >= powerCostDetails.length - 2}
+                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Cards Grid */}
+          <div className="grid grid-cols-2 gap-4 flex-grow">
+            {powerCostDetails
+              .slice(costCardIndex, costCardIndex + 2)
+              .map((detail, index) => {
+                const IconComponent = detail.icon;
+                return (
+                  <div
+                    key={index}
+                    className="bg-white rounded-lg p-4 text-left shadow-sm border border-gray-200 dark:border-gray-700 bocursor-pointer hover:brightness-95 transition-colors"
+                    title={`Click for detailed ${detail.label} information`}
+                  >
+                    <div className="flex justify-left mb-2">
+                      <IconComponent className="w-8 h-8" />
+                    </div>
+                    <div className="flex flex-col items-start">
+                      <h4 className="text-[18px] font-semibold text-gray-900 dark:text-white py-2">
+                        {detail.label}
+                      </h4>
+                      <p className="text-green-600 dark:text-green-400 font-bold text-md py-1">
+                        {detail.value}
+                      </p>
+                      {/* Extra details */}
+                      {detail.details?.map((d, i) => (
+                        <p
+                          key={i}
+                          className="text-xs text-gray-500 dark:text-gray-400"
+                        >
+                          {d}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+        </div>
+
       </div>
 
-      {/* Middle Section: Performance Analytics (Left) + VM Monitoring & Insights (Right) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-        {/* Performance Analytics (Left Half) */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-          <div className="flex items-center justify-between mb-4 perform-dash">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white h31">Performance Analytics</h3>
+      {/* Middle Section: Performance Analytics (Left) + VM Monitoring & Insights (Right) */}
+      <div className="grid grid-cols-5 gap-6">
+
+        {/* Performance Analytics (Revised Layout) */}
+        <div className="col-span-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 pt-4 w-full max-w-xl">
+          {/* Title at top-left */}
+          <div className="flex items-center justify-between mb-8">
+            <h3 className="text-[24px] font-normal text-gray-900 dark:text-white">
+              Performance Analytics
+            </h3>
+          </div>
+
+          {/* Dropdown centered below title */}
+          <div className="flex justify-center mb-6">
             <select
               value={selectedGraph}
               onChange={(e) => setSelectedGraph(e.target.value)}
-              className="px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg border border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982]"
+              className="px-6 py-2 my-3 text-lg bg-white dark:bg-gray-700 text-gray-700 dark:text-white rounded-md border border-gray-400 dark:border-gray-600 w-120 h-10 focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982]"
             >
               {graphOptions.map(option => (
                 <option key={option.value} value={option.value}>
@@ -1117,36 +1277,39 @@ const AdminDashboardNew = ({
             </select>
           </div>
 
-          <div className="h-80">
+          {/* Bar chart centered below dropdown */}
+          <div className="h-80 flex justify-center items-center">
             {chartData ? (
-              <Bar
-                data={chartData}
-                options={{
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                      backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                      titleColor: 'white',
-                      bodyColor: 'white',
-                    }
-                  },
-                  scales: {
-                    x: {
-                      ticks: { maxRotation: 45, minRotation: 45, font: { size: 10 } },
-                      grid: { display: false }
+              <div className="w-full">
+                <Bar
+                  data={chartData}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                      legend: { display: false },
+                      tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        titleColor: 'white',
+                        bodyColor: 'white',
+                      }
                     },
-                    y: {
-                      beginAtZero: true,
-                      grid: { color: 'rgba(0, 0, 0, 0.05)' }
+                    scales: {
+                      x: {
+                        ticks: { maxRotation: 45, minRotation: 45, font: { size: 10 } },
+                        grid: { display: false }
+                      },
+                      y: {
+                        beginAtZero: true,
+                        grid: { color: 'rgba(0, 0, 0, 0.05)' }
+                      }
+                    },
+                    elements: {
+                      bar: { borderRadius: 4 }
                     }
-                  },
-                  elements: {
-                    bar: { borderRadius: 4 }
-                  }
-                }}
-              />
+                  }}
+                />
+              </div>
             ) : (
               <div className="flex items-center justify-center h-full">
                 <div className="text-center">
@@ -1158,21 +1321,28 @@ const AdminDashboardNew = ({
           </div>
         </div>
 
+
         {/* Right Column: VM Monitoring + System Insights */}
-        <div className="space-y-6">
+        <div className="col-span-3 grid grid-rows-2 gap-6 h-full">
 
           {/* VM Monitoring Section (Top Right) */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 pt-4 h-full">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Current VM Instances</h3>
+              {/* Header left */}
+              <h3 className="text-[24px] font-normal text-gray-900 dark:text-white">
+                Current VM Instances
+              </h3>
+
+              {/* Button right */}
               <button
                 onClick={fetchVMData}
-                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+                className="flex items-center justify-center w-8 h-8 rounded-full border border-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                 disabled={vmDataLoading}
               >
-                <div className={`w-4 h-4 ${vmDataLoading ? 'animate-spin' : ''}`}>⟳</div>
+                <div className={`text-sm ${vmDataLoading ? 'animate-spin' : ''}`}>⟳</div>
               </button>
             </div>
+
 
             <div className="space-y-2 max-h-40 overflow-y-auto">
               {vmDataLoading ? (
@@ -1188,7 +1358,7 @@ const AdminDashboardNew = ({
                   <p className="text-gray-500 dark:text-gray-400 mb-4">No VM Instances Found</p>
                   <button
                     onClick={fetchVMData}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors btn3"
+                    className="px-4 py-2 bg-green-30 text-white rounded-lg hover:bg-green-30 transition-colors btn3"
                   >
                     Retry
                   </button>
@@ -1237,7 +1407,7 @@ const AdminDashboardNew = ({
           </div>
 
           {/* System Insights & Recommendations (Bottom Right) */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+          <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 pt-4 h-full">
             <SystemInsightsGenerator
               processData={topProcesses}
               vmData={vmData || []}
@@ -1252,106 +1422,91 @@ const AdminDashboardNew = ({
       {/* Process Monitoring Section */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
         <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Process Performance & Cost Analysis</h3>
+          <div className="flex items-center justify-between mb-12">
+            <h3 className="text-[24px] font-normal text-gray-900">
+              Process Performance & Cost Analysis
+            </h3>
           </div>
+
 
           {/* Search and Filter Bar */}
-          <div className="mt-4 flex items-center gap-3">
-            <div className="relative">
+          <div className="mt-2 flex items-center gap-3">
+            {/* Search Input with Icon */}
+            <div className="relative w-[400px]"> {/* wider input */}
               <input
                 type="text"
-                placeholder="Search processes..."
-                className="process-search-input"
+                placeholder="Search"
+                className="w-full pl-10 pr-4 py-2 border border-gray-400 rounded-lg text-gray-700 placeholder-gray-500 text-base focus:outline-none focus:ring-1 focus:ring-gray-500"
               />
-              <svg
-                className="process-search-icon"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
-              </svg>
+              <Search
+                className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5  font-bolder text-gray-900"
+              />
             </div>
-            <button className="process-filter-button">
-              <svg
-                className="process-filter-icon"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.707A1 1 0 013 7V4z"
-                />
-              </svg>
 
+            {/* Filter Button */}
+            <button className="p-2 border border-gray-400 rounded-lg hover:bg-gray-100 transition-colors">
+              <Funnel className="w-5 h-5 text-gray-600" />
             </button>
           </div>
+
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 dark:bg-gray-700">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Process</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">User</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">CPU %</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Memory</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">GPU %</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">GPU Mem</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Power (W)</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Cost ({currentRegion.currency}/hr)</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Status</th>
+          <table className="w-full border-collapse justify-center">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-300">
+                <th className="px-4 py-3 text-left text-[18px] font-medium text-gray-700">
+                  Process
+                </th>
+                <th className="px-4 py-3 text-left text-[18px] font-medium text-gray-900">
+                  User
+                </th>
+                <th className="px-4 py-3 text-left text-[18px] font-medium text-gray-900">
+                  CPU %
+                </th>
+                <th className="px-4 py-3 text-left text-[18px] font-medium text-gray-900">
+                  Memory
+                </th>
+                <th className="px-4 py-3 text-left text-[18px] font-medium text-gray-900">
+                  Status
+                </th>
               </tr>
             </thead>
-            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+            <tbody>
               {topProcesses.slice(0, 5).map((process, index) => (
                 <tr
                   key={process['Process ID'] || index}
                   onClick={() => handleProcessClick(process)}
-                  className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  className={
+                    index % 2 === 1
+                      ? "bg-gray-50 cursor-pointer"
+                      : "bg-white cursor-pointer"
+                  }
                 >
-                  <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white truncate">
-                    {process['Process Name'] || 'Unknown'}
+                  <td className="px-4 py-3 text-md text-gray-600">
+                    {process['Process Name'] || 'Unknown'} PID: {process['Process ID']}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                  <td className="px-4 py-3 text-md text-gray-600">
                     {process['Username'] || 'System'}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
+                  <td className="px-4 py-3 text-md text-gray-600">
                     {(process['CPU Usage (%)'] || 0).toFixed(1)}%
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
-                    {(process['Memory Usage (MB)'] || 0).toFixed(1)} MB
+                  <td className="px-4 py-3 text-md text-gray-600">
+                    {(process['Memory Usage (MB)'] || 0).toFixed(1)}MB,{" "}
+                    {(process['Memory Usage (%)'] || 0).toFixed(1)}%
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
-                    <span className={`${(process['GPU Utilization (%)'] || 0) > 70 ? 'text-red-600' : (process['GPU Utilization (%)'] || 0) > 30 ? 'text-yellow-600' : 'text-green-600'}`}>
-                      {(process['GPU Utilization (%)'] || 0).toFixed(1)}%
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
-                    {(process['GPU Memory Usage (MB)'] || 0).toFixed(0)} MB
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
-                    {(process['Power Consumption (W)'] || 0).toFixed(1)}W
-                  </td>
-                  <td className="px-4 py-3 text-sm font-medium text-[#01a982] dark:text-[#6ee7b7]">
-                    {currentRegion.currency}{(process['Energy Cost ($)'] || 0).toFixed(4)}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      process.Status === 'running'
-                        ? 'bg-[#ecfdf5] text-[#01a982] dark:bg-[#064e3b] dark:text-[#6ee7b7]'
-                        : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-                    }`}>
-                      {process.Status || 'running'}
+                  <td className="px-4 py-3 text-md font-medium">
+                    <span
+                      className={
+                        process.Status === "Running"
+                          ? "text-green-600"
+                          : process.Status === "Idle"
+                            ? "text-yellow-500"
+                            : "text-red-600"
+                      }
+                    >
+                      {process.Status || "Unknown"}
                     </span>
                   </td>
                 </tr>
@@ -1360,12 +1515,13 @@ const AdminDashboardNew = ({
           </table>
         </div>
 
+
         {/* View All Button at Bottom */}
         <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700">
           <div className="flex justify-end">
             <button
               onClick={() => navigate('/processes')}
-              className="px-4 py-2 bg-[#01a982] text-white text-sm rounded-lg hover:bg-[#019670] transition-colors btn2"
+              className="px-6 py-2.5 bg-[#008060] hover:bg-[#00694d] text-white font-bold rounded-full text-md flex items-center gap-2 h-11 transition-colors"
             >
               View All
             </button>

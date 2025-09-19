@@ -255,20 +255,22 @@ const SimulateTab = () => {
   return (
     <div className="main">
       <div className="para">
-
+      <h1 className="text-4xl font-medium mb-6" style={{ color: '#16a34a' }}>
+        GreenMatrix Panel
+      </h1>
 
         {/* Outer Container */}
-        <div className="w-full max-w-6xl mx-auto bg-white rounded-lg shadow-sm border border-gray-200 p-6 para1">
-          <div className="paraetext-lg font-semibold text-gray-900 dark:text-white text7">Simulate Performance</div>
+        <div className="w-full mx-auto bg-white rounded-lg shadow-sm border border-gray-200 p-6 para1">
+          <div className="text-[24px] font-normal text-gray-900 dark:text-white">Simulate Performance</div>
 
           {/* Inner Container */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 max-w-6xl mx-auto mt-4 bgr">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mx-auto mt-4 bgr">
             {/* Header Section */}
             <div className="mb-4">
-              <h1 className="text-xl font-bold text-gray-900 dark:text-white mb-1 text6">
+              <h1 className="text-[23px] font-bold text-gray-900 dark:text-white mb-2 text6">
                 Simulate Parameters
               </h1>
-              <p className="text-sm text-gray-600 dark:text-gray-300">
+              <p className="text-md text-gray-600 dark:text-gray-300 ml-1">
                 Enter your AI workload details to simulate performance across different hardware options.
               </p>
 
@@ -299,10 +301,10 @@ const SimulateTab = () => {
         )}
       </div>
 
-      <div className="simulate-form-grid">
+      <div className="simulate-form-grid ml-1">
         {/* Model Name */}
         <div>
-          <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          <label className="flex items-center gap-2 text-md font-medium text-gray-600 dark:text-gray-300 mb-2">
             Model Name
             <div className="relative">
               <Info 
@@ -322,7 +324,7 @@ const SimulateTab = () => {
             <select
               value={modelName}
               onChange={(e) => setModelName(e.target.value)}
-              className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
+              className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-lg text-gray-600 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
               disabled={isLoadingDropdowns}
             >
               <option value="">
@@ -344,7 +346,7 @@ const SimulateTab = () => {
 
         {/* Framework */}
         <div>
-          <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          <label className="flex items-center gap-2 text-md font-medium text-gray-600 dark:text-gray-300 mb-2">
             Framework
             <div className="relative">
               <Info 
@@ -364,7 +366,7 @@ const SimulateTab = () => {
             <select
               value={framework}
               onChange={(e) => setFramework(e.target.value)}
-              className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
+              className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-lg text-gray-600 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
               disabled={isLoadingModelData}
             >
               <option value="">Select framework</option>
@@ -385,7 +387,7 @@ const SimulateTab = () => {
 
         {/* Task Type */}
         <div className="relative">
-          <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          <label className="flex items-center gap-2 text-md font-medium text-gray-600 dark:text-gray-300 mb-2">
             Task Type
             <div className="relative">
               <Info 
@@ -405,7 +407,7 @@ const SimulateTab = () => {
             <select
               value={taskType}
               onChange={(e) => setTaskType(e.target.value)}
-              className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-lg text-gray-600 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
               disabled={isLoadingModelData || isLoadingDropdowns}
             >
               <option value="">Select task type</option>
@@ -422,7 +424,7 @@ const SimulateTab = () => {
 
         {/* Scenario */}
         <div>
-          <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          <label className="flex items-center gap-2 text-md font-medium text-gray-600 dark:text-gray-300 mb-2">
             Scenario
             <div className="relative">
               <Info 
@@ -442,7 +444,7 @@ const SimulateTab = () => {
             <select
               value={scenario}
               onChange={(e) => setScenario(e.target.value)}
-              className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
+              className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-lg text-gray-600 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
             >
               <option value="Single Stream">Single Stream</option>
               <option value="Server">Server</option>
@@ -457,7 +459,7 @@ const SimulateTab = () => {
 
         {/* Model Size */}
         <div>
-          <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          <label className="flex items-center gap-2 text-md font-medium text-gray-600 dark:text-gray-300 mb-2">
             Model Size (MB)
             <div className="relative">
               <Info 
@@ -485,7 +487,7 @@ const SimulateTab = () => {
 
         {/* Parameters */}
         <div>
-          <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          <label className="flex items-center gap-2 text-md font-medium text-gray-600 dark:text-gray-300 mb-2">
             Parameters (Millions)
             <div className="relative">
               <Info 
@@ -513,7 +515,7 @@ const SimulateTab = () => {
 
         {/* FLOPs */}
         <div>
-          <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          <label className="flex items-center gap-2 text-md font-medium text-gray-600 dark:text-gray-300 mb-2">
             GFLOPs (Billions)
             <div className="relative">
               <Info 
@@ -544,7 +546,7 @@ const SimulateTab = () => {
           <>
             {/* Batch Size */}
             <div>
-              <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="flex items-center gap-2 text-md font-medium text-gray-600 dark:text-gray-300 mb-2">
                 Batch Size
                 <div className="relative">
                   <Info 
@@ -572,7 +574,7 @@ const SimulateTab = () => {
 
             {/* Input Size */}
             <div>
-              <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="flex items-center gap-2 text-md font-medium text-gray-600 dark:text-gray-300 mb-2">
                 Input Size
                 <div className="relative">
                   <Info 
@@ -935,11 +937,11 @@ const SimulateTab = () => {
       )}
 
       {/* Action Buttons */}
-      <div className="mt-8 flex justify-center gap-4">
+      <div className="mt-6 flex justify-end gap-4 my-3">
         <button 
           onClick={handleRunSimulation}
           disabled={isLoadingModelData || isLoadingDropdowns || isRunningSimulation || !modelName || !taskType}
-          className="px-8 py-3 bg-gradient-to-r from-[#01a982] to-[#00d4aa] text-white font-medium rounded-lg hover:from-[#019670] hover:to-[#00c299] transform hover:scale-105 transition-all duration-200 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+          className="px-5 py-2.5 bg-gray-100 hover:bg-gray-300 text-emerald-700 rounded-full border text-lg font-medium flex items-center gap-2 h-11 transition-colors"
         >
           {isRunningSimulation ? (
             <div className="flex items-center gap-2">
