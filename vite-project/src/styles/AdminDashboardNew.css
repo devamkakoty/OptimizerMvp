@@ -893,3 +893,14 @@
 .bgr{
     background-color: transparent;
 }
+
+/* Override the input styles completely */
+.react-datepicker__input-container input {
+  width: 100% !important;
+  line-height: 1.25rem !important;
+  border-radius: 0.5rem !important;
+  transition: all 0.15s ease-in-out !important;
+  cursor: pointer !important;
+  min-width: 150px !important;
+  box-shadow: none !important;
+}
