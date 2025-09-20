@@ -1218,7 +1218,7 @@ const AdminDashboardNew = ({
                 return (
                   <div
                     key={index}
-                    className="bg-white rounded-lg p-4 text-left shadow-sm border border-gray-200 dark:border-gray-700 bocursor-pointer hover:brightness-95 transition-colors"
+                    className="bg-white rounded-lg p-4 text-left shadow-sm border dark:bg-gray-800 border-gray-200 dark:border-gray-700 bocursor-pointer hover:brightness-95 transition-colors"
                     title={`Click for detailed ${detail.label} information`}
                   >
                     <div className="flex justify-left mb-2">
@@ -1420,10 +1420,10 @@ const AdminDashboardNew = ({
       </div>
 
       {/* Process Monitoring Section */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+      <div className="bg-white dark:bg-gray-800 rounded-xl  shadow-sm border border-gray-200 dark:border-gray-700">
+        <div className="px-6 py-4 border-b border-gray-200 dark:text-white dark:border-gray-700">
           <div className="flex items-center justify-between mb-12">
-            <h3 className="text-[24px] font-normal text-gray-900">
+            <h3 className="text-[24px] dark:text-white font-normal text-gray-900">
               Process Performance & Cost Analysis
             </h3>
           </div>
@@ -1436,7 +1436,7 @@ const AdminDashboardNew = ({
               <input
                 type="text"
                 placeholder="Search"
-                className="w-full pl-10 pr-4 py-2 border border-gray-400 rounded-lg text-gray-700 placeholder-gray-500 text-base focus:outline-none focus:ring-1 focus:ring-gray-500"
+                className="w-full pl-10 pr-4 py-2 border border-gray-400 dark:bg-gray-800 dark:border-gray-700 rounded-lg text-gray-700 placeholder-gray-500 text-base focus:outline-none focus:ring-1 focus:ring-gray-500"
               />
               <Search
                 className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5  font-bolder text-gray-900"
@@ -1454,20 +1454,20 @@ const AdminDashboardNew = ({
         <div className="overflow-x-auto">
           <table className="w-full border-collapse justify-center">
             <thead>
-              <tr className="bg-gray-50 border-b border-gray-300">
-                <th className="px-4 py-3 text-left text-[18px] font-medium text-gray-700">
+              <tr className="bg-gray-50 dark:bg-gray-800 border-b border-gray-300">
+                <th className="px-4 py-3 text-left text-[18px] font-medium dark:text-gray-300 text-gray-900">
                   Process
                 </th>
-                <th className="px-4 py-3 text-left text-[18px] font-medium text-gray-900">
+                <th className="px-4 py-3 text-left text-[18px] font-medium dark:text-gray-300 text-gray-900">
                   User
                 </th>
-                <th className="px-4 py-3 text-left text-[18px] font-medium text-gray-900">
+                <th className="px-4 py-3 text-left text-[18px] font-medium dark:text-gray-300 text-gray-900">
                   CPU %
                 </th>
-                <th className="px-4 py-3 text-left text-[18px] font-medium text-gray-900">
+                <th className="px-4 py-3 text-left text-[18px] font-medium  dark:text-gray-300 text-gray-900">
                   Memory
                 </th>
-                <th className="px-4 py-3 text-left text-[18px] font-medium text-gray-900">
+                <th className="px-4 py-3 text-left text-[18px] font-medium dark:text-gray-300 text-gray-900">
                   Status
                 </th>
               </tr>

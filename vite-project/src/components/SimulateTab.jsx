@@ -264,7 +264,7 @@ const SimulateTab = () => {
           <div className="text-[24px] font-normal text-gray-900 dark:text-white">Simulate Performance</div>
 
           {/* Inner Container */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mx-auto mt-4 bgr">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 p-4 mx-auto mt-4 bgr">
             {/* Header Section */}
             <div className="mb-4">
               <h1 className="text-[23px] font-bold text-gray-900 dark:text-white mb-2 text6">

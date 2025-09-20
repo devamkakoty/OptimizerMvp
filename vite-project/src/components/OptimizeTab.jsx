@@ -1789,7 +1789,7 @@ const OptimizeTab = () => {
 
         {/* Tabs */}
         <div className="mt-6">
-          <div className="dark:bg-gray-800 shadow-sm dark:border-gray-700 overflow-hidden">
+          <div className="shadow-sm dark:border-gray-700 overflow-hidden">
             <div className="flex space-x-6">
               {/* Pre-Deployment Tab */}
               <button
@@ -1835,7 +1835,7 @@ const OptimizeTab = () => {
 
 
         {/* Inner Container */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mt-4 bgr">
+        <div className="bg-white rounded-lg shadow-sm border dark:bg-gray-800 border-gray-200 p-4 mt-4 bgr">
           {/* Header Section */}
           <div className="mb-4">
             {/* Loading Indicators */}

@@ -236,7 +236,7 @@ const ModelTab = () => {
               )}
             </div>
 
-            <div className="simulate-form-grid rounded-lg border border-gray-200 p-6">
+            <div className="simulate-form-grid dark:bg-gray-800 rounded-lg border border-gray-200 p-6">
               {/* Model Name */}
               <div>
                 <label className="flex items-center gap-2 text-md font-medium text-gray-600 dark:text-gray-300 mb-2">
