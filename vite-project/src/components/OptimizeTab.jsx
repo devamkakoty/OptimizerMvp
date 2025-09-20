@@ -1109,14 +1109,16 @@ const OptimizeTab = () => {
         </div>
       </div> */}
 
-      {/* Post-Deployment Section with Sub-tabs */}
-      {optimizationMode === 'post-deployment' && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-8 mb-6">
-          {/* Post-Deployment Mode Selector */}
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">Post-Deployment Optimization</h2>
-              <div className="flex gap-4">
+      {/* Main Form Section */}
+      <h1 className="text-4xl font-medium mb-6" style={{ color: '#16a34a' }}>
+        GreenMatrix Panel
+      </h1>
+      <div className="w-full bg-white rounded-lg shadow-sm border border-gray-200 p-6 para1">
+        <div className='flex items-center justify-between mb-4'>
+          <div className="text-[24px] font-normal text-gray-900 dark:text-white">
+            {optimizationMode === 'pre-deployment' ? 'Recommend Hardware' : 'Post-Deployment Optimization'}
+          </div>
+          <div className="flex gap-4">
                 <button
                   onClick={() => setIsOverrideEnabled(!isOverrideEnabled)}
                   className={`flex items-center gap-2 text-sm transition-colors ${isOverrideEnabled
@@ -1149,15 +1151,52 @@ const OptimizeTab = () => {
                   )}
                 </button>
               </div>
-            </div>
+        </div>
 
+        {/* Tabs */}
+        <div className="mt-6">
+          <div className="shadow-sm dark:border-gray-700 overflow-hidden">
+            <div className="flex space-x-6">
+              {/* Pre-Deployment Tab */}
+              <button
+                onClick={() => setOptimizationMode('pre-deployment')}
+                className={`flex items-center gap-2 pb-2 text-base font-medium border-b-2 transition-all ${optimizationMode === 'pre-deployment'
+                    ? 'text-emerald-700 border-emerald-700 text-xl'
+                    : 'text-gray-600 dark:text-gray-300 border-transparent hover:text-emerald-700 hover:border-emerald-700 text-xl'
+                  }`}
+              >
+                <CodeXml className="w-4 h-4" />
+                <span>Pre-Deployment</span>
+              </button>
+
+              {/* Post-Deployment Tab */}
+              <button
+                onClick={() => setOptimizationMode('post-deployment')}
+                className={`flex items-center gap-2 pb-2 text-base font-medium border-b-2 transition-all ${optimizationMode === 'post-deployment'
+                    ? 'text-emerald-700 border-emerald-700 text-xl'
+                    : 'text-gray-600 dark:text-gray-300 border-transparent hover:text-emerald-700 hover:border-emerald-700 text-xl'
+                  }`}
+              >
+                <CodeXml className="w-4 h-4" />
+                <span>Post-Deployment</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Place your code here */}
+        {/* Post-Deployment Section with Sub-tabs */}
+      {optimizationMode === 'post-deployment' && (
+        <div className="bg-gray-50 dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-8 mb-6">
+          {/* Post-Deployment Mode Selector */}
+          <div className="mb-6">
             {/* Sub-tabs for Post-Deployment */}
             <div className="flex justify-center mb-6">
-              <div className="inline-flex items-center gap-2 bg-gray-100 dark:bg-gray-700 p-1 rounded-lg">
+              <div className="bg-white inline-flex items-center gap-2 shadow-sm border border-gray-200 dark:border-gray-700 dark:bg-gray-700 p-1 rounded-lg">
                 <button
                   onClick={() => setPostDeploymentMode('bare-metal')}
                   className={`px-4 py-2 rounded-md font-medium text-sm transition-all ${postDeploymentMode === 'bare-metal'
-                    ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
+                    ? 'bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
                     : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
                     }`}
                 >
@@ -1166,7 +1205,7 @@ const OptimizeTab = () => {
                 <button
                   onClick={() => setPostDeploymentMode('vm-level')}
                   className={`px-4 py-2 rounded-md font-medium text-sm transition-all ${postDeploymentMode === 'vm-level'
-                    ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
+                    ? 'bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
                     : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
                     }`}
                 >
@@ -1180,7 +1219,7 @@ const OptimizeTab = () => {
           {postDeploymentMode === 'bare-metal' && (
             <div>
               <div className="mb-4">
-                <p className="text-gray-600 dark:text-gray-300">Real-time resource utilization metrics of Bare Metal Host Machine</p>
+                <p className="text-md text-gray-500 dark:text-gray-300">Real-time resource utilization metrics of Bare Metal Host Machine</p>
               </div>
 
               {/* Host Metrics Status Indicator */}
@@ -1212,7 +1251,7 @@ const OptimizeTab = () => {
               <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
                 {/* GPU Utilization */}
                 <div>
-                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="flex items-center gap-2 text-md font-medium text-gray-700 dark:text-gray-300 mb-2">
                     GPU Utilization
                     <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                   </label>
@@ -1227,8 +1266,8 @@ const OptimizeTab = () => {
                       max="100"
                     />
                   ) : (
-                    <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                      <div className="text-lg font-semibold text-gray-500 dark:text-gray-400">
+                    <div className="bg-white border border-gray-300 dark:bg-gray-700 rounded-lg p-3">
+                      <div className="text-md font-medium text-gray-800 dark:text-gray-400">
                         {gpuUtilization}%
                       </div>
                     </div>
@@ -1237,7 +1276,7 @@ const OptimizeTab = () => {
 
                 {/* GPU Memory Usage */}
                 <div>
-                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="flex items-center gap-2 text-md font-medium text-gray-700 dark:text-gray-300 mb-2">
                     GPU Memory Usage
                     <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                   </label>
@@ -1252,8 +1291,8 @@ const OptimizeTab = () => {
                       max="100"
                     />
                   ) : (
-                    <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                      <div className="text-lg font-semibold text-gray-500 dark:text-gray-400">
+                    <div className="bg-white border border-gray-300 dark:bg-gray-700 rounded-lg p-3">
+                      <div className="text-md font-medium text-gray-800 dark:text-gray-400">
                         {gpuMemoryUsage}%
                       </div>
                     </div>
@@ -1262,7 +1301,7 @@ const OptimizeTab = () => {
 
                 {/* CPU Utilization */}
                 <div>
-                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="flex items-center gap-2 text-md font-medium text-gray-700 dark:text-gray-300 mb-2">
                     CPU Utilization
                     <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                   </label>
@@ -1277,8 +1316,8 @@ const OptimizeTab = () => {
                       max="100"
                     />
                   ) : (
-                    <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                      <div className="text-lg font-semibold text-gray-500 dark:text-gray-400">
+                    <div className="bg-white border border-gray-300 dark:bg-gray-700 rounded-lg p-3">
+                      <div className="text-md font-medium text-gray-800 dark:text-gray-400">
                         {cpuUtilization}%
                       </div>
                     </div>
@@ -1287,7 +1326,7 @@ const OptimizeTab = () => {
 
                 {/* CPU Memory Usage */}
                 <div>
-                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="flex items-center gap-2 text-md font-medium text-gray-700 dark:text-gray-300 mb-2">
                     CPU Memory Usage
                     <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                   </label>
@@ -1302,8 +1341,8 @@ const OptimizeTab = () => {
                       max="100"
                     />
                   ) : (
-                    <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                      <div className="text-lg font-semibold text-gray-500 dark:text-gray-400">
+                    <div className="bg-white border border-gray-300 dark:bg-gray-700 rounded-lg p-3">
+                      <div className="text-md font-medium text-gray-800 dark:text-gray-400">
                         {cpuMemoryUsage}%
                       </div>
                     </div>
@@ -1312,7 +1351,7 @@ const OptimizeTab = () => {
 
                 {/* Disk IOPS */}
                 <div>
-                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="flex items-center gap-2 text-md font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Disk IOPS
                     <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                   </label>
@@ -1325,8 +1364,8 @@ const OptimizeTab = () => {
                       placeholder="Enter IOPS"
                     />
                   ) : (
-                    <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                      <div className="text-lg font-semibold text-gray-500 dark:text-gray-400">
+                    <div className="bg-white border border-gray-300 dark:bg-gray-700 rounded-lg p-3">
+                      <div className="text-md font-medium text-gray-800 dark:text-gray-400">
                         {diskIops} IOPS
                       </div>
                     </div>
@@ -1335,7 +1374,7 @@ const OptimizeTab = () => {
 
                 {/* Network Bandwidth */}
                 <div>
-                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="flex items-center gap-2 text-md font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Network Bandwidth
                     <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                   </label>
@@ -1348,8 +1387,8 @@ const OptimizeTab = () => {
                       placeholder="Enter MB/s"
                     />
                   ) : (
-                    <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                      <div className="text-lg font-semibold text-gray-500 dark:text-gray-400">
+                    <div className="bg-white border border-gray-300 dark:bg-gray-700 rounded-lg p-3">
+                      <div className="text-md font-medium text-gray-800 dark:text-gray-400">
                         {networkBandwidth} MB/s
                       </div>
                     </div>
@@ -1358,7 +1397,7 @@ const OptimizeTab = () => {
 
                 {/* Current Hardware ID */}
                 <div>
-                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="flex items-center gap-2 text-md font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Current Hardware
                     <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                   </label>
@@ -1778,45 +1817,8 @@ const OptimizeTab = () => {
         </div>
       )}
 
-      {/* Main Form Section */}
-      <h1 className="text-4xl font-medium mb-6" style={{ color: '#16a34a' }}>
-        GreenMatrix Panel
-      </h1>
-      <div className="w-full bg-white rounded-lg shadow-sm border border-gray-200 p-6 para1">
-        <div className="text-[24px] font-normal text-gray-900 dark:text-white">
-          {optimizationMode === 'pre-deployment' ? 'Recommend Hardware' : 'Optimize Hardware'}
-        </div>
 
-        {/* Tabs */}
-        <div className="mt-6">
-          <div className="shadow-sm dark:border-gray-700 overflow-hidden">
-            <div className="flex space-x-6">
-              {/* Pre-Deployment Tab */}
-              <button
-                onClick={() => setOptimizationMode('pre-deployment')}
-                className={`flex items-center gap-2 pb-2 text-base font-medium border-b-2 transition-all ${optimizationMode === 'pre-deployment'
-                    ? 'text-emerald-700 border-emerald-700 text-xl'
-                    : 'text-gray-600 dark:text-gray-300 border-transparent hover:text-emerald-700 hover:border-emerald-700 text-xl'
-                  }`}
-              >
-                <CodeXml className="w-4 h-4" />
-                <span>Pre-Deployment</span>
-              </button>
 
-              {/* Post-Deployment Tab */}
-              <button
-                onClick={() => setOptimizationMode('post-deployment')}
-                className={`flex items-center gap-2 pb-2 text-base font-medium border-b-2 transition-all ${optimizationMode === 'post-deployment'
-                    ? 'text-emerald-700 border-emerald-700 text-xl'
-                    : 'text-gray-600 dark:text-gray-300 border-transparent hover:text-emerald-700 hover:border-emerald-700 text-xl'
-                  }`}
-              >
-                <CodeXml className="w-4 h-4" />
-                <span>Post-Deployment</span>
-              </button>
-            </div>
-          </div>
-        </div>
         <h1 className="text-lg font-medium text-gray-900 dark:text-white my-2 mt-6">
               {optimizationMode === 'pre-deployment' ? 'Workload Parameters' : 'Runtime Parameters'}
             </h1>
