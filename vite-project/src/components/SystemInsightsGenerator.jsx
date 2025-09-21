@@ -20,15 +20,15 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode, 
     const totalCpuUsage = validProcessData.reduce((sum, p) => sum + (p['CPU Usage (%)'] || 0), 0);
     const totalMemoryUsage = validProcessData.reduce((sum, p) => sum + (p['Memory Usage (MB)'] || 0), 0);
     const avgCpuUsage = validProcessData.length > 0 ? totalCpuUsage / validProcessData.length : 0;
-    const avgMemoryUsagePercent = validProcessData.length > 0 ? 
+    const avgMemoryUsagePercent = validProcessData.length > 0 ?
       validProcessData.reduce((sum, p) => sum + (p['Memory Usage (%)'] || 0), 0) / validProcessData.length : 0;
-    
+
     // GPU metrics
-    const avgGpuMemoryUsage = validProcessData.length > 0 ? 
+    const avgGpuMemoryUsage = validProcessData.length > 0 ?
       validProcessData.reduce((sum, p) => sum + (p['GPU Memory (MB)'] || 0), 0) / validProcessData.length : 0;
-    const avgGpuUtilization = validProcessData.length > 0 ? 
+    const avgGpuUtilization = validProcessData.length > 0 ?
       validProcessData.reduce((sum, p) => sum + (p['GPU Util %'] || 0), 0) / validProcessData.length : 0;
-    
+
     const highCpuProcesses = validProcessData.filter(p => (p['CPU Usage (%)'] || 0) > 5);
     const highMemoryProcesses = validProcessData.filter(p => (p['Memory Usage (MB)'] || 0) > 500);
     const highGpuMemoryProcesses = validProcessData.filter(p => (p['GPU Memory (MB)'] || 0) > 100);
@@ -37,9 +37,9 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode, 
 
     // VM Analysis
     const runningVMs = validVmData.filter(vm => vm.status === 'Running');
-    const vmCpuAvg = runningVMs.length > 0 ? 
+    const vmCpuAvg = runningVMs.length > 0 ?
       runningVMs.reduce((sum, vm) => sum + (vm.cpuUsage || 0), 0) / runningVMs.length : 0;
-    const vmRamAvg = runningVMs.length > 0 ? 
+    const vmRamAvg = runningVMs.length > 0 ?
       runningVMs.reduce((sum, vm) => sum + (vm.ramUsagePercent || 0), 0) / runningVMs.length : 0;
     const underutilizedVMs = runningVMs.filter(vm => (vm.cpuUsage || 0) < 20 && (vm.ramUsagePercent || 0) < 30);
     const overutilizedVMs = runningVMs.filter(vm => (vm.cpuUsage || 0) > 80 || (vm.ramUsagePercent || 0) > 85);
@@ -134,7 +134,7 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode, 
     const cpuThreshold = viewMode === 'week' ? 25 : 30;
     const memoryThreshold = viewMode === 'week' ? 35 : 40;
     const gpuThreshold = viewMode === 'week' ? 20 : 25;
-    
+
     if (avgCpuUsage < cpuThreshold && avgMemoryUsagePercent < memoryThreshold && avgGpuUtilization < gpuThreshold) {
       const analysisContext = viewMode === 'week' ? 'consistently over the week' : 'during this period';
       analysis.cost.push({
@@ -149,7 +149,7 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode, 
         difficulty: 'Medium'
       });
     }
-    
+
     // GPU-specific cost optimization
     if (avgGpuUtilization < 10 && avgGpuMemoryUsage < 50) {
       const analysisContext = viewMode === 'week' ? 'consistently over the week' : 'during this period';
@@ -202,7 +202,7 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode, 
       if (avgCpuUsage > 75) resourceDetails.push(`CPU: ${avgCpuUsage.toFixed(1)}%`);
       if (avgMemoryUsagePercent > 80) resourceDetails.push(`Memory: ${avgMemoryUsagePercent.toFixed(1)}%`);
       if (avgGpuUtilization > 85) resourceDetails.push(`GPU: ${avgGpuUtilization.toFixed(1)}%`);
-      
+
       analysis.scaling.push({
         type: 'warning',
         priority: 'high',
@@ -214,7 +214,7 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode, 
         difficulty: 'Medium'
       });
     }
-    
+
     // GPU-specific scaling recommendation
     if (highGpuUtilProcesses.length > 3 && avgGpuMemoryUsage > 80) {
       analysis.scaling.push({
@@ -268,7 +268,7 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode, 
         difficulty: 'Medium'
       });
     }
-    
+
     // GPU performance insights
     if (topGpuProcess && topGpuProcess['GPU Memory (MB)'] > 500) {
       analysis.performance.push({
@@ -282,7 +282,7 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode, 
         difficulty: 'Medium'
       });
     }
-    
+
     if (avgGpuUtilization > 50 && avgGpuMemoryUsage < 200) {
       analysis.performance.push({
         type: 'info',
@@ -311,11 +311,11 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode, 
     }
 
     // SECURITY INSIGHTS
-    const suspiciousProcesses = processData.filter(p => 
-      p['Open Files'] > 50 || ((p['GPU Util %'] > 0 || p['GPU Memory (MB)'] > 0) && !['chrome', 'steam', 'firefox', 'nvidia', 'cuda'].some(name => 
+    const suspiciousProcesses = processData.filter(p =>
+      p['Open Files'] > 50 || ((p['GPU Util %'] > 0 || p['GPU Memory (MB)'] > 0) && !['chrome', 'steam', 'firefox', 'nvidia', 'cuda'].some(name =>
         p['Process Name']?.toLowerCase().includes(name)))
     );
-    
+
     if (suspiciousProcesses.length > 0) {
       analysis.security.push({
         type: 'warning',
@@ -328,14 +328,14 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode, 
         difficulty: 'Medium'
       });
     }
-    
+
     // Cryptocurrency mining detection
-    const potentialMiningProcesses = processData.filter(p => 
+    const potentialMiningProcesses = processData.filter(p =>
       (p['GPU Util %'] > 80 && p['GPU Memory (MB)'] > 1000) &&
-      !['games', 'blender', 'premiere', 'davinci', 'obs', 'streamlabs'].some(name => 
+      !['games', 'blender', 'premiere', 'davinci', 'obs', 'streamlabs'].some(name =>
         p['Process Name']?.toLowerCase().includes(name))
     );
-    
+
     if (potentialMiningProcesses.length > 0) {
       analysis.security.push({
         type: 'warning',
@@ -868,16 +868,16 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode, 
   const handleDownloadReport = () => {
     const insightsData = generateInsightsData();
     const htmlContent = generateHTMLReport(insightsData);
-    
+
     // Create blob and download
     const blob = new Blob([htmlContent], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    
+
     const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
-    const dateLabel = viewMode === 'week' ? `Week_Analysis` : 
-                     selectedDate === 'today' ? 'Latest' : selectedDate.replace(/-/g, '');
-    
+    const dateLabel = viewMode === 'week' ? `Week_Analysis` :
+      selectedDate === 'today' ? 'Latest' : selectedDate.replace(/-/g, '');
+
     a.href = url;
     a.download = `HPE_GreenMatrix_Insights_${dateLabel}_${timestamp}.html`;
     document.body.appendChild(a);
@@ -887,74 +887,62 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode, 
   };
 
   const previewData = generateInsightsData();
-  const totalRecommendations = previewData.cost.length + previewData.scaling.length + 
-                              previewData.performance.length + previewData.security.length;
+  const totalRecommendations = previewData.cost.length + previewData.scaling.length +
+    previewData.performance.length + previewData.security.length;
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <div className="flex-1 min-w-0">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2 break-words">
-            System Insights & Recommendations
-          </h3>
-          <p className="text-sm text-gray-600 dark:text-gray-300">
-            AI-powered analysis with {totalRecommendations} actionable recommendations
-          </p>
-        </div>
-        <div className="flex-shrink-0">
-          <button
-            onClick={handleDownloadReport}
-            className="flex items-center gap-2 px-4 py-2 bg-[#01a982] hover:bg-[#019670] text-white rounded-lg transition-colors"
-          >
-            <Download className="w-4 h-4" />
-            <span className="hidden sm:inline">Recommendations</span>
-            <span className="sm:hidden">Report</span>
-          </button>
+    <div className="bg-white dark:bg-gray-800 rounded-xl flex flex-col h-full">
+      {/* Header (Top Left) */}
+      <h3 className="text-[24px] font-normal text-gray-900 dark:text-white break-words mb-6">
+        System Insights & Recommendations
+      </h3>
+
+      {/* Middle Content (Metrics Grid) */}
+      <div className="flex-1 flex items-center">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 w-full text-left justify-between">
+          <div className="space-y-2">
+            <div className="text-[21px] font-medium text-gray-900 dark:text-gray-400">Cost Savings</div>
+            <div className="text-lg font-medium text-emerald-900 dark:text-white">
+              $ {previewData.cost.reduce((sum, item) => sum + (parseInt(item.savings?.replace(/[$,]/g, '') || 0)), 0)}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <div className="text-[21px] font-medium text-gray-900 dark:text-gray-400">Scaling</div>
+            <div className="text-lg font-medium text-emerald-900 dark:text-white">
+              {previewData.scaling.length} recommendations
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <div className="text-[21px] font-medium text-gray-900 dark:text-gray-400">Performance</div>
+            <div className="text-lg font-medium text-emerald-900 dark:text-white">
+              {previewData.performance.length} insights
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <div className="text-[21px] font-medium text-gray-900 dark:text-gray-400">Security</div>
+            <div className="text-lg font-medium text-emerald-900 dark:text-white">
+              {previewData.security.length} alerts
+            </div>
+          </div>
         </div>
       </div>
-      
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-        <div className="space-y-2">
-          <div className="text-sm font-medium text-gray-600 dark:text-gray-400">Cost Savings</div>
-          <div className="text-2xl font-bold text-gray-900 dark:text-white">
-            $ {previewData.cost.reduce((sum, item) => sum + (parseInt(item.savings?.replace(/[$,]/g, '') || 0)), 0)}
-          </div>
-          <div className="text-xs text-gray-500 dark:text-gray-500">
-            {previewData.cost.length} opportunities
-          </div>
-        </div>
-        
-        <div className="space-y-2">
-          <div className="text-sm font-medium text-gray-600 dark:text-gray-400">Scaling</div>
-          <div className="text-2xl font-bold text-gray-900 dark:text-white">
-            {previewData.scaling.length}
-          </div>
-          <div className="text-xs text-gray-500 dark:text-gray-500">
-            recommendations
-          </div>
-        </div>
-        
-        <div className="space-y-2">
-          <div className="text-sm font-medium text-gray-600 dark:text-gray-400">Performance</div>
-          <div className="text-2xl font-bold text-gray-900 dark:text-white">
-            {previewData.performance.length}
-          </div>
-          <div className="text-xs text-gray-500 dark:text-gray-500">
-            insights
-          </div>
-        </div>
-        
-        <div className="space-y-2">
-          <div className="text-sm font-medium text-gray-600 dark:text-gray-400">Security</div>
-          <div className="text-2xl font-bold text-gray-900 dark:text-white">
-            {previewData.security.length}
-          </div>
-          <div className="text-xs text-gray-500 dark:text-gray-500">
-            alerts
-          </div>
-        </div>
+
+      {/* Bottom Right Button */}
+      <div className="flex justify-end mt-6">
+        <button
+          onClick={handleDownloadReport}
+          className="flex items-center gap-2 px-5 py-2 border-2 border-[#01a982] text-black font-medium rounded-full hover:bg-[#01a982] hover:text-white transition-colors"
+        >
+          <span className="hidden sm:inline">Recommendations</span>
+          <Download className="w-4 h-4" />
+          <span className="sm:hidden">Report</span>
+        </button>
       </div>
     </div>
+
   );
 };
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Hpe, Moon, Sun } from 'grommet-icons';
+import { Hpe, Moon, Sun, User, Notification, HelpOption } from 'grommet-icons';
 import { Link } from 'react-router-dom';
 import logo from '../assets/logo.png';
 import DatePicker from 'react-datepicker';
@@ -16,7 +16,7 @@ import '../styles/datepicker.css';
 const AdminPage = () => {
   const [activeAdminTab, setActiveAdminTab] = useState('dashboard');
   const { isDarkMode, toggleDarkMode } = useDarkMode();
-  
+
   // Navigation state
   const [activeSection, setActiveSection] = useState('administration');
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -52,22 +52,22 @@ const AdminPage = () => {
         setInitialLoading(true);
       }
       let url = '/api/host-process-metrics';
-      
+
       // Add query parameters if filters are provided
       const params = new URLSearchParams();
       if (filters.start_date) params.append('start_date', filters.start_date);
       if (filters.end_date) params.append('end_date', filters.end_date);
       if (filters.limit) params.append('limit', filters.limit.toString());
-      
+
       if (params.toString()) {
         url += `?${params.toString()}`;
       }
-      
+
       const response = await fetch(url);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       const data = await response.json();
       return data;
     } catch (err) {
@@ -85,16 +85,16 @@ const AdminPage = () => {
     if (!apiResponse || !apiResponse.data || !Array.isArray(apiResponse.data)) {
       return {};
     }
-    
+
     const transformedData = {};
-    
+
     apiResponse.data.forEach(item => {
       const date = new Date(item.timestamp).toISOString().split('T')[0];
-      
+
       if (!transformedData[date]) {
         transformedData[date] = [];
       }
-      
+
       transformedData[date].push({
         'Process Name': item.process_name || 'Unknown',
         'Process ID': item.process_id || 0,
@@ -112,7 +112,7 @@ const AdminPage = () => {
         'IOPS': parseFloat(item.iops || 0)
       });
     });
-    
+
     return transformedData;
   };
 
@@ -121,12 +121,12 @@ const AdminPage = () => {
     const loadAvailableDates = async () => {
       const dates = await fetchAvailableDates();
       setAvailableDates(dates);
-      
+
       // Set default to 'today' for live data, or latest available date
       if (dates.length > 0) {
         const today = new Date().toISOString().split('T')[0];
         const latestDate = dates[0]; // dates are sorted in descending order
-        
+
         if (latestDate === today) {
           // Today's data is available - use live mode
           setSelectedDate('today');
@@ -138,7 +138,7 @@ const AdminPage = () => {
         }
       }
     };
-    
+
     loadAvailableDates();
   }, []);
 
@@ -152,13 +152,13 @@ const AdminPage = () => {
         setApiData(transformed);
       }
     };
-    
+
     // Load data immediately (initial load)
     loadData({}, true);
-    
+
     // Set up auto-refresh every 2 seconds for real-time monitoring
     const interval = setInterval(loadData, 2000);
-    
+
     // Cleanup interval on component unmount
     return () => clearInterval(interval);
   }, []);
@@ -176,13 +176,13 @@ const AdminPage = () => {
         // For specific dates, fetch data for that day
         const startDate = selectedDate;
         const endDate = selectedDate;
-        
-        const response = await fetchHostMetrics({ 
-          start_date: startDate, 
-          end_date: endDate, 
-          limit: 1000 
+
+        const response = await fetchHostMetrics({
+          start_date: startDate,
+          end_date: endDate,
+          limit: 1000
         });
-        
+
         if (response && response.success && response.data && response.data.length > 0) {
           const transformed = transformApiData(response);
           setApiData(transformed);
@@ -204,7 +204,7 @@ const AdminPage = () => {
 
     loadDateSpecificData();
   }, [selectedDate]);
-  
+
   const twoWeeksData = apiData;
 
   // Helper function to handle calendar date change
@@ -223,23 +223,23 @@ const AdminPage = () => {
   const availableDateObjects = availableDates.map(dateStr => new Date(dateStr));
   const minDate = availableDateObjects[0];
   const maxDate = availableDateObjects[availableDateObjects.length - 1];
-  
+
   // Get current process data based on selection
   const getCurrentProcessData = () => {
     if (loading) {
       return [];
     }
-    
+
     if (error) {
       console.error('Error loading process data:', error);
       return [];
     }
-    
+
     if (viewMode === 'week' && selectedWeek !== null) {
       // Aggregate week data
       const weekDates = availableDates.slice(selectedWeek * 7, (selectedWeek + 1) * 7);
       const aggregatedData = {};
-      
+
       weekDates.forEach(date => {
         if (twoWeeksData[date]) {
           twoWeeksData[date].forEach(process => {
@@ -260,7 +260,7 @@ const AdminPage = () => {
           });
         }
       });
-      
+
       return Object.values(aggregatedData).map(process => ({
         ...process,
         'CPU Usage (%)': parseFloat((process['CPU Usage (%)'] / process.count).toFixed(1)),
@@ -296,10 +296,10 @@ const AdminPage = () => {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
       {/* Fixed Header */}
-      <header className="bg-white dark:bg-gray-800 w-full fixed top-0 z-50">
-        <div className="px-6 py-1 flex items-center justify-between">
+      <header className="bg-white dark:bg-gray-800 w-full fixed top-0 z-50 border-b border-gray-300 dark:border-gray-700">
+        <div className="px-6 py-2 flex items-center justify-between">
           <div className="flex items-center">
-            <img src={logo} alt="HPE Logo" className="w-8" />
+            <img src={logo} alt="HPE Logo" className="w-18 h-6" />
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -307,6 +307,24 @@ const AdminPage = () => {
               className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
             >
               {isDarkMode ? <Sun color="#fbbf24" /> : <Moon color="#6b7280" />}
+            </button>
+            <button
+              onClick={toggleDarkMode}
+              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
+            >
+              {isDarkMode ? <Notification size="20" color="#67655eff" /> : <Notification size="20" color="#6b7280" />}
+            </button>
+            <button
+              onClick={toggleDarkMode}
+              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
+            >
+              {isDarkMode ? <HelpOption size="20" color="#67655eff" /> : <HelpOption size="20" color="#6b7280" />}
+            </button>
+            <button
+              onClick={toggleDarkMode}
+              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
+            >
+              {isDarkMode ? <User size="20" color="#67655eff" /> : <User size="20" color="#6b7280" />}
             </button>
           </div>
         </div>
@@ -325,15 +343,14 @@ const AdminPage = () => {
         />
 
         {/* Main Content */}
-        <div className={`flex-1 flex flex-col transition-all duration-300 overflow-hidden ${
-          isCollapsed ? 'lg:ml-16' : 'lg:ml-64'
-        }`}>
+        <div className={`flex-1 flex flex-col pt-4 transition-all duration-300 ${isCollapsed ? 'lg:ml-16' : 'lg:ml-64'
+          }`}>
 
-        {/* Content Area */}
-        <div className="flex-1 overflow-auto">
+          {/* Content Area */}
+          <div className="flex-1 overflow-auto pb-24">
 
-          {/* Hero Section */}
-          {/* {activeSection === 'administration' && (
+            {/* Hero Section */}
+            {/* {activeSection === 'administration' && (
             <div className="bg-gradient-to-b from-[#ecfdf5] to-white dark:from-[#0e2b1a] dark:to-gray-900">
               <div className="max-w-6xl mx-auto px-6 py-12 text-center">
                 <h1 className="text-4xl font-bold bg-gradient-to-r from-[#01a982] to-[#047857] bg-clip-text text-transparent mb-4">
@@ -352,115 +369,117 @@ const AdminPage = () => {
             </div>
           )} */}
 
-          {/* Default Welcome for other sections */}
-          {activeSection !== 'administration' && (
-            <div className="bg-gradient-to-b from-gray-50 to-white dark:from-gray-800 dark:to-gray-900">
-              <div className="max-w-6xl mx-auto px-6 py-12 text-center">
-                <h1 className="text-4xl font-bold bg-gradient-to-r from-[#01a982] to-[#047857] bg-clip-text text-transparent mb-4">
-                  Welcome to HPE Analytics
-                </h1>
-                <p className="text-lg text-gray-600 dark:text-gray-300">
-                  Analytics platform for monitoring and optimizing your infrastructure.
-                </p>
+            {/* Default Welcome for other sections */}
+            {activeSection !== 'administration' && (
+              <div className="bg-gradient-to-b from-gray-50 to-white dark:from-gray-800 dark:to-gray-900">
+                <div className="max-w-6xl mx-auto px-6 py-12 text-center">
+                  <h1 className="text-4xl font-bold bg-gradient-to-r from-[#01a982] to-[#047857] bg-clip-text text-transparent mb-4">
+                    Welcome to HPE Analytics
+                  </h1>
+                  <p className="text-lg text-gray-600 dark:text-gray-300">
+                    Analytics platform for monitoring and optimizing your infrastructure.
+                  </p>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Content based on active section */}
-          {activeSection === 'administration' && (
-            <>
-              {/* Loading indicator - only show on initial load */}
-              {initialLoading && (
-                <div className="max-w-6xl mx-auto px-6 mt-6">
-                  <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 text-center">
-                    <div className="text-gray-600 dark:text-gray-300">Loading process metrics data...</div>
+            {/* Content based on active section */}
+            {activeSection === 'administration' && (
+              <>
+                {/* Loading indicator - only show on initial load */}
+                {initialLoading && (
+                  <div className="max-w-6xl mx-auto px-6 mt-6">
+                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 text-center">
+                      <div className="text-gray-600 dark:text-gray-300">Loading process metrics data...</div>
+                    </div>
                   </div>
+                )}
+
+
+
+                {/* Admin Content */}
+                <div className="w-full mx-auto px-6 mt-2 mb-8 flex-1">
+                  {activeAdminTab === 'dashboard' && (
+                    <AdminDashboardNew
+                      processData={processData}
+                      chartOptions={chartOptions}
+                      viewMode={viewMode}
+                      selectedDate={selectedDate}
+                      selectedWeek={selectedWeek}
+                      availableDates={availableDates}
+                      setViewMode={setViewMode}
+                      setSelectedDate={setSelectedDate}
+                      setSelectedWeek={setSelectedWeek}
+                      selectedCalendarDate={selectedCalendarDate}
+                      setSelectedCalendarDate={setSelectedCalendarDate}
+                      handleCalendarDateChange={handleCalendarDateChange}
+                      minDate={minDate}
+                      maxDate={maxDate}
+                      availableDateObjects={availableDateObjects}
+                      noDataError={noDataError}
+                    />
+                  )}
+
+                  {activeAdminTab === 'performance' && (
+                    <PerformanceTab />
+                  )}
+
+                  {activeAdminTab === 'hardware' && (
+                    <HardwareTab />
+                  )}
+
+
+                  {activeAdminTab === 'costs' && (
+                    <CostManagementTab />
+                  )}
+
+                  {activeAdminTab === 'models' && (
+                    <AIModelManagementTab />
+                  )}
                 </div>
-              )}
-              
+              </>
+            )}
 
-
-              {/* Admin Content */}
-              <div className="max-w-6xl mx-auto px-6 mt-2 mb-8 flex-1">
-                {activeAdminTab === 'dashboard' && (
-                  <AdminDashboardNew 
-                    processData={processData} 
-                    chartOptions={chartOptions}
-                    viewMode={viewMode}
-                    selectedDate={selectedDate}
-                    selectedWeek={selectedWeek}
-                    availableDates={availableDates}
-                    setViewMode={setViewMode}
-                    setSelectedDate={setSelectedDate}
-                    setSelectedWeek={setSelectedWeek}
-                    selectedCalendarDate={selectedCalendarDate}
-                    setSelectedCalendarDate={setSelectedCalendarDate}
-                    handleCalendarDateChange={handleCalendarDateChange}
-                    minDate={minDate}
-                    maxDate={maxDate}
-                    availableDateObjects={availableDateObjects}
-                    noDataError={noDataError}
-                  />
-                )}
-
-                {activeAdminTab === 'performance' && (
-                  <PerformanceTab />
-                )}
-
-                {activeAdminTab === 'hardware' && (
-                  <HardwareTab />
-                )}
-
-
-                {activeAdminTab === 'costs' && (
-                  <CostManagementTab />
-                )}
-
-                {activeAdminTab === 'models' && (
-                  <AIModelManagementTab />
-                )}
-              </div>
-            </>
-          )}
-
-          {/* Other sections content */}
-          {activeSection !== 'administration' && (
-            <div className="max-w-6xl mx-auto px-6 mt-4 mb-8 flex-1">
-              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-12 text-center">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-                  {activeSection.charAt(0).toUpperCase() + activeSection.slice(1)} Section
-                </h2>
-                <p className="text-gray-600 dark:text-gray-300">
-                  This section is under development. More features coming soon!
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Footer */}
-          <footer className="mt-auto bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
-            <div className="max-w-7xl mx-auto px-6 py-4">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div className="text-sm text-gray-600 dark:text-gray-300">
-                  &copy; {new Date().getFullYear()} Hewlett Packard Enterprise Development LP - Admin Portal
-                </div>
-                <div className="flex flex-wrap gap-4">
-                  <button className="text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors">
-                    System Docs
-                  </button>
-                  <button className="text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors">
-                    Support
-                  </button>
-                  <button className="text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors">
-                    API Reference
-                  </button>
+            {/* Other sections content */}
+            {activeSection !== 'administration' && (
+              <div className="max-w-6xl mx-auto px-6 mt-4 mb-8 flex-1">
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-12 text-center">
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+                    {activeSection.charAt(0).toUpperCase() + activeSection.slice(1)} Section
+                  </h2>
+                  <p className="text-gray-600 dark:text-gray-300">
+                    This section is under development. More features coming soon!
+                  </p>
                 </div>
               </div>
-            </div>
-          </footer>
-        </div>
+            )}
+          </div>
         </div>
       </div>
+      {/* Footer */}
+      <footer className="w-full fixed bottom-0 left-0 mt-auto py-4 px-6 text-center z-50 bg-gray-100 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
+        <div className="w-full mx-auto px-6 py-4">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="text-sm text-gray-600 dark:text-gray-300">
+              &copy; {new Date().getFullYear()} Hewlett Packard Enterprise D evelopment LP
+            </div>
+            <div className="flex flex-wrap gap-8">
+              <button className="text-black font-bold text-[18px] dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors">
+                Terms
+              </button>
+              <button className="text-black font-bold text-[18px] dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors">
+                Security
+              </button>
+              <button className="text-black font-bold text-[18px] dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors">
+                Privacy
+              </button>
+              <button className="text-black font-bold text-[18px] dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors">
+                Feedback
+              </button>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 };
