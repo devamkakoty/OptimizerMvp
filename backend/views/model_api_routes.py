@@ -1629,6 +1629,50 @@ async def get_vm_analysis(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to analyze VM: {str(e)}")
 
+# HOST-SPECIFIC RECOMMENDATION ENDPOINTS
+
+@app.get("/api/recommendations/host", response_model=Dict[str, Any])
+async def get_host_recommendations(
+    time_range_days: int = 7,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    db: Session = Depends(get_metrics_db)
+):
+    """Get performance and cost optimization recommendations for bare metal host"""
+    try:
+        result = recommendation_engine.generate_host_recommendations(db, time_range_days, start_date, end_date)
+
+        if not result['success']:
+            raise HTTPException(status_code=400, detail=result['error'])
+
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate host recommendations: {str(e)}")
+
+@app.get("/api/recommendations/host/analysis", response_model=Dict[str, Any])
+async def get_host_analysis(
+    time_range_days: int = 7,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    db: Session = Depends(get_metrics_db)
+):
+    """Get detailed resource consumption analysis for bare metal host"""
+    try:
+        result = recommendation_engine.analyze_host_resource_consumption(db, time_range_days, start_date, end_date)
+
+        if not result['success']:
+            raise HTTPException(status_code=400, detail=result['error'])
+
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to analyze host: {str(e)}")
+
 # =============================================================================
 # VM MONITORING API ENDPOINTS
 # =============================================================================

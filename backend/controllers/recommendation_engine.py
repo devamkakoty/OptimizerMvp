@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, func, desc
+from sqlalchemy import and_, func, desc, text, case
 from app.models.cost_models import CostModel
 from app.models.host_process_metrics import HostProcessMetric
 from app.models.host_overall_metrics import HostOverallMetric
@@ -1023,3 +1023,684 @@ class RecommendationEngine:
         except Exception as e:
             # Return empty list if analysis fails
             return []
+
+    def analyze_host_resource_consumption(
+        self,
+        db: Session,
+        time_range_days: int = 7,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Analyze historical resource consumption of the bare metal host"""
+        try:
+            # Use specific date range if provided, otherwise use time_range_days
+            if start_date and end_date:
+                start_time = datetime.fromisoformat(start_date.replace('Z', '+00:00')) if 'T' in start_date else datetime.strptime(start_date, '%Y-%m-%d')
+                end_time = datetime.fromisoformat(end_date.replace('Z', '+00:00')) if 'T' in end_date else datetime.strptime(end_date, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
+
+                # For current date, limit to current time
+                if end_date == datetime.utcnow().strftime('%Y-%m-%d'):
+                    end_time = datetime.utcnow()
+            else:
+                end_time = datetime.utcnow()
+                start_time = end_time - timedelta(days=time_range_days)
+
+            # Query host-specific process metrics
+            query = db.query(HostProcessMetric).filter(
+                and_(
+                    HostProcessMetric.timestamp >= start_time,
+                    HostProcessMetric.timestamp <= end_time,
+                    HostProcessMetric.estimated_power_watts.isnot(None)
+                )
+            )
+
+            # Get comprehensive statistical analysis from process-level data
+            result = query.with_entities(
+                # Basic aggregations
+                func.avg(HostProcessMetric.estimated_power_watts).label('avg_power_watts'),
+                func.max(HostProcessMetric.estimated_power_watts).label('max_power_watts'),
+                func.min(HostProcessMetric.estimated_power_watts).label('min_power_watts'),
+                func.sum(HostProcessMetric.estimated_power_watts).label('total_power_watts'),
+                func.count(HostProcessMetric.estimated_power_watts).label('data_points'),
+
+                # CPU statistics
+                func.avg(HostProcessMetric.cpu_usage_percent).label('avg_cpu_percent'),
+                func.max(HostProcessMetric.cpu_usage_percent).label('max_cpu_percent'),
+                func.min(HostProcessMetric.cpu_usage_percent).label('min_cpu_percent'),
+                func.stddev(HostProcessMetric.cpu_usage_percent).label('cpu_volatility'),
+
+                # GPU statistics
+                func.avg(HostProcessMetric.gpu_utilization_percent).label('avg_gpu_percent'),
+                func.max(HostProcessMetric.gpu_utilization_percent).label('max_gpu_percent'),
+                func.min(HostProcessMetric.gpu_utilization_percent).label('min_gpu_percent'),
+
+                # Memory statistics
+                func.avg(HostProcessMetric.memory_usage_mb).label('avg_memory_mb'),
+                func.max(HostProcessMetric.memory_usage_mb).label('max_memory_mb'),
+                func.min(HostProcessMetric.memory_usage_mb).label('min_memory_mb'),
+
+                # Power efficiency statistics
+                func.stddev(HostProcessMetric.estimated_power_watts).label('power_volatility'),
+                func.avg(HostProcessMetric.iops).label('avg_iops'),
+                func.count(func.distinct(HostProcessMetric.process_name)).label('unique_processes')
+            ).first()
+
+            if not result or result.data_points == 0:
+                return {
+                    "success": False,
+                    "error": f"No process data found for host in the specified time range"
+                }
+
+            # Calculate percentiles efficiently using separate queries (compatible with all PostgreSQL versions)
+            cpu_percentiles = db.execute(text("""
+                SELECT
+                    percentile_disc(0.95) WITHIN GROUP (ORDER BY cpu_usage_percent) as cpu_95th,
+                    percentile_disc(0.99) WITHIN GROUP (ORDER BY cpu_usage_percent) as cpu_99th
+                FROM host_process_metrics
+                WHERE timestamp >= :start_time AND timestamp <= :end_time
+                AND estimated_power_watts IS NOT NULL
+            """), {'start_time': start_time, 'end_time': end_time}).fetchone()
+
+            # Calculate overall metrics percentiles
+            overall_percentiles = db.execute(text("""
+                SELECT
+                    percentile_disc(0.95) WITHIN GROUP (ORDER BY host_cpu_usage_percent) as cpu_95th,
+                    percentile_disc(0.95) WITHIN GROUP (ORDER BY host_ram_usage_percent) as ram_95th,
+                    percentile_disc(0.95) WITHIN GROUP (ORDER BY host_gpu_utilization_percent) as gpu_95th
+                FROM host_overall_metrics
+                WHERE timestamp >= :start_time AND timestamp <= :end_time
+            """), {'start_time': start_time, 'end_time': end_time}).fetchone()
+
+            # Calculate energy consumption (assuming 1-minute intervals)
+            interval_hours = 1 / 60.0
+            total_energy_kwh = (result.total_power_watts * interval_hours) / 1000.0
+
+            # Get top processes for the host
+            top_processes_query = db.query(
+                HostProcessMetric.process_name,
+                func.avg(HostProcessMetric.estimated_power_watts).label('avg_power'),
+                func.avg(HostProcessMetric.cpu_usage_percent).label('avg_cpu'),
+                func.avg(HostProcessMetric.memory_usage_mb).label('avg_memory'),
+                func.count(HostProcessMetric.process_name).label('occurrences')
+            ).filter(
+                and_(
+                    HostProcessMetric.timestamp >= start_time,
+                    HostProcessMetric.timestamp <= end_time,
+                    HostProcessMetric.estimated_power_watts.isnot(None)
+                )
+            ).group_by(
+                HostProcessMetric.process_name
+            ).order_by(
+                desc(func.avg(HostProcessMetric.estimated_power_watts))
+            ).limit(5)
+
+            top_processes = []
+            for proc in top_processes_query.all():
+                top_processes.append({
+                    'process_name': proc.process_name,
+                    'avg_power_watts': round(float(proc.avg_power), 2),
+                    'avg_cpu_percent': round(float(proc.avg_cpu or 0), 2),
+                    'avg_memory_mb': round(float(proc.avg_memory or 0), 2),
+                    'occurrences': proc.occurrences
+                })
+
+            # Get host overall metrics for additional insights
+            overall_metrics_query = db.query(HostOverallMetric).filter(
+                and_(
+                    HostOverallMetric.timestamp >= start_time,
+                    HostOverallMetric.timestamp <= end_time
+                )
+            )
+
+            overall_result = overall_metrics_query.with_entities(
+                # Basic averages
+                func.avg(HostOverallMetric.host_cpu_usage_percent).label('avg_host_cpu'),
+                func.avg(HostOverallMetric.host_ram_usage_percent).label('avg_host_ram'),
+                func.avg(HostOverallMetric.host_gpu_utilization_percent).label('avg_host_gpu'),
+                func.avg(HostOverallMetric.host_gpu_memory_utilization_percent).label('avg_host_gpu_memory'),
+                func.avg(HostOverallMetric.host_gpu_temperature_celsius).label('avg_gpu_temp'),
+                func.avg(HostOverallMetric.host_gpu_power_draw_watts).label('avg_gpu_power'),
+                func.count().label('overall_data_points'),
+
+                # Peak analysis
+                func.max(HostOverallMetric.host_cpu_usage_percent).label('max_host_cpu'),
+                func.max(HostOverallMetric.host_ram_usage_percent).label('max_host_ram'),
+                func.max(HostOverallMetric.host_gpu_utilization_percent).label('max_host_gpu'),
+                func.max(HostOverallMetric.host_gpu_temperature_celsius).label('max_gpu_temp'),
+
+                # Min values for range analysis
+                func.min(HostOverallMetric.host_cpu_usage_percent).label('min_host_cpu'),
+                func.min(HostOverallMetric.host_ram_usage_percent).label('min_host_ram'),
+                func.min(HostOverallMetric.host_gpu_utilization_percent).label('min_host_gpu'),
+
+                # Volatility analysis
+                func.stddev(HostOverallMetric.host_cpu_usage_percent).label('cpu_volatility'),
+                func.stddev(HostOverallMetric.host_ram_usage_percent).label('ram_volatility'),
+                func.stddev(HostOverallMetric.host_gpu_power_draw_watts).label('gpu_power_volatility')
+            ).first()
+
+            # Simplified threshold breach analysis using raw SQL to avoid SQLAlchemy case issues
+            try:
+                threshold_sql = text("""
+                    SELECT
+                        (COUNT(CASE WHEN host_cpu_usage_percent > 90 THEN 1 END) * 100.0 / COUNT(*)) as cpu_critical_breach_percent,
+                        (COUNT(CASE WHEN host_cpu_usage_percent > 80 THEN 1 END) * 100.0 / COUNT(*)) as cpu_warning_breach_percent,
+                        (COUNT(CASE WHEN host_cpu_usage_percent > 70 THEN 1 END) * 100.0 / COUNT(*)) as cpu_elevated_breach_percent,
+                        (COUNT(CASE WHEN host_ram_usage_percent > 90 THEN 1 END) * 100.0 / COUNT(*)) as memory_critical_breach_percent,
+                        (COUNT(CASE WHEN host_ram_usage_percent > 80 THEN 1 END) * 100.0 / COUNT(*)) as memory_warning_breach_percent,
+                        (COUNT(CASE WHEN host_gpu_utilization_percent > 90 THEN 1 END) * 100.0 / COUNT(*)) as gpu_critical_breach_percent,
+                        (COUNT(CASE WHEN host_gpu_utilization_percent > 80 THEN 1 END) * 100.0 / COUNT(*)) as gpu_warning_breach_percent,
+                        (COUNT(CASE WHEN host_gpu_temperature_celsius > 85 THEN 1 END) * 100.0 / COUNT(*)) as temp_critical_breach_percent,
+                        (COUNT(CASE WHEN host_gpu_temperature_celsius > 80 THEN 1 END) * 100.0 / COUNT(*)) as temp_warning_breach_percent
+                    FROM host_overall_metrics
+                    WHERE timestamp >= :start_time AND timestamp <= :end_time
+                """)
+                threshold_analysis = db.execute(threshold_sql, {"start_time": start_time, "end_time": end_time}).first()
+            except Exception as e:
+                # If threshold analysis fails, create default values
+                threshold_analysis = type('obj', (object,), {
+                    'cpu_critical_breach_percent': 0, 'cpu_warning_breach_percent': 0, 'cpu_elevated_breach_percent': 0,
+                    'memory_critical_breach_percent': 0, 'memory_warning_breach_percent': 0,
+                    'gpu_critical_breach_percent': 0, 'gpu_warning_breach_percent': 0,
+                    'temp_critical_breach_percent': 0, 'temp_warning_breach_percent': 0
+                })()
+
+            # Time pattern analysis - peak usage by hour using raw SQL
+            try:
+                peak_hours_sql = text("""
+                    SELECT
+                        EXTRACT(hour FROM timestamp) as hour,
+                        AVG(host_cpu_usage_percent) as avg_cpu,
+                        MAX(host_cpu_usage_percent) as peak_cpu,
+                        COUNT(CASE WHEN host_cpu_usage_percent > 80 THEN 1 END) as high_cpu_count
+                    FROM host_overall_metrics
+                    WHERE timestamp >= :start_time AND timestamp <= :end_time
+                    GROUP BY EXTRACT(hour FROM timestamp)
+                    ORDER BY hour
+                """)
+                peak_hours_query = db.execute(peak_hours_sql, {"start_time": start_time, "end_time": end_time}).fetchall()
+            except Exception as e:
+                peak_hours_query = []
+
+            # Process efficiency analysis - optimized to avoid heavy computation
+            efficiency_query = db.query(
+                HostProcessMetric.process_name,
+                func.avg(HostProcessMetric.cpu_usage_percent).label('avg_cpu'),
+                func.avg(HostProcessMetric.estimated_power_watts).label('avg_power'),
+                func.avg(HostProcessMetric.memory_usage_mb).label('avg_memory'),
+                func.count().label('sample_count')
+            ).filter(
+                and_(
+                    HostProcessMetric.timestamp >= start_time,
+                    HostProcessMetric.timestamp <= end_time,
+                    HostProcessMetric.estimated_power_watts > 1.0,  # Only processes using meaningful power
+                    HostProcessMetric.estimated_power_watts.isnot(None)
+                )
+            ).group_by(HostProcessMetric.process_name).having(func.count() > 10).limit(20).all()  # Limit to top 20 processes
+
+            # Convert efficiency results to dict with calculated ratios
+            efficiency_data = []
+            for eff in efficiency_query:
+                avg_power = float(eff.avg_power or 1.0)
+                cpu_efficiency = round(float(eff.avg_cpu or 0) / avg_power, 4) if avg_power > 0 else 0
+                memory_efficiency = round(float(eff.avg_memory or 0) / avg_power, 4) if avg_power > 0 else 0
+
+                efficiency_data.append({
+                    'process_name': eff.process_name,
+                    'avg_cpu_percent': round(float(eff.avg_cpu or 0), 2),
+                    'avg_power_watts': round(avg_power, 2),
+                    'avg_memory_mb': round(float(eff.avg_memory or 0), 2),
+                    'cpu_efficiency_per_watt': cpu_efficiency,
+                    'memory_efficiency_per_watt': memory_efficiency,
+                    'sample_count': eff.sample_count
+                })
+
+            # Convert peak hours to structured data
+            peak_hours_data = {}
+            for hour_data in peak_hours_query:
+                peak_hours_data[int(hour_data.hour)] = {
+                    'avg_cpu': round(float(hour_data.avg_cpu or 0), 2),
+                    'peak_cpu': round(float(hour_data.peak_cpu or 0), 2),
+                    'high_cpu_count': hour_data.high_cpu_count or 0
+                }
+
+            # Combine process-level and overall metrics with advanced statistics
+            host_analysis = {
+                "host_name": "bare-metal-host",
+                "time_range_days": time_range_days,
+                "process_data_points": result.data_points,
+                "overall_data_points": overall_result.overall_data_points if overall_result else 0,
+
+                # Process-level aggregated metrics with enhanced statistics
+                "avg_process_power_watts": round(float(result.avg_power_watts), 2),
+                "max_process_power_watts": round(float(result.max_power_watts), 2),
+                "min_process_power_watts": round(float(result.min_power_watts or 0), 2),
+                "power_volatility": round(float(result.power_volatility or 0), 2),
+                "total_energy_kwh": round(total_energy_kwh, 4),
+
+                # CPU statistics with percentiles and volatility
+                "avg_process_cpu_percent": round(float(result.avg_cpu_percent or 0), 2),
+                "max_process_cpu_percent": round(float(result.max_cpu_percent or 0), 2),
+                "min_process_cpu_percent": round(float(result.min_cpu_percent or 0), 2),
+                "cpu_95th_percentile": round(float(cpu_percentiles.cpu_95th or 0), 2) if cpu_percentiles else 0,
+                "cpu_99th_percentile": round(float(cpu_percentiles.cpu_99th or 0), 2) if cpu_percentiles else 0,
+                "cpu_volatility": round(float(result.cpu_volatility or 0), 2),
+
+                # GPU statistics with percentiles
+                "avg_process_gpu_percent": round(float(result.avg_gpu_percent or 0), 2),
+                "max_process_gpu_percent": round(float(result.max_gpu_percent or 0), 2),
+                "min_process_gpu_percent": round(float(result.min_gpu_percent or 0), 2),
+
+                # Memory statistics with percentiles
+                "avg_process_memory_mb": round(float(result.avg_memory_mb or 0), 2),
+                "max_process_memory_mb": round(float(result.max_memory_mb or 0), 2),
+                "min_process_memory_mb": round(float(result.min_memory_mb or 0), 2),
+
+                # Other process metrics
+                "avg_process_iops": round(float(result.avg_iops or 0), 2),
+                "unique_processes": result.unique_processes,
+                "top_processes": top_processes,
+
+                # Overall host metrics with enhanced statistics
+                "avg_host_cpu_percent": round(float(overall_result.avg_host_cpu or 0), 2) if overall_result else 0,
+                "max_host_cpu_percent": round(float(overall_result.max_host_cpu or 0), 2) if overall_result else 0,
+                "min_host_cpu_percent": round(float(overall_result.min_host_cpu or 0), 2) if overall_result else 0,
+                "host_cpu_95th_percentile": round(float(overall_percentiles.cpu_95th or 0), 2) if overall_percentiles else 0,
+                "host_cpu_volatility": round(float(overall_result.cpu_volatility or 0), 2) if overall_result else 0,
+
+                "avg_host_ram_percent": round(float(overall_result.avg_host_ram or 0), 2) if overall_result else 0,
+                "max_host_ram_percent": round(float(overall_result.max_host_ram or 0), 2) if overall_result else 0,
+                "min_host_ram_percent": round(float(overall_result.min_host_ram or 0), 2) if overall_result else 0,
+                "host_ram_95th_percentile": round(float(overall_percentiles.ram_95th or 0), 2) if overall_percentiles else 0,
+                "host_ram_volatility": round(float(overall_result.ram_volatility or 0), 2) if overall_result else 0,
+
+                "avg_host_gpu_percent": round(float(overall_result.avg_host_gpu or 0), 2) if overall_result else 0,
+                "max_host_gpu_percent": round(float(overall_result.max_host_gpu or 0), 2) if overall_result else 0,
+                "min_host_gpu_percent": round(float(overall_result.min_host_gpu or 0), 2) if overall_result else 0,
+                "host_gpu_95th_percentile": round(float(overall_percentiles.gpu_95th or 0), 2) if overall_percentiles else 0,
+
+                "avg_host_gpu_memory_percent": round(float(overall_result.avg_host_gpu_memory or 0), 2) if overall_result else 0,
+                "avg_gpu_temperature_celsius": round(float(overall_result.avg_gpu_temp or 0), 2) if overall_result else 0,
+                "max_gpu_temperature_celsius": round(float(overall_result.max_gpu_temp or 0), 2) if overall_result else 0,
+                "avg_gpu_power_watts": round(float(overall_result.avg_gpu_power or 0), 2) if overall_result else 0,
+                "gpu_power_volatility": round(float(overall_result.gpu_power_volatility or 0), 2) if overall_result else 0,
+
+                # Threshold breach analysis
+                "cpu_critical_breach_percent": round(float(threshold_analysis.cpu_critical_breach_percent or 0), 2) if threshold_analysis else 0,
+                "cpu_warning_breach_percent": round(float(threshold_analysis.cpu_warning_breach_percent or 0), 2) if threshold_analysis else 0,
+                "cpu_elevated_breach_percent": round(float(threshold_analysis.cpu_elevated_breach_percent or 0), 2) if threshold_analysis else 0,
+
+                "memory_critical_breach_percent": round(float(threshold_analysis.memory_critical_breach_percent or 0), 2) if threshold_analysis else 0,
+                "memory_warning_breach_percent": round(float(threshold_analysis.memory_warning_breach_percent or 0), 2) if threshold_analysis else 0,
+
+                "gpu_critical_breach_percent": round(float(threshold_analysis.gpu_critical_breach_percent or 0), 2) if threshold_analysis else 0,
+                "gpu_warning_breach_percent": round(float(threshold_analysis.gpu_warning_breach_percent or 0), 2) if threshold_analysis else 0,
+
+                "temp_critical_breach_percent": round(float(threshold_analysis.temp_critical_breach_percent or 0), 2) if threshold_analysis else 0,
+                "temp_warning_breach_percent": round(float(threshold_analysis.temp_warning_breach_percent or 0), 2) if threshold_analysis else 0,
+
+                # Time pattern analysis
+                "peak_hours_analysis": peak_hours_data,
+
+                # Process efficiency analysis
+                "process_efficiency_data": efficiency_data
+            }
+
+            return {
+                "success": True,
+                "host_analysis": host_analysis
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Failed to analyze host: {str(e)}"
+            }
+
+    def generate_host_recommendations(
+        self,
+        db: Session,
+        time_range_days: int = 7,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Generate performance and cost optimization recommendations for bare metal host"""
+        try:
+            # Define time range for analysis
+            if start_date and end_date:
+                start_time = datetime.fromisoformat(start_date.replace('Z', '+00:00')) if 'T' in start_date else datetime.strptime(start_date, '%Y-%m-%d')
+                end_time = datetime.fromisoformat(end_date.replace('Z', '+00:00')) if 'T' in end_date else datetime.strptime(end_date, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
+
+                if end_date == datetime.utcnow().strftime('%Y-%m-%d'):
+                    end_time = datetime.utcnow()
+            else:
+                end_time = datetime.utcnow()
+                start_time = end_time - timedelta(days=time_range_days)
+
+            # Step 1: Analyze host resource consumption
+            host_result = self.analyze_host_resource_consumption(db, time_range_days, start_date, end_date)
+
+            if not host_result['success']:
+                return host_result
+
+            host_analysis = host_result['host_analysis']
+            recommendations = []
+
+            # Enhanced CPU Performance Recommendations using sophisticated statistics
+            avg_host_cpu = host_analysis['avg_host_cpu_percent']
+            cpu_95th = host_analysis['host_cpu_95th_percentile']
+            cpu_critical_breach = host_analysis['cpu_critical_breach_percent']
+            cpu_warning_breach = host_analysis['cpu_warning_breach_percent']
+            cpu_volatility = host_analysis['host_cpu_volatility']
+
+            # Critical: Frequent breaches of 90% threshold
+            if cpu_critical_breach > 5:  # More than 5% of time above 90%
+                recommendations.append({
+                    'category': 'performance',
+                    'priority': 'high',
+                    'title': 'Critical CPU Threshold Breaches Detected',
+                    'description': f'CPU exceeded 90% for {cpu_critical_breach:.1f}% of monitoring period (95th percentile: {cpu_95th:.1f}%)',
+                    'recommendations': [
+                        'Immediate CPU upgrade required - system at capacity',
+                        'Implement emergency load balancing',
+                        'Schedule non-critical processes during off-peak hours',
+                        'Consider horizontal scaling with additional hosts'
+                    ],
+                    'impact': 'System stability at risk - immediate action required',
+                    'statistics': {
+                        'critical_breach_percent': cpu_critical_breach,
+                        'cpu_95th_percentile': cpu_95th,
+                        'avg_cpu': avg_host_cpu
+                    }
+                })
+            # Warning: Frequent breaches of 80% threshold
+            elif cpu_warning_breach > 15:  # More than 15% of time above 80%
+                recommendations.append({
+                    'category': 'performance',
+                    'priority': 'medium',
+                    'title': 'Frequent CPU Performance Bottlenecks',
+                    'description': f'CPU exceeded 80% for {cpu_warning_breach:.1f}% of time (peak 95th percentile: {cpu_95th:.1f}%)',
+                    'recommendations': [
+                        'Plan CPU capacity upgrade within 2-4 weeks',
+                        'Optimize CPU-intensive processes during peak hours',
+                        'Implement CPU affinity for critical applications',
+                        'Monitor for performance degradation'
+                    ],
+                    'impact': 'Performance bottlenecks during peak usage',
+                    'statistics': {
+                        'warning_breach_percent': cpu_warning_breach,
+                        'cpu_95th_percentile': cpu_95th
+                    }
+                })
+            # Underutilization: Low average with minimal peak usage
+            elif avg_host_cpu < 20 and cpu_95th < 40:
+                recommendations.append({
+                    'category': 'cost_optimization',
+                    'priority': 'medium',
+                    'title': 'Significant CPU Underutilization',
+                    'description': f'CPU averaging {avg_host_cpu:.1f}% with 95th percentile only {cpu_95th:.1f}%',
+                    'recommendations': [
+                        'Consolidate workloads from other hosts',
+                        'Deploy additional applications to utilize capacity',
+                        'Consider downsizing CPU allocation',
+                        'Evaluate cost savings from resource optimization'
+                    ],
+                    'potential_savings': f'Up to 60-70% capacity available for consolidation',
+                    'statistics': {
+                        'avg_cpu': avg_host_cpu,
+                        'cpu_95th_percentile': cpu_95th,
+                        'utilization_efficiency': f'{(avg_host_cpu/100)*100:.1f}%'
+                    }
+                })
+
+            # High volatility workload pattern analysis
+            if cpu_volatility > 15:  # High variance in CPU usage
+                peak_hours = [hour for hour, data in host_analysis['peak_hours_analysis'].items()
+                             if data['avg_cpu'] > avg_host_cpu * 1.5]
+
+                recommendations.append({
+                    'category': 'optimization',
+                    'priority': 'medium',
+                    'title': 'Highly Variable CPU Workload Pattern',
+                    'description': f'CPU usage shows high volatility (σ={cpu_volatility:.1f}%), indicating unpredictable load spikes',
+                    'recommendations': [
+                        'Implement auto-scaling based on CPU metrics',
+                        'Schedule batch jobs during low-usage periods',
+                        f'Peak usage occurs around hours: {peak_hours}' if peak_hours else 'Analyze workload timing patterns',
+                        'Consider burst-capable instance types'
+                    ],
+                    'impact': 'Improved resource efficiency through better scheduling',
+                    'statistics': {
+                        'cpu_volatility': cpu_volatility,
+                        'peak_hours': peak_hours
+                    }
+                })
+
+            # Enhanced Memory Optimization Recommendations
+            avg_host_ram = host_analysis['avg_host_ram_percent']
+            ram_95th = host_analysis['host_ram_95th_percentile']
+            memory_critical_breach = host_analysis['memory_critical_breach_percent']
+            memory_warning_breach = host_analysis['memory_warning_breach_percent']
+            ram_volatility = host_analysis['host_ram_volatility']
+
+            # Critical memory pressure
+            if memory_critical_breach > 3:  # More than 3% of time above 90%
+                recommendations.append({
+                    'category': 'performance',
+                    'priority': 'high',
+                    'title': 'Critical Memory Pressure Detected',
+                    'description': f'Memory exceeded 90% for {memory_critical_breach:.1f}% of time (95th percentile: {ram_95th:.1f}%)',
+                    'recommendations': [
+                        'Immediate memory upgrade required to prevent swapping',
+                        'Identify and optimize memory-intensive processes',
+                        'Implement memory monitoring and alerting',
+                        'Consider temporary process migration to reduce load'
+                    ],
+                    'impact': 'Risk of system swapping and severe performance degradation',
+                    'statistics': {
+                        'critical_breach_percent': memory_critical_breach,
+                        'ram_95th_percentile': ram_95th,
+                        'avg_ram': avg_host_ram
+                    }
+                })
+            # Warning level memory usage
+            elif memory_warning_breach > 10:  # More than 10% of time above 80%
+                recommendations.append({
+                    'category': 'performance',
+                    'priority': 'medium',
+                    'title': 'Frequent Memory Pressure Events',
+                    'description': f'Memory exceeded 80% for {memory_warning_breach:.1f}% of time (peak: {ram_95th:.1f}%)',
+                    'recommendations': [
+                        'Plan memory capacity upgrade within 1-2 months',
+                        'Optimize memory usage of top consuming processes',
+                        'Implement memory caching strategies',
+                        'Monitor for memory leaks'
+                    ],
+                    'impact': 'Performance may degrade during peak memory usage',
+                    'statistics': {
+                        'warning_breach_percent': memory_warning_breach,
+                        'ram_95th_percentile': ram_95th
+                    }
+                })
+            # Significant underutilization
+            elif avg_host_ram < 30 and ram_95th < 50:
+                recommendations.append({
+                    'category': 'cost_optimization',
+                    'priority': 'low',
+                    'title': 'Significant Memory Underutilization',
+                    'description': f'Memory averaging {avg_host_ram:.1f}% with 95th percentile only {ram_95th:.1f}%',
+                    'recommendations': [
+                        'Consolidate memory-intensive workloads here',
+                        'Deploy in-memory caching solutions',
+                        'Consider reducing memory allocation elsewhere',
+                        'Utilize excess memory for performance optimization'
+                    ],
+                    'potential_savings': f'Over 50% memory capacity available for optimization',
+                    'statistics': {
+                        'avg_ram': avg_host_ram,
+                        'ram_95th_percentile': ram_95th,
+                        'available_capacity_percent': 100 - ram_95th
+                    }
+                })
+
+            # Process Efficiency Analysis Recommendations
+            efficiency_data = host_analysis.get('process_efficiency_data', [])
+            if efficiency_data:
+                # Find most and least efficient processes
+                most_efficient = sorted(efficiency_data, key=lambda x: x['cpu_efficiency_per_watt'], reverse=True)[:3]
+                least_efficient = sorted(efficiency_data, key=lambda x: x['cpu_efficiency_per_watt'])[:3]
+
+                if least_efficient and least_efficient[0]['cpu_efficiency_per_watt'] < 1.0:
+                    recommendations.append({
+                        'category': 'optimization',
+                        'priority': 'medium',
+                        'title': 'Process Efficiency Optimization Opportunities',
+                        'description': f'Found {len([p for p in efficiency_data if p["cpu_efficiency_per_watt"] < 1.0])} inefficient processes consuming disproportionate power',
+                        'recommendations': [
+                            f"Optimize '{proc['process_name']}' (efficiency: {proc['cpu_efficiency_per_watt']:.3f} CPU%/W)"
+                            for proc in least_efficient[:3]
+                        ] + [
+                            'Consider process replacement or configuration optimization',
+                            'Benchmark against most efficient processes',
+                            'Implement power-aware process scheduling'
+                        ],
+                        'impact': 'Significant power savings through process optimization',
+                        'statistics': {
+                            'least_efficient_processes': least_efficient[:3],
+                            'most_efficient_processes': most_efficient[:3],
+                            'total_processes_analyzed': len(efficiency_data)
+                        }
+                    })
+
+            # GPU Optimization Recommendations
+            avg_host_gpu = host_analysis['avg_host_gpu_percent']
+            avg_gpu_temp = host_analysis['avg_gpu_temperature_celsius']
+            avg_gpu_power = host_analysis['avg_gpu_power_watts']
+
+            if avg_host_gpu > 0:
+                if avg_host_gpu > 80:
+                    recommendations.append({
+                        'category': 'performance',
+                        'priority': 'high',
+                        'title': 'High GPU Utilization',
+                        'description': f'Host GPU running at {avg_host_gpu:.1f}% utilization',
+                        'recommendations': [
+                            'Consider adding additional GPUs',
+                            'Implement GPU workload scheduling',
+                            'Optimize GPU memory allocation',
+                            'Monitor GPU temperature and power limits'
+                        ],
+                        'impact': 'Critical for GPU-intensive workloads'
+                    })
+                elif avg_host_gpu < 20 and avg_gpu_power > 50:
+                    recommendations.append({
+                        'category': 'cost_optimization',
+                        'priority': 'medium',
+                        'title': 'Underutilized High-Power GPU',
+                        'description': f'GPU at {avg_host_gpu:.1f}% usage but consuming {avg_gpu_power:.1f}W',
+                        'recommendations': [
+                            'Deploy GPU-accelerated applications',
+                            'Consider GPU power management settings',
+                            'Share GPU resources across applications',
+                            'Evaluate if GPU is necessary for current workload'
+                        ],
+                        'potential_savings': 'Significant power savings possible'
+                    })
+
+            # Temperature monitoring
+            if avg_gpu_temp > 80:
+                recommendations.append({
+                    'category': 'maintenance',
+                    'priority': 'high',
+                    'title': 'High GPU Temperature',
+                    'description': f'Average GPU temperature at {avg_gpu_temp:.1f}°C',
+                    'recommendations': [
+                        'Check cooling system and airflow',
+                        'Clean dust from GPU fans and heatsinks',
+                        'Consider undervolting or reducing power limits',
+                        'Monitor for thermal throttling'
+                    ],
+                    'impact': 'Prevent hardware damage and performance throttling'
+                })
+
+            # Process-Specific Recommendations
+            top_processes = host_analysis.get('top_processes', [])
+            if top_processes:
+                high_power_processes = [p for p in top_processes if p['avg_power_watts'] > 25]
+                if high_power_processes:
+                    recommendations.append({
+                        'category': 'optimization',
+                        'priority': 'medium',
+                        'title': 'High Power Consuming Processes Identified',
+                        'description': f'Found {len(high_power_processes)} processes with high power consumption',
+                        'recommendations': [
+                            f"Optimize '{proc['process_name']}' (avg: {proc['avg_power_watts']:.1f}W)"
+                            for proc in high_power_processes[:3]
+                        ] + ['Consider process optimization or scheduling'],
+                        'processes': high_power_processes
+                    })
+
+            # Cost Estimation and Regional Comparison
+            regions = self.get_all_regions_with_pricing(db)
+            avg_total_power = host_analysis['avg_process_power_watts'] + host_analysis['avg_gpu_power_watts']
+
+            if regions and avg_total_power > 0:
+                # Calculate 30-day projected costs
+                daily_energy_kwh = (avg_total_power * 24) / 1000.0
+                monthly_energy_kwh = daily_energy_kwh * 30
+
+                regional_costs = []
+                for region in regions:
+                    monthly_cost = monthly_energy_kwh * region['cost_per_kwh']
+                    regional_costs.append({
+                        'region': region['region'],
+                        'monthly_cost': round(monthly_cost, 4),
+                        'cost_per_kwh': region['cost_per_kwh']
+                    })
+
+                # Sort by cost
+                regional_costs.sort(key=lambda x: x['monthly_cost'])
+
+                if len(regional_costs) > 1:
+                    cheapest = regional_costs[0]
+                    current_region_cost = next(
+                        (r for r in regional_costs if r['region'] == self.current_region),
+                        cheapest
+                    )
+
+                    if current_region_cost['monthly_cost'] > cheapest['monthly_cost']:
+                        savings = current_region_cost['monthly_cost'] - cheapest['monthly_cost']
+                        recommendations.append({
+                            'category': 'cost_optimization',
+                            'priority': 'low',
+                            'title': 'Regional Cost Optimization Opportunity',
+                            'description': f'Current region costs ${current_region_cost["monthly_cost"]:.2f}/month vs ${cheapest["monthly_cost"]:.2f}/month in {cheapest["region"]}',
+                            'recommendations': [
+                                f'Consider migrating to {cheapest["region"]} region',
+                                'Evaluate migration costs vs energy savings',
+                                'Consider hybrid deployment across regions'
+                            ],
+                            'potential_savings': f'${savings:.2f}/month (${savings*12:.2f}/year)',
+                            'regional_analysis': regional_costs[:3]
+                        })
+
+            return {
+                "success": True,
+                "host_analysis": host_analysis,
+                "recommendations": recommendations,
+                "analysis_period": f"Last {time_range_days} days" if not start_date else f"{start_date} to {end_date}",
+                "generated_at": datetime.utcnow().isoformat(),
+                "summary": {
+                    "total_recommendations": len(recommendations),
+                    "high_priority": len([r for r in recommendations if r.get('priority') == 'high']),
+                    "medium_priority": len([r for r in recommendations if r.get('priority') == 'medium']),
+                    "low_priority": len([r for r in recommendations if r.get('priority') == 'low']),
+                    "categories": list(set([r.get('category', 'general') for r in recommendations]))
+                }
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Failed to generate host recommendations: {str(e)}"
+            }
