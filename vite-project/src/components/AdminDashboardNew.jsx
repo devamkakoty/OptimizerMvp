@@ -21,6 +21,7 @@ import {
 import { Line, Bar, Doughnut } from 'react-chartjs-2';
 import VMRecommendationsModal from './VMRecommendationsModal';
 import ProcessInsightsModal from './ProcessInsightsModal';
+import CardModal from './CardModal';
 
 ChartJS.register(
   CategoryScale,
@@ -97,6 +98,20 @@ const AdminDashboardNew = ({
 
   // State for top processes data
   const [topProcesses, setTopProcesses] = useState([]);
+  
+  // State for showing and hiding the Walkthrough Modal
+  const [showModal, setShowModal] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowModal(true);
+    }, 100);
+    return () => clearTimeout(timer);
+  }, []);
+
+useEffect(() => {
+  console.log('showModal:', showModal);
+}, [showModal]);
 
   // Generate AI-powered process-specific recommendations
   const generateProcessRecommendations = (processName, power, cost, process) => {
@@ -595,6 +610,18 @@ const AdminDashboardNew = ({
     };
   }, []);
 
+  // Optional: freeze background scroll
+  useEffect(() => {
+    if (showModal) {
+      document.body.classList.add('overflow-hidden');
+    } else {
+      document.body.classList.remove('overflow-hidden');
+    }
+    return () => {
+      document.body.classList.remove('overflow-hidden');
+    }
+  }, [showModal]);
+
   // Refetch ONLY date-range dependent data when date range changes
   useEffect(() => {
     fetchChartData(); // Charts should reflect date range
@@ -665,11 +692,11 @@ const AdminDashboardNew = ({
     };
   };
 
-
+  
   // State for optimized data from backend
   const [systemOverview, setSystemOverview] = useState(null);
   const [chartData, setChartData] = useState(null);
-
+  
   // Fetch optimized system overview from backend
   const fetchSystemOverview = async () => {
     try {
@@ -951,165 +978,168 @@ const AdminDashboardNew = ({
   };
 
   return (
-    <div className="space-y-4 max-w-full overflow-hidden">
+    <>
+    {showModal && <CardModal showModal={showModal} onClose={() => setShowModal(false)} />}
+      <div className={`space-y-6 max-w-full overflow-hidden transition-opacity duration-300 ${showModal ? 'pointer-events-none opacity-50' : 'opacity-100'}`}></div>
+          <div className="space-y-4 max-w-full overflow-hidden">
       {/* Top Right-Aligned Toolbar */}
       <div className="bg-gray-50 dark:bg-gray-800 px-3 py-2">
         <div className="flex justify-end">
           <div className="flex flex-nowrap items-center space-x-4">
 
             {/* Cost Calculation Region */}
-            <select
-              value={selectedRegion}
-              onChange={(e) => setSelectedRegion(e.target.value)}
+              <select
+                value={selectedRegion}
+                onChange={(e) => setSelectedRegion(e.target.value)}
               className="px-6 py-2.5 bg-gray-50 dark:bg-gray-700 text-xl font-lite text-gray-500 dark:text-white rounded-lg border border-gray-400 dark:border-gray-600 text-sm w-90 h-12 focus:ring-2 focus:ring-[#01a982]"
-            >
+              >
               <option default value="">Cost Calculation Region</option>
-              {availableRegions.map(region => (
-                <option key={region.code} value={region.code}>
-                  {region.code} - {region.currency}
-                </option>
-              ))}
-            </select>
+                {availableRegions.map(region => (
+                  <option key={region.code} value={region.code}>
+                    {region.code} - {region.currency}
+                  </option>
+                ))}
+              </select>
 
             {/* View Mode Dropdown */}
-            <select
-              value={viewMode}
-              onChange={(e) => setViewMode(e.target.value)}
+              <select
+                value={viewMode}
+                onChange={(e) => setViewMode(e.target.value)}
               className="px-4 py-2.5 bg-gray-50 dark:bg-gray-700 text-xl font-lite text-gray-500 dark:text-white rounded-lg border border-gray-400 dark:border-gray-600 text-xl w-85 h-12 focus:ring-2 focus:ring-[#01a982]"
-            >
-              <option value="day">Daily</option>
-              <option value="week">Weekly</option>
-              <option value="month">Monthly</option>
-            </select>
+              >
+                <option value="day">Daily</option>
+                <option value="week">Weekly</option>
+                <option value="month">Monthly</option>
+              </select>
 
             {/* Start Date Picker */}
-            <DatePicker
-              selected={dateRange.start}
-              onChange={(date) => setDateRange(prev => ({ ...prev, start: date }))}
-              minDate={minDate}
-              maxDate={maxDate}
+              <DatePicker
+                selected={dateRange.start}
+                onChange={(date) => setDateRange(prev => ({ ...prev, start: date }))}
+                minDate={minDate}
+                maxDate={maxDate}
               className="max-w-32 px-4 py-2.5 bg-gray-50 dark:bg-gray-700 text-xl font-lite text-gray-500 dark:text-white rounded-lg border border-gray-400 dark:border-gray-600 text-xl h-12 focus:ring-2 focus:ring-[#01a982]"
               placeholderText="mm/dd/yyyy"
               dateFormat="MM/dd/yyyy"
-            />
+              />
 
             {/* End Date Picker */}
-            <DatePicker
-              selected={dateRange.end}
-              onChange={(date) => setDateRange(prev => ({ ...prev, end: date }))}
-              selectsEnd
-              startDate={dateRange.start}
-              endDate={dateRange.end}
-              minDate={dateRange.start || minDate}
-              maxDate={maxDate}
+              <DatePicker
+                selected={dateRange.end}
+                onChange={(date) => setDateRange(prev => ({ ...prev, end: date }))}
+                selectsEnd
+                startDate={dateRange.start}
+                endDate={dateRange.end}
+                minDate={dateRange.start || minDate}
+                maxDate={maxDate}
               className="max-w-32 px-4 py-2.5 bg-gray-50 dark:bg-gray-700 text-xl font-lite text-gray-500 dark:text-white rounded-lg border border-gray-400 dark:border-gray-600 text-xl h-12 focus:ring-2 focus:ring-[#01a982]"
               placeholderText="mm/dd/yyyy"
               dateFormat="MM/dd/yyyy"
-            />
+              />
             {/* Report Button */}
-            <button
-              onClick={handleDownloadReport}
+              <button
+                onClick={handleDownloadReport}
               className="px-6 py-2.5 bg-[#008060] hover:bg-[#00694d] text-white rounded-full text-base font-medium flex items-center gap-2 h-11 transition-colors"
-            >
-              Report
+              >
+                Report
               <Download className="w-5 h-5" />
-            </button>
+              </button>
+            </div>
           </div>
         </div>
-      </div>
 
 
-      {/* System Overview Section */}
+        {/* System Overview Section */}
       {/* <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">System Overview</h2>
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">System Overview</h2>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6"> */}
 
-      {/* Live Performance Metrics (Left) */}
+            {/* Live Performance Metrics (Left) */}
       {/* <div className="relative">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Live Performance Metrics</h3>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setPerformanceCardIndex(Math.max(0, performanceCardIndex - 1))}
-                  disabled={performanceCardIndex === 0}
-                  className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => setPerformanceCardIndex(Math.min(performanceMetrics.length - 2, performanceCardIndex + 1))}
-                  disabled={performanceCardIndex >= performanceMetrics.length - 2}
-                  className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              {performanceMetrics.slice(performanceCardIndex, performanceCardIndex + 2).map((metric, index) => (
-                <div key={index} className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 text-center">
-                  <div className={`text-2xl font-bold text-${metric.color}-600 dark:text-${metric.color}-400`}>
-                    {metricsLoading ? '...' : `${metric.value.toFixed(1)}${metric.unit}`}
-                  </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">{metric.label}</div>
-                  <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2 mt-2">
-                    <div
-                      className={`bg-${metric.color}-500 h-2 rounded-full transition-all duration-300`}
-                      style={{ width: `${Math.min(100, metric.value)}%` }}
-                    />
-                  </div>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Live Performance Metrics</h3>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setPerformanceCardIndex(Math.max(0, performanceCardIndex - 1))}
+                    disabled={performanceCardIndex === 0}
+                    className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => setPerformanceCardIndex(Math.min(performanceMetrics.length - 2, performanceCardIndex + 1))}
+                    disabled={performanceCardIndex >= performanceMetrics.length - 2}
+                    className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
                 </div>
-              ))}
-            </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                {performanceMetrics.slice(performanceCardIndex, performanceCardIndex + 2).map((metric, index) => (
+                  <div key={index} className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 text-center">
+                    <div className={`text-2xl font-bold text-${metric.color}-600 dark:text-${metric.color}-400`}>
+                      {metricsLoading ? '...' : `${metric.value.toFixed(1)}${metric.unit}`}
+                    </div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">{metric.label}</div>
+                    <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2 mt-2">
+                      <div
+                        className={`bg-${metric.color}-500 h-2 rounded-full transition-all duration-300`}
+                        style={{ width: `${Math.min(100, metric.value)}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
           </div> */}
 
-      {/* Hardware Details (Right) */}
+            {/* Hardware Details (Right) */}
       {/* <div className="relative">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Hardware Details</h3>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setHardwareCardIndex(Math.max(0, hardwareCardIndex - 1))}
-                  disabled={hardwareCardIndex === 0}
-                  className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => setHardwareCardIndex(Math.min(hardwareDetails.length - 2, hardwareCardIndex + 1))}
-                  disabled={hardwareCardIndex >= hardwareDetails.length - 2}
-                  className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              {hardwareDetails.slice(hardwareCardIndex, hardwareCardIndex + 2).map((detail, index) => {
-                const IconComponent = detail.icon;
-                return (
-                  <div
-                    key={index}
-                    className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 text-center cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-                    onClick={() => handleHardwareCardClick(detail)}
-                    title={`Click for detailed ${detail.label} information`}
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Hardware Details</h3>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setHardwareCardIndex(Math.max(0, hardwareCardIndex - 1))}
+                    disabled={hardwareCardIndex === 0}
+                    className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <div className="flex justify-center mb-2">
-                      <IconComponent className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => setHardwareCardIndex(Math.min(hardwareDetails.length - 2, hardwareCardIndex + 1))}
+                    disabled={hardwareCardIndex >= hardwareDetails.length - 2}
+                    className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                {hardwareDetails.slice(hardwareCardIndex, hardwareCardIndex + 2).map((detail, index) => {
+                  const IconComponent = detail.icon;
+                  return (
+                    <div
+                      key={index}
+                      className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 text-center cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+                      onClick={() => handleHardwareCardClick(detail)}
+                      title={`Click for detailed ${detail.label} information`}
+                    >
+                      <div className="flex justify-center mb-2">
+                        <IconComponent className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">{detail.label}</div>
+                      <div className="text-lg font-semibold text-gray-900 dark:text-white mt-1 truncate">
+                        {hardwareLoading ? 'Loading...' : detail.value}
+                      </div>
                     </div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">{detail.label}</div>
-                    <div className="text-lg font-semibold text-gray-900 dark:text-white mt-1 truncate">
-                      {hardwareLoading ? 'Loading...' : detail.value}
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
             </div> */}
       {/* </div>
-        </div>
+              </div>
       </div> */}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1172,8 +1202,8 @@ const AdminDashboardNew = ({
                       </div>
                       <div className="text-sm font-semibold text-gray-500 dark:text-white truncate">
                         {hardwareLoading ? 'Loading...' : detail.value}
-                      </div>
-                    </div>
+          </div>
+        </div>
 
                   </div>
                 );
@@ -1250,7 +1280,7 @@ const AdminDashboardNew = ({
       </div>
 
 
-      {/* Middle Section: Performance Analytics (Left) + VM Monitoring & Insights (Right) */}
+        {/* Middle Section: Performance Analytics (Left) + VM Monitoring & Insights (Right) */}
       <div className="grid grid-cols-5 gap-6">
 
         {/* Performance Analytics (Revised Layout) */}
@@ -1264,22 +1294,22 @@ const AdminDashboardNew = ({
 
           {/* Dropdown centered below title */}
           <div className="flex justify-center mb-6">
-            <select
-              value={selectedGraph}
-              onChange={(e) => setSelectedGraph(e.target.value)}
+              <select
+                value={selectedGraph}
+                onChange={(e) => setSelectedGraph(e.target.value)}
               className="px-6 py-2 my-3 text-lg bg-white dark:bg-gray-700 text-gray-700 dark:text-white rounded-md border border-gray-400 dark:border-gray-600 w-120 h-10 focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982]"
-            >
-              {graphOptions.map(option => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
+              >
+                {graphOptions.map(option => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
 
           {/* Bar chart centered below dropdown */}
           <div className="h-80 flex justify-center items-center">
-            {chartData ? (
+              {chartData ? (
               <div className="w-full">
                 <Bar
                   data={chartData}
@@ -1310,148 +1340,148 @@ const AdminDashboardNew = ({
                   }}
                 />
               </div>
-            ) : (
-              <div className="flex items-center justify-center h-full">
-                <div className="text-center">
-                  <BarChart3 className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-500 dark:text-gray-400">No data available</p>
+              ) : (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center">
+                    <BarChart3 className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-500 dark:text-gray-400">No data available</p>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
-        </div>
 
 
-        {/* Right Column: VM Monitoring + System Insights */}
+          {/* Right Column: VM Monitoring + System Insights */}
         <div className="col-span-3 grid grid-rows-2 gap-6 h-full">
 
-          {/* VM Monitoring Section (Top Right) */}
+            {/* VM Monitoring Section (Top Right) */}
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 pt-4 h-full">
-            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center justify-between mb-4">
               {/* Header left */}
               <h3 className="text-[24px] font-normal text-gray-900 dark:text-white">
                 Current VM Instances
               </h3>
 
               {/* Button right */}
-              <button
-                onClick={fetchVMData}
+                <button
+                  onClick={fetchVMData}
                 className="flex items-center justify-center w-8 h-8 rounded-full border border-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                disabled={vmDataLoading}
-              >
+                  disabled={vmDataLoading}
+                >
                 <div className={`text-sm ${vmDataLoading ? 'animate-spin' : ''}`}>⟳</div>
-              </button>
-            </div>
+                </button>
+              </div>
 
 
-            <div className="space-y-2 max-h-40 overflow-y-auto">
-              {vmDataLoading ? (
-                <div className="text-center py-4">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500 mx-auto"></div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">Loading VM instances...</p>
-                </div>
-              ) : vmData.length === 0 ? (
-                <div className="text-center py-8">
-                  <div className="w-12 h-12 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <span className="text-2xl">ℹ️</span>
+              <div className="space-y-2 max-h-40 overflow-y-auto">
+                {vmDataLoading ? (
+                  <div className="text-center py-4">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500 mx-auto"></div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">Loading VM instances...</p>
                   </div>
-                  <p className="text-gray-500 dark:text-gray-400 mb-4">No VM Instances Found</p>
-                  <button
-                    onClick={fetchVMData}
-                    className="px-4 py-2 bg-green-30 text-white rounded-lg hover:bg-green-30 transition-colors btn3"
-                  >
-                    Retry
-                  </button>
-                </div>
-              ) : (
-                vmData.map((vm) => (
-                  <div key={vm.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-3">
-                    <div
-                      className="flex items-center justify-between cursor-pointer"
-                      onClick={() => setExpandedVM(expandedVM === vm.id ? null : vm.id)}
-                    >
-                      <div className="flex items-center space-x-3">
-                        <div className="w-2 h-2 bg-[#01a982] rounded-full"></div>
-                        <div>
-                          <div className="font-medium text-gray-900 dark:text-white">{vm.name}</div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">{vm.type}</div>
-                        </div>
-                      </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">
-                        CPU: {vm.cpuUsage.toFixed(1)}%
-                      </div>
+                ) : vmData.length === 0 ? (
+                  <div className="text-center py-8">
+                    <div className="w-12 h-12 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <span className="text-2xl">ℹ️</span>
                     </div>
-
-                    {expandedVM === vm.id && (
-                      <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-                        <div className="grid grid-cols-2 gap-2 text-xs">
-                          <div>RAM: {vm.ramUsagePercent.toFixed(1)}%</div>
-                          <div>Processes: {vm.processCount}</div>
-                        </div>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedVMForRecommendations(vm);
-                            setRecommendationsModalOpen(true);
-                          }}
-                          className="mt-2 w-full px-3 py-1 bg-[#01a982] text-white text-xs rounded hover:bg-[#019670] transition-colors"
-                        >
-                          View Recommendations
-                        </button>
-                      </div>
-                    )}
+                    <p className="text-gray-500 dark:text-gray-400 mb-4">No VM Instances Found</p>
+                    <button
+                      onClick={fetchVMData}
+                    className="px-4 py-2 bg-green-30 text-white rounded-lg hover:bg-green-30 transition-colors btn3"
+                    >
+                      Retry
+                    </button>
                   </div>
-                ))
-              )}
-            </div>
-          </div>
+                ) : (
+                  vmData.map((vm) => (
+                    <div key={vm.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-3">
+                      <div
+                        className="flex items-center justify-between cursor-pointer"
+                        onClick={() => setExpandedVM(expandedVM === vm.id ? null : vm.id)}
+                      >
+                        <div className="flex items-center space-x-3">
+                          <div className="w-2 h-2 bg-[#01a982] rounded-full"></div>
+                          <div>
+                            <div className="font-medium text-gray-900 dark:text-white">{vm.name}</div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">{vm.type}</div>
+                          </div>
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          CPU: {vm.cpuUsage.toFixed(1)}%
+                        </div>
+                      </div>
 
-          {/* System Insights & Recommendations (Bottom Right) */}
+                      {expandedVM === vm.id && (
+                        <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div>RAM: {vm.ramUsagePercent.toFixed(1)}%</div>
+                            <div>Processes: {vm.processCount}</div>
+                          </div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedVMForRecommendations(vm);
+                              setRecommendationsModalOpen(true);
+                            }}
+                            className="mt-2 w-full px-3 py-1 bg-[#01a982] text-white text-xs rounded hover:bg-[#019670] transition-colors"
+                          >
+                            View Recommendations
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* System Insights & Recommendations (Bottom Right) */}
           <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 pt-4 h-full">
-            <SystemInsightsGenerator
-              processData={topProcesses}
-              vmData={vmData || []}
-              selectedDate={selectedDate || 'today'}
-              viewMode={viewMode || 'daily'}
+              <SystemInsightsGenerator
+                processData={topProcesses}
+                vmData={vmData || []}
+                selectedDate={selectedDate || 'today'}
+                viewMode={viewMode || 'daily'}
               hostMetrics={hostMetrics}
-            />
+              />
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Process Monitoring Section */}
+        {/* Process Monitoring Section */}
       <div className="bg-white dark:bg-gray-800 rounded-xl  shadow-sm border border-gray-200 dark:border-gray-700">
         <div className="px-6 py-4 border-b border-gray-200 dark:text-white dark:border-gray-700">
           <div className="flex items-center justify-between mb-12">
             <h3 className="text-[24px] dark:text-white font-normal text-gray-900">
               Process Performance & Cost Analysis
             </h3>
-          </div>
+            </div>
 
 
-          {/* Search and Filter Bar */}
+            {/* Search and Filter Bar */}
           <div className="mt-2 flex items-center gap-3">
             {/* Search Input with Icon */}
             <div className="relative w-[400px]"> {/* wider input */}
-              <input
-                type="text"
+                <input
+                  type="text"
                 placeholder="Search"
                 className="w-full pl-10 pr-4 py-2 border border-gray-400 dark:bg-gray-800 dark:border-gray-700 rounded-lg text-gray-700 placeholder-gray-500 text-base focus:outline-none focus:ring-1 focus:ring-gray-500"
               />
               <Search
                 className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5  font-bolder text-gray-900"
-              />
-            </div>
+                  />
+              </div>
 
             {/* Filter Button */}
             <button className="p-2 border border-gray-400 rounded-lg hover:bg-gray-100 transition-colors">
               <Funnel className="w-5 h-5 text-gray-600" />
-            </button>
+              </button>
+            </div>
+
           </div>
 
-        </div>
-
-        <div className="overflow-x-auto">
+          <div className="overflow-x-auto">
           <table className="w-full border-collapse justify-center">
             <thead>
               <tr className="bg-gray-50 dark:bg-gray-800 border-b border-gray-300">
@@ -1470,32 +1500,32 @@ const AdminDashboardNew = ({
                 <th className="px-4 py-3 text-left text-[18px] font-medium dark:text-gray-300 text-gray-900">
                   Status
                 </th>
-              </tr>
-            </thead>
+                </tr>
+              </thead>
             <tbody>
-              {topProcesses.slice(0, 5).map((process, index) => (
-                <tr
-                  key={process['Process ID'] || index}
-                  onClick={() => handleProcessClick(process)}
+                {topProcesses.slice(0, 5).map((process, index) => (
+                  <tr
+                    key={process['Process ID'] || index}
+                    onClick={() => handleProcessClick(process)}
                   className={
                     index % 2 === 1
                       ? "bg-gray-50 cursor-pointer"
                       : "bg-white cursor-pointer"
                   }
-                >
+                  >
                   <td className="px-4 py-3 text-md text-gray-600">
                     {process['Process Name'] || 'Unknown'} PID: {process['Process ID']}
-                  </td>
+                    </td>
                   <td className="px-4 py-3 text-md text-gray-600">
-                    {process['Username'] || 'System'}
-                  </td>
+                      {process['Username'] || 'System'}
+                    </td>
                   <td className="px-4 py-3 text-md text-gray-600">
-                    {(process['CPU Usage (%)'] || 0).toFixed(1)}%
-                  </td>
+                      {(process['CPU Usage (%)'] || 0).toFixed(1)}%
+                    </td>
                   <td className="px-4 py-3 text-md text-gray-600">
                     {(process['Memory Usage (MB)'] || 0).toFixed(1)}MB,{" "}
                     {(process['Memory Usage (%)'] || 0).toFixed(1)}%
-                  </td>
+                    </td>
                   <td className="px-4 py-3 text-md font-medium">
                     <span
                       className={
@@ -1507,101 +1537,102 @@ const AdminDashboardNew = ({
                       }
                     >
                       {process.Status || "Unknown"}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-
-        {/* View All Button at Bottom */}
-        <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700">
-          <div className="flex justify-end">
-            <button
-              onClick={() => navigate('/processes')}
-              className="px-6 py-2.5 bg-[#008060] hover:bg-[#00694d] text-white font-bold rounded-full text-md flex items-center gap-2 h-11 transition-colors"
-            >
-              View All
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Process Insights Modal */}
-      <ProcessInsightsModal
-        isOpen={processModalOpen}
-        onClose={() => {
-          setProcessModalOpen(false);
-          setSelectedProcess(null);
-        }}
-        selectedProcess={selectedProcess}
-        processRecommendations={processRecommendations}
-        processRealTimeData={processRealTimeData}
-      />
-
-      {/* Hardware Details Popup Modal */}
-      {showHardwarePopup && selectedHardwareDetail && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full mx-4 max-h-[80vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  {selectedHardwareDetail.icon && (
-                    <selectedHardwareDetail.icon className="w-8 h-8 text-[#01a982]" />
-                  )}
-                  <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
-                    {selectedHardwareDetail.label} Details
-                  </h3>
-                </div>
-                <button
-                  onClick={() => setShowHardwarePopup(false)}
-                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-
-              <div className="space-y-3">
-                {Object.entries(selectedHardwareDetail.details || {}).map(([key, value]) => (
-                  <div key={key} className="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-600">
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">{key}:</span>
-                    <span className="text-sm text-gray-900 dark:text-white font-semibold">{value}</span>
-                  </div>
+                      </span>
+                    </td>
+                  </tr>
                 ))}
-              </div>
+              </tbody>
+            </table>
+          </div>
 
-              <div className="mt-6 flex justify-end">
-                <button
-                  onClick={() => setShowHardwarePopup(false)}
-                  className="px-4 py-2 bg-[#01a982] text-white rounded-lg hover:bg-[#018f73] transition-colors"
-                >
-                  Close
-                </button>
-              </div>
+
+          {/* View All Button at Bottom */}
+          <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex justify-end">
+              <button
+                onClick={() => navigate('/processes')}
+              className="px-6 py-2.5 bg-[#008060] hover:bg-[#00694d] text-white font-bold rounded-full text-md flex items-center gap-2 h-11 transition-colors"
+              >
+                View All
+              </button>
             </div>
           </div>
         </div>
-      )}
 
-      {/* VM Recommendations Modal */}
-      {recommendationsModalOpen && selectedVMForRecommendations && (
-        <VMRecommendationsModal
-          isOpen={recommendationsModalOpen}
+        {/* Process Insights Modal */}
+        <ProcessInsightsModal
+          isOpen={processModalOpen}
           onClose={() => {
-            setRecommendationsModalOpen(false);
-            setSelectedVMForRecommendations(null);
+            setProcessModalOpen(false);
+            setSelectedProcess(null);
           }}
-          vmName={selectedVMForRecommendations.name}
+          selectedProcess={selectedProcess}
+          processRecommendations={processRecommendations}
+          processRealTimeData={processRealTimeData}
+        />
+
+        {/* Hardware Details Popup Modal */}
+        {showHardwarePopup && selectedHardwareDetail && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full mx-4 max-h-[80vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    {selectedHardwareDetail.icon && (
+                      <selectedHardwareDetail.icon className="w-8 h-8 text-[#01a982]" />
+                    )}
+                    <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+                      {selectedHardwareDetail.label} Details
+                    </h3>
+                  </div>
+                  <button
+                    onClick={() => setShowHardwarePopup(false)}
+                    className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {Object.entries(selectedHardwareDetail.details || {}).map(([key, value]) => (
+                    <div key={key} className="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-600">
+                      <span className="text-sm font-medium text-gray-600 dark:text-gray-400">{key}:</span>
+                      <span className="text-sm text-gray-900 dark:text-white font-semibold">{value}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-6 flex justify-end">
+                  <button
+                    onClick={() => setShowHardwarePopup(false)}
+                    className="px-4 py-2 bg-[#01a982] text-white rounded-lg hover:bg-[#018f73] transition-colors"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* VM Recommendations Modal */}
+        {recommendationsModalOpen && selectedVMForRecommendations && (
+          <VMRecommendationsModal
+            isOpen={recommendationsModalOpen}
+            onClose={() => {
+              setRecommendationsModalOpen(false);
+              setSelectedVMForRecommendations(null);
+            }}
+            vmName={selectedVMForRecommendations.name}
           timeRangeDays={7}
           selectedDate={dateRange.start ? dateRange.start.toISOString().split('T')[0] : 'today'}
           endDate={dateRange.end ? dateRange.end.toISOString().split('T')[0] : null}
-        />
-      )}
-    </div>
+          />
+        )}
+      </div>
+      </>
   );
 };
 
