@@ -1109,682 +1109,48 @@ const OptimizeTab = () => {
         </div>
       </div> */}
 
-      {/* Post-Deployment Section with Sub-tabs */}
-      {optimizationMode === 'post-deployment' && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-8 mb-6">
-          {/* Post-Deployment Mode Selector */}
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">Post-Deployment Optimization</h2>
-              <div className="flex gap-4">
-                <button
-                  onClick={() => setIsOverrideEnabled(!isOverrideEnabled)}
-                  className={`flex items-center gap-2 text-sm transition-colors ${isOverrideEnabled
-                    ? 'text-orange-600 hover:text-orange-700'
-                    : 'text-[#01a982] hover:text-[#019670]'
-                    }`}
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                  </svg>
-                  {isOverrideEnabled ? 'Exit Override' : 'Override'}
-                </button>
-                <button
-                  onClick={fetchHostMetrics}
-                  disabled={isLoadingHostMetrics}
-                  className="flex items-center gap-2 text-sm text-[#01a982] hover:text-[#019670] disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isLoadingHostMetrics ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-[#01a982] border-t-transparent rounded-full animate-spin"></div>
-                      Refreshing...
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                      </svg>
-                      Refresh Host Metrics
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-
-            {/* Sub-tabs for Post-Deployment */}
-            <div className="flex justify-center mb-6">
-              <div className="inline-flex items-center gap-2 bg-gray-100 dark:bg-gray-700 p-1 rounded-lg">
-                <button
-                  onClick={() => setPostDeploymentMode('bare-metal')}
-                  className={`px-4 py-2 rounded-md font-medium text-sm transition-all ${postDeploymentMode === 'bare-metal'
-                    ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
-                    : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-                    }`}
-                >
-                  Bare Metal Level Recommendation
-                </button>
-                <button
-                  onClick={() => setPostDeploymentMode('vm-level')}
-                  className={`px-4 py-2 rounded-md font-medium text-sm transition-all ${postDeploymentMode === 'vm-level'
-                    ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
-                    : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-                    }`}
-                >
-                  VM Level Recommendation
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Bare Metal Level Recommendation Content */}
-          {postDeploymentMode === 'bare-metal' && (
-            <div>
-              <div className="mb-4">
-                <p className="text-gray-600 dark:text-gray-300">Real-time resource utilization metrics of Bare Metal Host Machine</p>
-              </div>
-
-              {/* Host Metrics Status Indicator */}
-              {hostMetricsLastUpdated && (
-                <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-                  <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-                    <div className="flex items-center gap-1">
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      Last updated: {hostMetricsLastUpdated.toLocaleTimeString()}
-                    </div>
-                    {!isOverrideEnabled && (
-                      <div className="flex items-center gap-1">
-                        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                        Auto-refreshing every 2s
-                      </div>
-                    )}
-                    {isOverrideEnabled && (
-                      <div className="flex items-center gap-1">
-                        <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                        Auto-refresh paused (Override mode)
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-                {/* GPU Utilization */}
-                <div>
-                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    GPU Utilization
-                    <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-                  </label>
-                  {isOverrideEnabled ? (
-                    <input
-                      type="number"
-                      value={gpuUtilization}
-                      onChange={(e) => setGpuUtilization(e.target.value)}
-                      className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
-                      placeholder="Enter %"
-                      min="0"
-                      max="100"
-                    />
-                  ) : (
-                    <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                      <div className="text-lg font-semibold text-gray-500 dark:text-gray-400">
-                        {gpuUtilization}%
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* GPU Memory Usage */}
-                <div>
-                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    GPU Memory Usage
-                    <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-                  </label>
-                  {isOverrideEnabled ? (
-                    <input
-                      type="number"
-                      value={gpuMemoryUsage}
-                      onChange={(e) => setGpuMemoryUsage(e.target.value)}
-                      className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
-                      placeholder="Enter %"
-                      min="0"
-                      max="100"
-                    />
-                  ) : (
-                    <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                      <div className="text-lg font-semibold text-gray-500 dark:text-gray-400">
-                        {gpuMemoryUsage}%
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* CPU Utilization */}
-                <div>
-                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    CPU Utilization
-                    <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-                  </label>
-                  {isOverrideEnabled ? (
-                    <input
-                      type="number"
-                      value={cpuUtilization}
-                      onChange={(e) => setCpuUtilization(e.target.value)}
-                      className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
-                      placeholder="Enter %"
-                      min="0"
-                      max="100"
-                    />
-                  ) : (
-                    <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                      <div className="text-lg font-semibold text-gray-500 dark:text-gray-400">
-                        {cpuUtilization}%
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* CPU Memory Usage */}
-                <div>
-                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    CPU Memory Usage
-                    <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-                  </label>
-                  {isOverrideEnabled ? (
-                    <input
-                      type="number"
-                      value={cpuMemoryUsage}
-                      onChange={(e) => setCpuMemoryUsage(e.target.value)}
-                      className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
-                      placeholder="Enter %"
-                      min="0"
-                      max="100"
-                    />
-                  ) : (
-                    <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                      <div className="text-lg font-semibold text-gray-500 dark:text-gray-400">
-                        {cpuMemoryUsage}%
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Disk IOPS */}
-                <div>
-                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Disk IOPS
-                    <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-                  </label>
-                  {isOverrideEnabled ? (
-                    <input
-                      type="number"
-                      value={diskIops}
-                      onChange={(e) => setDiskIops(e.target.value)}
-                      className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
-                      placeholder="Enter IOPS"
-                    />
-                  ) : (
-                    <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                      <div className="text-lg font-semibold text-gray-500 dark:text-gray-400">
-                        {diskIops} IOPS
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Network Bandwidth */}
-                <div>
-                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Network Bandwidth
-                    <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-                  </label>
-                  {isOverrideEnabled ? (
-                    <input
-                      type="number"
-                      value={networkBandwidth}
-                      onChange={(e) => setNetworkBandwidth(e.target.value)}
-                      className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
-                      placeholder="Enter MB/s"
-                    />
-                  ) : (
-                    <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                      <div className="text-lg font-semibold text-gray-500 dark:text-gray-400">
-                        {networkBandwidth} MB/s
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Current Hardware ID */}
-                <div>
-                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Current Hardware
-                    <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-                  </label>
-                  <select
-                    value={currentHardwareId}
-                    onChange={(e) => setCurrentHardwareId(e.target.value)}
-                    className="w-full px-3 py-2 border text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600"
-                  >
-                    <option value="">Select hardware ({hardwareData.length} available)</option>
-                    {hardwareData.length > 0 ? (
-                      hardwareData.map((hw) => {
-                        const hardwareName = getHardwareName(hw);
-                        return (
-                          <option key={hw.id} value={hardwareName}>
-                            {hardwareName}
-                          </option>
-                        );
-                      })
-                    ) : (
-                      <option disabled>No hardware data loaded</option>
-                    )}
-                  </select>
-                </div>
-
-              </div>
-            </div>
-          )}
-
-          {/* VM Level Recommendation Content */}
-          {postDeploymentMode === 'vm-level' && (
-            <div>
-              <div className="mb-6">
-                <p className="text-gray-600 dark:text-gray-300">Select a VM instance to analyze and optimize its hardware configuration</p>
-
-                {/* VM Error Display */}
-                {vmError && (
-                  <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-                    <p className="text-red-600 dark:text-red-400 text-sm">{vmError}</p>
-                  </div>
-                )}
-
-                {/* VM Selection Dropdown */}
-                <div className="mt-4">
-                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                    Select VM Instance
-                    <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-                  </label>
-
-                  <select
-                    value={selectedVM?.vm_name || ''}
-                    onChange={(e) => {
-                      const vm = activeVMs.find(vm => vm.vm_name === e.target.value);
-                      setSelectedVM(vm || null);
-
-                      // Immediately populate VM Resource Metrics with VM's current usage
-                      if (vm) {
-                        setVmCpuMemoryUsage(vm.ram_usage_percent?.toString() || '0');
-                        setVmGpuMemoryUsage(vm.vram_usage_percent?.toString() || '0');
-
-                        // Also fetch live metrics from API
-                        fetchVmMetrics(vm.vm_name);
-                      } else {
-                        // Clear metrics if no VM selected
-                        setVmCpuMemoryUsage('');
-                        setVmGpuMemoryUsage('');
-                      }
-                    }}
-                    disabled={isLoadingVMs}
-                    className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <option value="">
-                      {isLoadingVMs ? 'Loading VM instances...' :
-                        activeVMs.length === 0 ? 'No active VM instances found' :
-                          `Select VM instance (${activeVMs.length} available)`}
-                    </option>
-                    {activeVMs.map((vm) => (
-                      <option key={vm.vm_name} value={vm.vm_name}>
-                        {vm.display_name}
-                      </option>
-                    ))}
-                  </select>
-
-                  {/* Selected VM Details */}
-                  {selectedVM && (
-                    <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
-                      <h4 className="font-medium text-gray-900 dark:text-white mb-3">Selected VM Configuration</h4>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                        <div>
-                          <span className="text-gray-600 dark:text-gray-400">VM Name:</span>
-                          <div className="font-medium text-gray-900 dark:text-white">{selectedVM.vm_name}</div>
-                        </div>
-                        <div>
-                          <span className="text-gray-600 dark:text-gray-400">Total RAM:</span>
-                          <div className="font-medium text-gray-900 dark:text-white">{selectedVM.memory_summary.ram}</div>
-                        </div>
-                        <div>
-                          <span className="text-gray-600 dark:text-gray-400">Total VRAM:</span>
-                          <div className="font-medium text-gray-900 dark:text-white">{selectedVM.memory_summary.vram}</div>
-                        </div>
-                        <div>
-                          <span className="text-gray-600 dark:text-gray-400">GPU Count:</span>
-                          <div className="font-medium text-gray-900 dark:text-white">{selectedVM.gpu_count || 0}</div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Refresh VMs Button */}
-                  <div className="mt-4 flex justify-end">
-                    <button
-                      onClick={fetchActiveVMs}
-                      disabled={isLoadingVMs}
-                      className="flex items-center gap-2 px-4 py-2 text-sm text-[#01a982] hover:text-[#019670] disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {isLoadingVMs ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-[#01a982] border-t-transparent rounded-full animate-spin"></div>
-                          Refreshing...
-                        </>
-                      ) : (
-                        <>
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                          </svg>
-                          Refresh VM List
-                        </>
-                      )}
-                    </button>
-                  </div>
-
-                  {/* VM Resource Metrics Section - Only show when VM is selected */}
-                  {selectedVM && (
-                    <div className="mt-6 p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
-                      <div className="flex items-center justify-between mb-4">
-                        <h4 className="font-semibold text-gray-900 dark:text-white">VM Resource Metrics</h4>
-                        <div className="flex gap-4">
-                          <button
-                            onClick={() => setIsVmOverrideEnabled(!isVmOverrideEnabled)}
-                            className={`flex items-center gap-2 text-sm transition-colors ${isVmOverrideEnabled
-                              ? 'text-orange-600 hover:text-orange-700'
-                              : 'text-[#01a982] hover:text-[#019670]'
-                              }`}
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                            </svg>
-                            {isVmOverrideEnabled ? 'Exit Override' : 'Override'}
-                          </button>
-                          <button
-                            onClick={() => fetchVmMetrics(selectedVM.vm_name)}
-                            disabled={isLoadingVmMetrics}
-                            className="flex items-center gap-2 text-sm text-[#01a982] hover:text-[#019670] disabled:opacity-50"
-                          >
-                            {isLoadingVmMetrics ? (
-                              <>
-                                <div className="w-4 h-4 border-2 border-[#01a982] border-t-transparent rounded-full animate-spin"></div>
-                                Loading...
-                              </>
-                            ) : (
-                              <>
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                </svg>
-                                Refresh Metrics
-                              </>
-                            )}
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="mb-4">
-                        <p className="text-sm text-gray-600 dark:text-gray-300">
-                          Latest resource utilization metrics for VM: {selectedVM.vm_name}
-                        </p>
-                        {vmMetricsLastUpdated && (
-                          <div className="flex items-center gap-4 mt-2 text-xs text-gray-500 dark:text-gray-400">
-                            <div className="flex items-center gap-1">
-                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                              Last updated: {vmMetricsLastUpdated.toLocaleTimeString()}
-                            </div>
-                            {!isVmOverrideEnabled && (
-                              <div className="flex items-center gap-1">
-                                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                                Auto-refreshing every 30s
-                              </div>
-                            )}
-                            {isVmOverrideEnabled && (
-                              <div className="flex items-center gap-1">
-                                <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                                Auto-refresh paused (Override mode)
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-                        {/* GPU Utilization */}
-                        <div>
-                          <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            GPU Utilization
-                            <span className="text-xs text-gray-500">%</span>
-                            <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-                          </label>
-                          {isVmOverrideEnabled ? (
-                            <input
-                              type="number"
-                              value={vmGpuUtilization}
-                              onChange={(e) => setVmGpuUtilization(e.target.value)}
-                              className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
-                              placeholder="Enter %"
-                              min="0"
-                              max="100"
-                            />
-                          ) : (
-                            <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                              <div className="text-lg font-semibold text-gray-500 dark:text-gray-400">
-                                {isLoadingVmMetrics ? (
-                                  <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
-                                ) : (
-                                  `${vmGpuUtilization}%`
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* GPU Memory Usage */}
-                        <div>
-                          <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            GPU Memory Usage
-                            <span className="text-xs text-gray-500">%</span>
-                            <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-                          </label>
-                          {isVmOverrideEnabled ? (
-                            <input
-                              type="number"
-                              value={vmGpuMemoryUsage}
-                              onChange={(e) => setVmGpuMemoryUsage(e.target.value)}
-                              className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
-                              placeholder="Enter %"
-                              min="0"
-                              max="100"
-                            />
-                          ) : (
-                            <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                              <div className="text-lg font-semibold text-gray-500 dark:text-gray-400">
-                                {isLoadingVmMetrics ? (
-                                  <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
-                                ) : (
-                                  `${vmGpuMemoryUsage}%`
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* CPU Utilization */}
-                        <div>
-                          <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            CPU Utilization
-                            <span className="text-xs text-gray-500">%</span>
-                            <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-                          </label>
-                          {isVmOverrideEnabled ? (
-                            <input
-                              type="number"
-                              value={vmCpuUtilization}
-                              onChange={(e) => setVmCpuUtilization(e.target.value)}
-                              className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
-                              placeholder="Enter %"
-                              min="0"
-                              max="100"
-                            />
-                          ) : (
-                            <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                              <div className="text-lg font-semibold text-gray-500 dark:text-gray-400">
-                                {isLoadingVmMetrics ? (
-                                  <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
-                                ) : (
-                                  `${vmCpuUtilization}%`
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* CPU Memory Usage */}
-                        <div>
-                          <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            CPU Memory Usage
-                            <span className="text-xs text-gray-500">%</span>
-                            <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-                          </label>
-                          {isVmOverrideEnabled ? (
-                            <input
-                              type="number"
-                              value={vmCpuMemoryUsage}
-                              onChange={(e) => setVmCpuMemoryUsage(e.target.value)}
-                              className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
-                              placeholder="Enter %"
-                              min="0"
-                              max="100"
-                            />
-                          ) : (
-                            <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                              <div className="text-lg font-semibold text-gray-500 dark:text-gray-400">
-                                {isLoadingVmMetrics ? (
-                                  <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
-                                ) : (
-                                  `${vmCpuMemoryUsage}%`
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Disk IOPS */}
-                        <div>
-                          <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Disk IOPS
-                            <span className="text-xs text-gray-500">IOPS</span>
-                            <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-                          </label>
-                          {isVmOverrideEnabled ? (
-                            <input
-                              type="number"
-                              value={vmDiskIops}
-                              onChange={(e) => setVmDiskIops(e.target.value)}
-                              className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
-                              placeholder="Enter IOPS"
-                            />
-                          ) : (
-                            <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                              <div className="text-lg font-semibold text-gray-500 dark:text-gray-400">
-                                {isLoadingVmMetrics ? (
-                                  <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
-                                ) : (
-                                  vmDiskIops
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Network Bandwidth */}
-                        <div>
-                          <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Network Bandwidth
-                            <span className="text-xs text-gray-500">MB/s</span>
-                            <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-                          </label>
-                          {isVmOverrideEnabled ? (
-                            <input
-                              type="number"
-                              value={vmNetworkBandwidth}
-                              onChange={(e) => setVmNetworkBandwidth(e.target.value)}
-                              className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
-                              placeholder="Enter MB/s"
-                            />
-                          ) : (
-                            <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                              <div className="text-lg font-semibold text-gray-500 dark:text-gray-400">
-                                {isLoadingVmMetrics ? (
-                                  <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
-                                ) : (
-                                  `${vmNetworkBandwidth} MB/s`
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Hardware Configuration Dropdown - Required for VM-level optimization */}
-                  {selectedVM && (
-                    <div className="mt-6">
-                      <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                        Host Hardware Configuration
-                        <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-                      </label>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                        Select the bare metal hardware that this VM is running on. This is required to determine GPU specifications for optimization.
-                      </p>
-                      <select
-                        value={currentHardwareId}
-                        onChange={(e) => setCurrentHardwareId(e.target.value)}
-                        className="w-full px-3 py-2 border text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600"
-                      >
-                        <option value="">Select host hardware ({hardwareData.length} available)</option>
-                        {hardwareData.length > 0 ? (
-                          hardwareData.map((hw) => {
-                            const hardwareName = getHardwareName(hw);
-                            return (
-                              <option key={hw.id} value={hardwareName}>
-                                {hardwareName}
-                              </option>
-                            );
-                          })
-                        ) : (
-                          <option disabled>No hardware data loaded</option>
-                        )}
-                      </select>
-                      {dropdownError && (
-                        <p className="text-red-500 dark:text-red-400 text-sm mt-2">{dropdownError}</p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
       {/* Main Form Section */}
       <h1 className="text-4xl font-medium mb-6" style={{ color: '#16a34a' }}>
         GreenMatrix Panel
       </h1>
       <div className="w-full bg-white rounded-lg shadow-sm border border-gray-200 p-6 para1">
-        <div className="text-[24px] font-normal text-gray-900 dark:text-white">
-          {optimizationMode === 'pre-deployment' ? 'Recommend Hardware' : 'Optimize Hardware'}
+        <div className='flex items-center justify-between mb-4'>
+          <div className="text-[24px] font-normal text-gray-900 dark:text-white">
+            {optimizationMode === 'pre-deployment' ? 'Recommend Hardware' : 'Post-Deployment Optimization'}
+          </div>
+          <div className="flex gap-4">
+            <button
+              onClick={() => setIsOverrideEnabled(!isOverrideEnabled)}
+              className={`flex items-center gap-2 text-md transition-colors ${isOverrideEnabled
+                ? 'text-orange-600 hover:text-orange-700'
+                : 'text-[#01a982] hover:text-[#019670]'
+                }`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+              </svg>
+              {isOverrideEnabled ? 'Exit Override' : 'Override'}
+            </button>
+            <button
+              onClick={fetchHostMetrics}
+              disabled={isLoadingHostMetrics}
+              className="flex items-center gap-2 text-md text-[#01a982] hover:text-[#019670] disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isLoadingHostMetrics ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-[#01a982] border-t-transparent rounded-full animate-spin"></div>
+                  Refreshing...
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Refresh Host Metrics
+                </>
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Tabs */}
@@ -1795,8 +1161,8 @@ const OptimizeTab = () => {
               <button
                 onClick={() => setOptimizationMode('pre-deployment')}
                 className={`flex items-center gap-2 pb-2 text-base font-medium border-b-2 transition-all ${optimizationMode === 'pre-deployment'
-                    ? 'text-emerald-700 border-emerald-700 text-xl'
-                    : 'text-gray-600 dark:text-gray-300 border-transparent hover:text-emerald-700 hover:border-emerald-700 text-xl'
+                  ? 'text-emerald-700 border-emerald-700 text-xl'
+                  : 'text-gray-600 dark:text-gray-300 border-transparent hover:text-emerald-700 hover:border-emerald-700 text-xl'
                   }`}
               >
                 <CodeXml className="w-4 h-4" />
@@ -1807,8 +1173,8 @@ const OptimizeTab = () => {
               <button
                 onClick={() => setOptimizationMode('post-deployment')}
                 className={`flex items-center gap-2 pb-2 text-base font-medium border-b-2 transition-all ${optimizationMode === 'post-deployment'
-                    ? 'text-emerald-700 border-emerald-700 text-xl'
-                    : 'text-gray-600 dark:text-gray-300 border-transparent hover:text-emerald-700 hover:border-emerald-700 text-xl'
+                  ? 'text-emerald-700 border-emerald-700 text-xl'
+                  : 'text-gray-600 dark:text-gray-300 border-transparent hover:text-emerald-700 hover:border-emerald-700 text-xl'
                   }`}
               >
                 <CodeXml className="w-4 h-4" />
@@ -1817,21 +1183,657 @@ const OptimizeTab = () => {
             </div>
           </div>
         </div>
-        <h1 className="text-lg font-medium text-gray-900 dark:text-white my-2 mt-6">
-              {optimizationMode === 'pre-deployment' ? 'Workload Parameters' : 'Runtime Parameters'}
-            </h1>
-            <p className="text-md text-gray-500 dark:text-gray-300">
-              {optimizationMode === 'pre-deployment'
-                ? 'Enter the details of your AI workload to get hardware recommendations'
-                : 'Enter the details of your running AI workload to optimize hardware configuration'}
-            </p>
 
-            {/* Error Message */}
-            {error && (
-              <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-                <p className="text-red-600 dark:text-red-400 text-sm">{error}</p>
+        {/* Place your code here */}
+        {/* Post-Deployment Section with Sub-tabs */}
+        {optimizationMode === 'post-deployment' && (
+          <div className="bg-gray-50 dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-8 mb-6">
+            {/* Post-Deployment Mode Selector */}
+            <div className="mb-6">
+              {/* Sub-tabs for Post-Deployment */}
+              <div className="flex justify-center mb-6">
+                <div className="bg-white inline-flex items-center gap-2 shadow-sm border border-gray-200 dark:border-gray-700 dark:bg-gray-700 p-1 rounded-lg">
+                  <button
+                    onClick={() => setPostDeploymentMode('bare-metal')}
+                    className={`px-4 py-2 rounded-md font-medium text-sm transition-all ${postDeploymentMode === 'bare-metal'
+                      ? 'bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+                      }`}
+                  >
+                    Bare Metal Level Recommendation
+                  </button>
+                  <button
+                    onClick={() => setPostDeploymentMode('vm-level')}
+                    className={`px-4 py-2 rounded-md font-medium text-sm transition-all ${postDeploymentMode === 'vm-level'
+                      ? 'bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+                      }`}
+                  >
+                    VM Level Recommendation
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Bare Metal Level Recommendation Content */}
+            {postDeploymentMode === 'bare-metal' && (
+              <div>
+                <div className="mb-4">
+                  <p className="text-md text-gray-500 dark:text-gray-300">Real-time resource utilization metrics of Bare Metal Host Machine</p>
+                </div>
+
+                {/* Host Metrics Status Indicator */}
+                {hostMetricsLastUpdated && (
+                  <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                      <div className="flex items-center gap-1">
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Last updated: {hostMetricsLastUpdated.toLocaleTimeString()}
+                      </div>
+                      {!isOverrideEnabled && (
+                        <div className="flex items-center gap-1">
+                          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                          Auto-refreshing every 2s
+                        </div>
+                      )}
+                      {isOverrideEnabled && (
+                        <div className="flex items-center gap-1">
+                          <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                          Auto-refresh paused (Override mode)
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+                  {/* GPU Utilization */}
+                  <div>
+                    <label className="flex items-center gap-2 text-md font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      GPU Utilization
+                      <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                    </label>
+                    {isOverrideEnabled ? (
+                      <input
+                        type="number"
+                        value={gpuUtilization}
+                        onChange={(e) => setGpuUtilization(e.target.value)}
+                        className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
+                        placeholder="Enter %"
+                        min="0"
+                        max="100"
+                      />
+                    ) : (
+                      <div className="bg-white border border-gray-300 dark:bg-gray-700 rounded-lg p-3">
+                        <div className="text-md font-medium text-gray-800 dark:text-gray-400">
+                          {gpuUtilization}%
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* GPU Memory Usage */}
+                  <div>
+                    <label className="flex items-center gap-2 text-md font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      GPU Memory Usage
+                      <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                    </label>
+                    {isOverrideEnabled ? (
+                      <input
+                        type="number"
+                        value={gpuMemoryUsage}
+                        onChange={(e) => setGpuMemoryUsage(e.target.value)}
+                        className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
+                        placeholder="Enter %"
+                        min="0"
+                        max="100"
+                      />
+                    ) : (
+                      <div className="bg-white border border-gray-300 dark:bg-gray-700 rounded-lg p-3">
+                        <div className="text-md font-medium text-gray-800 dark:text-gray-400">
+                          {gpuMemoryUsage}%
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* CPU Utilization */}
+                  <div>
+                    <label className="flex items-center gap-2 text-md font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      CPU Utilization
+                      <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                    </label>
+                    {isOverrideEnabled ? (
+                      <input
+                        type="number"
+                        value={cpuUtilization}
+                        onChange={(e) => setCpuUtilization(e.target.value)}
+                        className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
+                        placeholder="Enter %"
+                        min="0"
+                        max="100"
+                      />
+                    ) : (
+                      <div className="bg-white border border-gray-300 dark:bg-gray-700 rounded-lg p-3">
+                        <div className="text-md font-medium text-gray-800 dark:text-gray-400">
+                          {cpuUtilization}%
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* CPU Memory Usage */}
+                  <div>
+                    <label className="flex items-center gap-2 text-md font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      CPU Memory Usage
+                      <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                    </label>
+                    {isOverrideEnabled ? (
+                      <input
+                        type="number"
+                        value={cpuMemoryUsage}
+                        onChange={(e) => setCpuMemoryUsage(e.target.value)}
+                        className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
+                        placeholder="Enter %"
+                        min="0"
+                        max="100"
+                      />
+                    ) : (
+                      <div className="bg-white border border-gray-300 dark:bg-gray-700 rounded-lg p-3">
+                        <div className="text-md font-medium text-gray-800 dark:text-gray-400">
+                          {cpuMemoryUsage}%
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Disk IOPS */}
+                  <div>
+                    <label className="flex items-center gap-2 text-md font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Disk IOPS
+                      <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                    </label>
+                    {isOverrideEnabled ? (
+                      <input
+                        type="number"
+                        value={diskIops}
+                        onChange={(e) => setDiskIops(e.target.value)}
+                        className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
+                        placeholder="Enter IOPS"
+                      />
+                    ) : (
+                      <div className="bg-white border border-gray-300 dark:bg-gray-700 rounded-lg p-3">
+                        <div className="text-md font-medium text-gray-800 dark:text-gray-400">
+                          {diskIops} IOPS
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Network Bandwidth */}
+                  <div>
+                    <label className="flex items-center gap-2 text-md font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Network Bandwidth
+                      <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                    </label>
+                    {isOverrideEnabled ? (
+                      <input
+                        type="number"
+                        value={networkBandwidth}
+                        onChange={(e) => setNetworkBandwidth(e.target.value)}
+                        className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
+                        placeholder="Enter MB/s"
+                      />
+                    ) : (
+                      <div className="bg-white border border-gray-300 dark:bg-gray-700 rounded-lg p-3">
+                        <div className="text-md font-medium text-gray-800 dark:text-gray-400">
+                          {networkBandwidth} MB/s
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Current Hardware ID */}
+                  <div>
+                    <label className="flex items-center gap-2 text-md font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Current Hardware
+                      <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                    </label>
+                    <select
+                      value={currentHardwareId}
+                      onChange={(e) => setCurrentHardwareId(e.target.value)}
+                      className="w-full px-3 py-2 border text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600"
+                    >
+                      <option value="">Select hardware ({hardwareData.length} available)</option>
+                      {hardwareData.length > 0 ? (
+                        hardwareData.map((hw) => {
+                          const hardwareName = getHardwareName(hw);
+                          return (
+                            <option key={hw.id} value={hardwareName}>
+                              {hardwareName}
+                            </option>
+                          );
+                        })
+                      ) : (
+                        <option disabled>No hardware data loaded</option>
+                      )}
+                    </select>
+                  </div>
+
+                </div>
               </div>
             )}
+
+            {/* VM Level Recommendation Content */}
+            {postDeploymentMode === 'vm-level' && (
+              <div>
+                <div className="mb-6">
+                  <p className="text-gray-600 dark:text-gray-300">Select a VM instance to analyze and optimize its hardware configuration</p>
+
+                  {/* VM Error Display */}
+                  {vmError && (
+                    <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                      <p className="text-red-600 dark:text-red-400 text-sm">{vmError}</p>
+                    </div>
+                  )}
+
+                  {/* VM Selection Dropdown */}
+                  <div className="mt-4">
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                      Select VM Instance
+                      <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                    </label>
+
+                    <select
+                      value={selectedVM?.vm_name || ''}
+                      onChange={(e) => {
+                        const vm = activeVMs.find(vm => vm.vm_name === e.target.value);
+                        setSelectedVM(vm || null);
+
+                        // Immediately populate VM Resource Metrics with VM's current usage
+                        if (vm) {
+                          setVmCpuMemoryUsage(vm.ram_usage_percent?.toString() || '0');
+                          setVmGpuMemoryUsage(vm.vram_usage_percent?.toString() || '0');
+
+                          // Also fetch live metrics from API
+                          fetchVmMetrics(vm.vm_name);
+                        } else {
+                          // Clear metrics if no VM selected
+                          setVmCpuMemoryUsage('');
+                          setVmGpuMemoryUsage('');
+                        }
+                      }}
+                      disabled={isLoadingVMs}
+                      className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <option value="">
+                        {isLoadingVMs ? 'Loading VM instances...' :
+                          activeVMs.length === 0 ? 'No active VM instances found' :
+                            `Select VM instance (${activeVMs.length} available)`}
+                      </option>
+                      {activeVMs.map((vm) => (
+                        <option key={vm.vm_name} value={vm.vm_name}>
+                          {vm.display_name}
+                        </option>
+                      ))}
+                    </select>
+
+                    {/* Selected VM Details */}
+                    {selectedVM && (
+                      <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
+                        <h4 className="font-medium text-gray-900 dark:text-white mb-3">Selected VM Configuration</h4>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                          <div>
+                            <span className="text-gray-600 dark:text-gray-400">VM Name:</span>
+                            <div className="font-medium text-gray-900 dark:text-white">{selectedVM.vm_name}</div>
+                          </div>
+                          <div>
+                            <span className="text-gray-600 dark:text-gray-400">Total RAM:</span>
+                            <div className="font-medium text-gray-900 dark:text-white">{selectedVM.memory_summary.ram}</div>
+                          </div>
+                          <div>
+                            <span className="text-gray-600 dark:text-gray-400">Total VRAM:</span>
+                            <div className="font-medium text-gray-900 dark:text-white">{selectedVM.memory_summary.vram}</div>
+                          </div>
+                          <div>
+                            <span className="text-gray-600 dark:text-gray-400">GPU Count:</span>
+                            <div className="font-medium text-gray-900 dark:text-white">{selectedVM.gpu_count || 0}</div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Refresh VMs Button */}
+                    <div className="mt-4 flex justify-end">
+                      <button
+                        onClick={fetchActiveVMs}
+                        disabled={isLoadingVMs}
+                        className="flex items-center gap-2 px-4 py-2 text-sm text-[#01a982] hover:text-[#019670] disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isLoadingVMs ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-[#01a982] border-t-transparent rounded-full animate-spin"></div>
+                            Refreshing...
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            Refresh VM List
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    {/* VM Resource Metrics Section - Only show when VM is selected */}
+                    {selectedVM && (
+                      <div className="mt-6 p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
+                        <div className="flex items-center justify-between mb-4">
+                          <h4 className="font-semibold text-gray-900 dark:text-white">VM Resource Metrics</h4>
+                          <div className="flex gap-4">
+                            <button
+                              onClick={() => setIsVmOverrideEnabled(!isVmOverrideEnabled)}
+                              className={`flex items-center gap-2 text-sm transition-colors ${isVmOverrideEnabled
+                                ? 'text-orange-600 hover:text-orange-700'
+                                : 'text-[#01a982] hover:text-[#019670]'
+                                }`}
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                              </svg>
+                              {isVmOverrideEnabled ? 'Exit Override' : 'Override'}
+                            </button>
+                            <button
+                              onClick={() => fetchVmMetrics(selectedVM.vm_name)}
+                              disabled={isLoadingVmMetrics}
+                              className="flex items-center gap-2 text-sm text-[#01a982] hover:text-[#019670] disabled:opacity-50"
+                            >
+                              {isLoadingVmMetrics ? (
+                                <>
+                                  <div className="w-4 h-4 border-2 border-[#01a982] border-t-transparent rounded-full animate-spin"></div>
+                                  Loading...
+                                </>
+                              ) : (
+                                <>
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                  </svg>
+                                  Refresh Metrics
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="mb-4">
+                          <p className="text-sm text-gray-600 dark:text-gray-300">
+                            Latest resource utilization metrics for VM: {selectedVM.vm_name}
+                          </p>
+                          {vmMetricsLastUpdated && (
+                            <div className="flex items-center gap-4 mt-2 text-xs text-gray-500 dark:text-gray-400">
+                              <div className="flex items-center gap-1">
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                Last updated: {vmMetricsLastUpdated.toLocaleTimeString()}
+                              </div>
+                              {!isVmOverrideEnabled && (
+                                <div className="flex items-center gap-1">
+                                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                                  Auto-refreshing every 30s
+                                </div>
+                              )}
+                              {isVmOverrideEnabled && (
+                                <div className="flex items-center gap-1">
+                                  <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                                  Auto-refresh paused (Override mode)
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+                          {/* GPU Utilization */}
+                          <div>
+                            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                              GPU Utilization
+                              <span className="text-xs text-gray-500">%</span>
+                              <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                            </label>
+                            {isVmOverrideEnabled ? (
+                              <input
+                                type="number"
+                                value={vmGpuUtilization}
+                                onChange={(e) => setVmGpuUtilization(e.target.value)}
+                                className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
+                                placeholder="Enter %"
+                                min="0"
+                                max="100"
+                              />
+                            ) : (
+                              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                                <div className="text-lg font-semibold text-gray-500 dark:text-gray-400">
+                                  {isLoadingVmMetrics ? (
+                                    <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                                  ) : (
+                                    `${vmGpuUtilization}%`
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* GPU Memory Usage */}
+                          <div>
+                            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                              GPU Memory Usage
+                              <span className="text-xs text-gray-500">%</span>
+                              <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                            </label>
+                            {isVmOverrideEnabled ? (
+                              <input
+                                type="number"
+                                value={vmGpuMemoryUsage}
+                                onChange={(e) => setVmGpuMemoryUsage(e.target.value)}
+                                className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
+                                placeholder="Enter %"
+                                min="0"
+                                max="100"
+                              />
+                            ) : (
+                              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                                <div className="text-lg font-semibold text-gray-500 dark:text-gray-400">
+                                  {isLoadingVmMetrics ? (
+                                    <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                                  ) : (
+                                    `${vmGpuMemoryUsage}%`
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* CPU Utilization */}
+                          <div>
+                            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                              CPU Utilization
+                              <span className="text-xs text-gray-500">%</span>
+                              <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                            </label>
+                            {isVmOverrideEnabled ? (
+                              <input
+                                type="number"
+                                value={vmCpuUtilization}
+                                onChange={(e) => setVmCpuUtilization(e.target.value)}
+                                className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
+                                placeholder="Enter %"
+                                min="0"
+                                max="100"
+                              />
+                            ) : (
+                              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                                <div className="text-lg font-semibold text-gray-500 dark:text-gray-400">
+                                  {isLoadingVmMetrics ? (
+                                    <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                                  ) : (
+                                    `${vmCpuUtilization}%`
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* CPU Memory Usage */}
+                          <div>
+                            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                              CPU Memory Usage
+                              <span className="text-xs text-gray-500">%</span>
+                              <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                            </label>
+                            {isVmOverrideEnabled ? (
+                              <input
+                                type="number"
+                                value={vmCpuMemoryUsage}
+                                onChange={(e) => setVmCpuMemoryUsage(e.target.value)}
+                                className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
+                                placeholder="Enter %"
+                                min="0"
+                                max="100"
+                              />
+                            ) : (
+                              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                                <div className="text-lg font-semibold text-gray-500 dark:text-gray-400">
+                                  {isLoadingVmMetrics ? (
+                                    <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                                  ) : (
+                                    `${vmCpuMemoryUsage}%`
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Disk IOPS */}
+                          <div>
+                            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                              Disk IOPS
+                              <span className="text-xs text-gray-500">IOPS</span>
+                              <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                            </label>
+                            {isVmOverrideEnabled ? (
+                              <input
+                                type="number"
+                                value={vmDiskIops}
+                                onChange={(e) => setVmDiskIops(e.target.value)}
+                                className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
+                                placeholder="Enter IOPS"
+                              />
+                            ) : (
+                              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                                <div className="text-lg font-semibold text-gray-500 dark:text-gray-400">
+                                  {isLoadingVmMetrics ? (
+                                    <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                                  ) : (
+                                    vmDiskIops
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Network Bandwidth */}
+                          <div>
+                            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                              Network Bandwidth
+                              <span className="text-xs text-gray-500">MB/s</span>
+                              <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                            </label>
+                            {isVmOverrideEnabled ? (
+                              <input
+                                type="number"
+                                value={vmNetworkBandwidth}
+                                onChange={(e) => setVmNetworkBandwidth(e.target.value)}
+                                className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
+                                placeholder="Enter MB/s"
+                              />
+                            ) : (
+                              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                                <div className="text-lg font-semibold text-gray-500 dark:text-gray-400">
+                                  {isLoadingVmMetrics ? (
+                                    <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                                  ) : (
+                                    `${vmNetworkBandwidth} MB/s`
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Hardware Configuration Dropdown - Required for VM-level optimization */}
+                    {selectedVM && (
+                      <div className="mt-6">
+                        <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                          Host Hardware Configuration
+                          <Info className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                        </label>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                          Select the bare metal hardware that this VM is running on. This is required to determine GPU specifications for optimization.
+                        </p>
+                        <select
+                          value={currentHardwareId}
+                          onChange={(e) => setCurrentHardwareId(e.target.value)}
+                          className="w-full px-3 py-2 border text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600"
+                        >
+                          <option value="">Select host hardware ({hardwareData.length} available)</option>
+                          {hardwareData.length > 0 ? (
+                            hardwareData.map((hw) => {
+                              const hardwareName = getHardwareName(hw);
+                              return (
+                                <option key={hw.id} value={hardwareName}>
+                                  {hardwareName}
+                                </option>
+                              );
+                            })
+                          ) : (
+                            <option disabled>No hardware data loaded</option>
+                          )}
+                        </select>
+                        {dropdownError && (
+                          <p className="text-red-500 dark:text-red-400 text-sm mt-2">{dropdownError}</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+
+
+        <h1 className="text-lg font-medium text-gray-900 dark:text-white my-2 mt-6">
+          {optimizationMode === 'pre-deployment' ? 'Workload Parameters' : 'Runtime Parameters'}
+        </h1>
+        <p className="text-md text-gray-500 dark:text-gray-300">
+          {optimizationMode === 'pre-deployment'
+            ? 'Enter the details of your AI workload to get hardware recommendations'
+            : 'Enter the details of your running AI workload to optimize hardware configuration'}
+        </p>
+
+        {/* Error Message */}
+        {error && (
+          <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+            <p className="text-red-600 dark:text-red-400 text-sm">{error}</p>
+          </div>
+        )}
 
 
         {/* Inner Container */}
@@ -2562,7 +2564,7 @@ const OptimizeTab = () => {
             <button
               onClick={handleGetRecommendations}
               disabled={isLoadingModelData || isLoadingDropdowns || isRunningOptimization || !modelName || !taskType}
-          className="px-5 py-2.5 bg-gray-100 hover:bg-gray-300 text-emerald-700 rounded-full border text-lg font-medium flex items-center gap-2 h-11 transition-colors"
+              className="px-5 py-2.5 bg-gray-100 hover:bg-gray-300 text-emerald-700 rounded-full border text-lg font-medium flex items-center gap-2 h-11 transition-colors"
             >
               {isRunningOptimization ? (
                 <div className="flex items-center gap-2">
