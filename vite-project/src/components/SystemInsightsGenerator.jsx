@@ -1,7 +1,61 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import { Download } from 'lucide-react';
 
 const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode, hostMetrics, timeRangeDays = 7 }) => {
+  const [backendRecommendations, setBackendRecommendations] = useState(null);
+  const [backendLoading, setBackendLoading] = useState(false);
+  const [backendError, setBackendError] = useState(null);
+
+  // Fetch recommendations from backend
+  const fetchHostRecommendations = async () => {
+    setBackendLoading(true);
+    setBackendError(null);
+
+    try {
+      // Build query parameters
+      let queryParams = `time_range_days=${timeRangeDays}`;
+
+      // If specific date range provided, use it instead
+      if (selectedDate !== 'today' && selectedDate !== null && selectedDate !== undefined) {
+        queryParams = `start_date=${selectedDate}&end_date=${selectedDate}`;
+      }
+
+      const response = await fetch(`/api/recommendations/host?${queryParams}`);
+
+      if (!response.ok) {
+        let errorMessage = `HTTP error! status: ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.detail || errorMessage;
+        } catch (parseError) {
+          // If can't parse error response, use status message
+        }
+        throw new Error(errorMessage);
+      }
+
+      const data = await response.json();
+      setBackendRecommendations(data);
+    } catch (err) {
+      // Handle network errors gracefully
+      let errorMessage = err.message;
+      if (err.message.includes('Failed to fetch')) {
+        errorMessage = 'Backend not available - using cached analysis';
+      } else if (err.message.includes('NetworkError')) {
+        errorMessage = 'Network error - using offline analysis';
+      }
+      setBackendError(errorMessage);
+      console.warn('Backend recommendations unavailable, using client-side analysis:', err.message);
+    } finally {
+      setBackendLoading(false);
+    }
+  };
+
+  // Fetch recommendations when component mounts or parameters change
+  useEffect(() => {
+    // Always try to fetch - error handling will gracefully fall back
+    fetchHostRecommendations();
+  }, [selectedDate, timeRangeDays]);
+
   const generateInsightsData = () => {
     const analysis = {
       cost: [],
@@ -803,7 +857,7 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode, 
         </section>
 
         <main class="report-content">
-            ${validProcessData.length > 0 ? `
+            ${(processData && Array.isArray(processData) && processData.length > 0) ? `
                 <div class="section">
                     <h2>Top Resource Consuming Processes</h2>
                     <table class="table">
@@ -817,7 +871,7 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode, 
                             </tr>
                         </thead>
                         <tbody>
-                            ${validProcessData.map(process => `
+                            ${(processData || []).map(process => `
                                 <tr>
                                     <td>${process['Process Name'] || 'N/A'}</td>
                                     <td>${(process['CPU Usage (%)'] || 0).toFixed(1)}</td>
@@ -831,18 +885,18 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode, 
                 </div>
             ` : ''}
 
-            ${generateSectionHTML('Cost Optimization', cost, 'dollar-icon', '#10b981')}
-            ${generateSectionHTML('Scaling Recommendations', scaling, 'scale-icon', '#2563eb')}
-            ${generateSectionHTML('Performance Insights', performance, 'performance-icon', '#7c3aed')}
-            ${generateSectionHTML('Security & Maintenance', security, 'security-icon', '#dc2626')}
+            ${generateSectionHTML('Cost Optimization', insightsData.cost, 'dollar-icon', '#10b981')}
+            ${generateSectionHTML('Scaling Recommendations', insightsData.scaling, 'scale-icon', '#2563eb')}
+            ${generateSectionHTML('Performance Insights', insightsData.performance, 'performance-icon', '#7c3aed')}
+            ${generateSectionHTML('Security & Maintenance', insightsData.security, 'security-icon', '#dc2626')}
 
             <div class="section">
                 <h2>Methodology</h2>
                 <div class="card">
                     <h3>Analysis Details</h3>
-                    <div class="metric"><strong>Data Collection Period:</strong> ${summary.analysisDescription}</div>
-                    <div class="metric"><strong>Processes Analyzed:</strong> ${summary.totalProcesses}</div>
-                    <div class="metric"><strong>Virtual Machines Monitored:</strong> ${summary.runningVMs + summary.stoppedVMs}</div>
+                    <div class="metric"><strong>Data Collection Period:</strong> ${insightsData.summary?.analysisDescription || 'Last 7 days'}</div>
+                    <div class="metric"><strong>Processes Analyzed:</strong> ${insightsData.summary?.totalProcesses || (processData?.length || 0)}</div>
+                    <div class="metric"><strong>Virtual Machines Monitored:</strong> ${(insightsData.summary?.runningVMs || 0) + (insightsData.summary?.stoppedVMs || 0)}</div>
                     <div class="metric"><strong>Sampling Method:</strong> Real-time monitoring with comprehensive resource tracking</div>
                     <div class="metric"><strong>Recommendation Engine:</strong> AI-powered analysis based on current patterns and industry best practices</div>
                     <p style="margin-top: 15px; color: #6b7280; font-size: 14px;">
@@ -865,28 +919,303 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode, 
     `;
   };
 
+  // Generate HTML report for backend recommendations
+  const generateBackendHTMLReport = (backendData) => {
+    const hostAnalysis = backendData.host_analysis || {};
+    const recommendations = backendData.recommendations || [];
+    const analysisDate = backendData.analysis_period || `Last ${timeRangeDays} days`;
+
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>GreenMatrix Host Analysis Report</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 20px; color: #1f2937; line-height: 1.5; }
+          .header { text-align: center; margin-bottom: 30px; border-bottom: 3px solid #10b981; padding-bottom: 20px; }
+          .header h1 { color: #111827; margin: 0; font-size: 32px; font-weight: 700; }
+          .header p { color: #6b7280; margin: 8px 0; font-size: 14px; }
+          .section { margin: 30px 0; }
+          .section h2 { color: #374151; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px; font-size: 20px; font-weight: 600; margin-bottom: 20px; }
+          .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 12px 0; }
+          .card { border: 1px solid #d1d5db; padding: 15px; border-radius: 6px; background: #ffffff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); }
+          .card h3 { margin: 0 0 10px 0; color: #111827; font-size: 14px; font-weight: 600; }
+          .metric { margin: 6px 0; color: #374151; font-size: 13px; }
+          .metric strong { color: #10b981; font-weight: 600; }
+          .recommendation { border: 1px solid #e5e7eb; padding: 20px; border-radius: 8px; margin: 15px 0; background: #f9fafb; }
+          .recommendation h4 { color: #111827; margin: 0 0 10px 0; font-size: 18px; font-weight: 600; }
+          .priority-high { border-left: 4px solid #ef4444; }
+          .priority-medium { border-left: 4px solid #f59e0b; }
+          .priority-low { border-left: 4px solid #10b981; }
+          .actions { margin: 15px 0; }
+          .actions ul { margin: 10px 0; padding-left: 20px; }
+          .actions li { margin: 5px 0; color: #4b5563; }
+          .table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+          .table th, .table td { border: 1px solid #e5e7eb; padding: 12px 8px; text-align: left; }
+          .table th { background-color: #f9fafb; color: #374151; font-weight: 600; }
+          .footer { text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 12px; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>GreenMatrix Host Analysis Report</h1>
+          <p><strong>Bare Metal Host:</strong> ${hostAnalysis.host_name || 'bare-metal-host'}</p>
+          <p><strong>Analysis Period:</strong> ${analysisDate}</p>
+          <p><strong>Generated:</strong> ${new Date().toLocaleString()}</p>
+        </div>
+
+        <div class="section">
+          <h2>Resource Utilization Analysis</h2>
+          <div class="grid">
+            <div class="card">
+              <h3>CPU Performance</h3>
+              <div class="metric"><strong>Average Usage:</strong> ${hostAnalysis.avg_host_cpu_percent || 0}%</div>
+              <div class="metric"><strong>Peak Usage:</strong> ${hostAnalysis.max_host_cpu_percent || 0}%</div>
+              <div class="metric"><strong>95th Percentile:</strong> ${hostAnalysis.host_cpu_95th_percentile || 0}%</div>
+              <div class="metric"><strong>Process-level Avg:</strong> ${hostAnalysis.avg_process_cpu_percent || 0}%</div>
+              <div class="metric"><strong>Volatility (σ):</strong> ${hostAnalysis.host_cpu_volatility || 0}%</div>
+            </div>
+            <div class="card">
+              <h3>Memory Utilization</h3>
+              <div class="metric"><strong>Average Usage:</strong> ${hostAnalysis.avg_host_ram_percent || 0}%</div>
+              <div class="metric"><strong>Peak Usage:</strong> ${hostAnalysis.max_host_ram_percent || 0}%</div>
+              <div class="metric"><strong>95th Percentile:</strong> ${hostAnalysis.host_ram_95th_percentile || 0}%</div>
+              <div class="metric"><strong>Process Avg:</strong> ${hostAnalysis.avg_process_memory_mb || 0} MB</div>
+              <div class="metric"><strong>Volatility (σ):</strong> ${hostAnalysis.host_ram_volatility || 0}%</div>
+            </div>
+            <div class="card">
+              <h3>GPU Performance</h3>
+              <div class="metric"><strong>Average Usage:</strong> ${hostAnalysis.avg_host_gpu_percent || 0}%</div>
+              <div class="metric"><strong>Peak Usage:</strong> ${hostAnalysis.max_host_gpu_percent || 0}%</div>
+              <div class="metric"><strong>95th Percentile:</strong> ${hostAnalysis.host_gpu_95th_percentile || 0}%</div>
+              <div class="metric"><strong>Avg Temperature:</strong> ${hostAnalysis.avg_gpu_temperature_celsius || 0}°C</div>
+              <div class="metric"><strong>Peak Temperature:</strong> ${hostAnalysis.max_gpu_temperature_celsius || 0}°C</div>
+            </div>
+            <div class="card">
+              <h3>Power Consumption</h3>
+              <div class="metric"><strong>Average Power:</strong> ${hostAnalysis.avg_process_power_watts || 0}W</div>
+              <div class="metric"><strong>Peak Power:</strong> ${hostAnalysis.max_process_power_watts || 0}W</div>
+              <div class="metric"><strong>GPU Power:</strong> ${hostAnalysis.avg_gpu_power_watts || 0}W</div>
+              <div class="metric"><strong>Power Volatility (σ):</strong> ${hostAnalysis.power_volatility || 0}W</div>
+              <div class="metric"><strong>Total Energy:</strong> ${hostAnalysis.total_energy_kwh || 0} kWh</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Threshold Breach Analysis</h2>
+          <div class="grid">
+            <div class="card">
+              <h3>CPU Threshold Breaches</h3>
+              <div class="metric"><strong>Critical (>90%):</strong> ${hostAnalysis.cpu_critical_breach_percent || 0}% of time</div>
+              <div class="metric"><strong>Warning (>80%):</strong> ${hostAnalysis.cpu_warning_breach_percent || 0}% of time</div>
+              <div class="metric"><strong>Elevated (>70%):</strong> ${hostAnalysis.cpu_elevated_breach_percent || 0}% of time</div>
+            </div>
+            <div class="card">
+              <h3>Memory Threshold Breaches</h3>
+              <div class="metric"><strong>Critical (>90%):</strong> ${hostAnalysis.memory_critical_breach_percent || 0}% of time</div>
+              <div class="metric"><strong>Warning (>80%):</strong> ${hostAnalysis.memory_warning_breach_percent || 0}% of time</div>
+            </div>
+            <div class="card">
+              <h3>GPU Threshold Breaches</h3>
+              <div class="metric"><strong>Critical (>90%):</strong> ${hostAnalysis.gpu_critical_breach_percent || 0}% of time</div>
+              <div class="metric"><strong>Warning (>80%):</strong> ${hostAnalysis.gpu_warning_breach_percent || 0}% of time</div>
+            </div>
+            <div class="card">
+              <h3>Temperature Breaches</h3>
+              <div class="metric"><strong>Critical (>85°C):</strong> ${hostAnalysis.temp_critical_breach_percent || 0}% of time</div>
+              <div class="metric"><strong>Warning (>80°C):</strong> ${hostAnalysis.temp_warning_breach_percent || 0}% of time</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>System Performance Statistics</h2>
+          <div class="grid">
+            <div class="card">
+              <h3>Data Collection</h3>
+              <div class="metric"><strong>Process Metrics:</strong> ${hostAnalysis.process_data_points || 0} data points</div>
+              <div class="metric"><strong>Overall Metrics:</strong> ${hostAnalysis.overall_data_points || 0} data points</div>
+              <div class="metric"><strong>Monitoring Period:</strong> ${hostAnalysis.time_range_days || 7} days</div>
+              <div class="metric"><strong>Unique Processes:</strong> ${hostAnalysis.unique_processes || 0}</div>
+            </div>
+            <div class="card">
+              <h3>Resource Variability</h3>
+              <div class="metric"><strong>CPU Volatility:</strong> ${hostAnalysis.host_cpu_volatility || 0}% (σ)</div>
+              <div class="metric"><strong>Memory Volatility:</strong> ${hostAnalysis.host_ram_volatility || 0}% (σ)</div>
+              <div class="metric"><strong>Power Volatility:</strong> ${hostAnalysis.power_volatility || 0}W (σ)</div>
+              <div class="metric"><strong>GPU Power Volatility:</strong> ${hostAnalysis.gpu_power_volatility || 0}W (σ)</div>
+            </div>
+            <div class="card">
+              <h3>Efficiency Analysis</h3>
+              <div class="metric"><strong>Processes Analyzed:</strong> ${(hostAnalysis.process_efficiency_data || []).length}</div>
+              ${(hostAnalysis.process_efficiency_data || []).slice(0, 3).map(proc =>
+                `<div class="metric"><strong>${proc.process_name}:</strong> ${proc.cpu_efficiency_per_watt} CPU%/W</div>`
+              ).join('')}
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Top Power Consuming Processes</h2>
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Process Name</th>
+                <th>Avg Power (W)</th>
+                <th>Avg CPU (%)</th>
+                <th>Avg Memory (MB)</th>
+                <th>Occurrences</th>
+                <th>CPU Efficiency (CPU%/W)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${(hostAnalysis.top_processes || []).map(proc => {
+                const efficiency = (hostAnalysis.process_efficiency_data || []).find(eff => eff.process_name === proc.process_name);
+                return `
+                  <tr>
+                    <td>${proc.process_name}</td>
+                    <td>${proc.avg_power_watts}</td>
+                    <td>${proc.avg_cpu_percent}</td>
+                    <td>${proc.avg_memory_mb}</td>
+                    <td>${proc.occurrences}</td>
+                    <td>${efficiency ? efficiency.cpu_efficiency_per_watt : 'N/A'}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="section">
+          <h2>Recommendations and Insights</h2>
+          ${recommendations.map(rec => `
+            <div class="recommendation priority-${rec.priority}">
+              <h4>${rec.title}</h4>
+              <p>${rec.description}</p>
+              <div class="actions">
+                <div class="detail-row">
+                  <strong>Category:</strong> ${rec.category}
+                </div>
+                <div class="detail-row">
+                  <strong>Priority:</strong> ${rec.priority.toUpperCase()}
+                </div>
+                <div class="detail-row">
+                  <strong>Impact:</strong> ${rec.impact || 'Performance and efficiency improvement'}
+                </div>
+                ${rec.potential_savings ? `
+                  <div class="detail-row">
+                    <strong>Potential Savings:</strong> ${rec.potential_savings}
+                  </div>
+                ` : ''}
+                ${rec.statistics ? `
+                  <div class="detail-row">
+                    <strong>Supporting Data:</strong>
+                    <ul style="margin: 5px 0 0 20px;">
+                      ${Object.entries(rec.statistics).map(([key, value]) =>
+                        `<li>${key.replace(/_/g, ' ')}: ${value}</li>`
+                      ).join('')}
+                    </ul>
+                  </div>
+                ` : ''}
+                <div class="detail-row">
+                  <strong>Recommended Actions:</strong>
+                  <ul style="margin: 5px 0 0 20px;">
+                    ${(rec.recommendations || []).map(action => `<li>${action}</li>`).join('')}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+
+        <div class="footer">
+          <p>© ${new Date().getFullYear()} Hewlett Packard Enterprise Development LP</p>
+          <p>Generated by GreenMatrix Host Analysis Engine</p>
+          <p>Report ID: HOST-${new Date().toISOString().slice(0, 19).replace(/:/g, '')}</p>
+        </div>
+      </body>
+      </html>
+    `;
+  };
+
   const handleDownloadReport = () => {
-    const insightsData = generateInsightsData();
-    const htmlContent = generateHTMLReport(insightsData);
+    let htmlContent;
+    let filename;
+
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+    const dateLabel = viewMode === 'week' ? `Week_Analysis` :
+      selectedDate === 'today' ? 'Latest' : selectedDate.replace(/-/g, '');
+
+    // Debug logging to track which report is being generated
+    console.log('Download Report Debug Info:');
+    console.log('- backendRecommendations:', backendRecommendations ? 'Available' : 'Null');
+    console.log('- backendError:', backendError);
+    console.log('- backendLoading:', backendLoading);
+
+    // Check if backend is available (not a network/connection error)
+    const isBackendAvailable = !backendError ||
+      (backendError && !backendError.includes('Failed to fetch') && !backendError.includes('NetworkError'));
+
+    // Use backend report structure if backend is reachable, even if no data found
+    if (isBackendAvailable) {
+      console.log('- Using backend report structure (sophisticated format)');
+      // If we have recommendations, use them; otherwise create empty structure
+      const reportData = backendRecommendations || {
+        host_analysis: {},
+        recommendations: [],
+        analysis_period: `Last ${timeRangeDays} days`,
+        generated_at: new Date().toISOString(),
+        summary: { total_recommendations: 0 }
+      };
+      htmlContent = generateBackendHTMLReport(reportData);
+      filename = `GreenMatrix_Host_Report_${dateLabel}_${timestamp}.html`;
+    } else {
+      console.log('- Falling back to basic client-side report (backend not reachable)');
+      const insightsData = generateInsightsData();
+      htmlContent = generateHTMLReport(insightsData);
+      filename = `HPE_GreenMatrix_Insights_${dateLabel}_${timestamp}.html`;
+    }
 
     // Create blob and download
     const blob = new Blob([htmlContent], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
 
-    const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
-    const dateLabel = viewMode === 'week' ? `Week_Analysis` :
-      selectedDate === 'today' ? 'Latest' : selectedDate.replace(/-/g, '');
-
     a.href = url;
-    a.download = `HPE_GreenMatrix_Insights_${dateLabel}_${timestamp}.html`;
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
 
-  const previewData = generateInsightsData();
+  // Use backend data for preview if available, otherwise use client-side generated data
+  const previewData = useMemo(() => {
+    // Check if backend is available (same logic as download)
+    const isBackendAvailable = !backendError ||
+      (backendError && !backendError.includes('Failed to fetch') && !backendError.includes('NetworkError'));
+
+    if (isBackendAvailable && backendRecommendations) {
+      const backendRecs = backendRecommendations.recommendations || [];
+      // Transform backend recommendations to match client-side format for display
+      const cost = backendRecs.filter(r => r.category === 'cost_optimization');
+      const scaling = backendRecs.filter(r => r.category === 'performance');
+      const performance = backendRecs.filter(r => r.category === 'optimization');
+      const security = backendRecs.filter(r => r.category === 'maintenance');
+
+      return {
+        cost,
+        scaling,
+        performance,
+        security,
+        summary: backendRecommendations.host_analysis || {}
+      };
+    } else {
+      return generateInsightsData();
+    }
+  }, [backendRecommendations, backendError, processData, vmData, hostMetrics]);
+
   const totalRecommendations = previewData.cost.length + previewData.scaling.length +
     previewData.performance.length + previewData.security.length;
 
@@ -897,46 +1226,120 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode, 
         System Insights & Recommendations
       </h3>
 
-      {/* Middle Content (Metrics Grid) */}
+      {/* Middle Content (Enhanced Metrics Grid) */}
       <div className="flex-1 flex items-center">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 w-full text-left justify-between">
-          <div className="space-y-2">
-            <div className="text-[21px] font-medium text-gray-900 dark:text-gray-400">Cost Savings</div>
-            <div className="text-lg font-medium text-emerald-900 dark:text-white">
-              $ {previewData.cost.reduce((sum, item) => sum + (parseInt(item.savings?.replace(/[$,]/g, '') || 0)), 0)}
+        {backendRecommendations && !backendError ? (
+          // Show enhanced statistics when backend data is available
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 w-full text-left">
+            <div className="space-y-1">
+              <div className="text-[18px] font-medium text-gray-900 dark:text-gray-400">CPU Performance</div>
+              <div className="text-lg font-medium text-emerald-900 dark:text-white">
+                {backendRecommendations.host_analysis?.avg_host_cpu_percent || 0}% avg
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-500">
+                Peak: {backendRecommendations.host_analysis?.max_host_cpu_percent || 0}%
+              </div>
+              {backendRecommendations.host_analysis?.cpu_critical_breach_percent > 0 && (
+                <div className="text-sm text-red-600">
+                  {backendRecommendations.host_analysis.cpu_critical_breach_percent}% critical breaches
+                </div>
+              )}
             </div>
-          </div>
 
-          <div className="space-y-2">
-            <div className="text-[21px] font-medium text-gray-900 dark:text-gray-400">Scaling</div>
-            <div className="text-lg font-medium text-emerald-900 dark:text-white">
-              {previewData.scaling.length} recommendations
+            <div className="space-y-1">
+              <div className="text-[18px] font-medium text-gray-900 dark:text-gray-400">Memory Usage</div>
+              <div className="text-lg font-medium text-emerald-900 dark:text-white">
+                {backendRecommendations.host_analysis?.avg_host_ram_percent || 0}% avg
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-500">
+                95th: {backendRecommendations.host_analysis?.host_ram_95th_percentile || 0}%
+              </div>
+              {backendRecommendations.host_analysis?.memory_critical_breach_percent > 0 && (
+                <div className="text-sm text-red-600">
+                  {backendRecommendations.host_analysis.memory_critical_breach_percent}% pressure events
+                </div>
+              )}
             </div>
-          </div>
 
-          <div className="space-y-2">
-            <div className="text-[21px] font-medium text-gray-900 dark:text-gray-400">Performance</div>
-            <div className="text-lg font-medium text-emerald-900 dark:text-white">
-              {previewData.performance.length} insights
+            <div className="space-y-1">
+              <div className="text-[18px] font-medium text-gray-900 dark:text-gray-400">Power Efficiency</div>
+              <div className="text-lg font-medium text-emerald-900 dark:text-white">
+                {backendRecommendations.host_analysis?.avg_process_power_watts || 0}W avg
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-500">
+                {backendRecommendations.host_analysis?.total_energy_kwh || 0} kWh total
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-500">
+                {(backendRecommendations.host_analysis?.process_efficiency_data || []).length} processes analyzed
+              </div>
             </div>
-          </div>
 
-          <div className="space-y-2">
-            <div className="text-[21px] font-medium text-gray-900 dark:text-gray-400">Security</div>
-            <div className="text-lg font-medium text-emerald-900 dark:text-white">
-              {previewData.security.length} alerts
+            <div className="space-y-1">
+              <div className="text-[18px] font-medium text-gray-900 dark:text-gray-400">Recommendations</div>
+              <div className="text-lg font-medium text-emerald-900 dark:text-white">
+                {totalRecommendations} insights
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-500">
+                {backendRecommendations.summary?.high_priority || 0} high priority
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-500">
+                {backendRecommendations.host_analysis?.process_data_points || 0} data points
+              </div>
             </div>
           </div>
-        </div>
+        ) : (
+          // Fallback to basic metrics when backend data unavailable
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 w-full text-left justify-between">
+            <div className="space-y-2">
+              <div className="text-[21px] font-medium text-gray-900 dark:text-gray-400">Cost Savings</div>
+              <div className="text-lg font-medium text-emerald-900 dark:text-white">
+                $ {previewData.cost.reduce((sum, item) => sum + (parseInt(item.savings?.replace(/[$,]/g, '') || 0)), 0)}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="text-[21px] font-medium text-gray-900 dark:text-gray-400">Scaling</div>
+              <div className="text-lg font-medium text-emerald-900 dark:text-white">
+                {previewData.scaling.length} recommendations
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="text-[21px] font-medium text-gray-900 dark:text-gray-400">Performance</div>
+              <div className="text-lg font-medium text-emerald-900 dark:text-white">
+                {previewData.performance.length} insights
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="text-[21px] font-medium text-gray-900 dark:text-gray-400">Security</div>
+              <div className="text-lg font-medium text-emerald-900 dark:text-white">
+                {previewData.security.length} alerts
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Bottom Right Button */}
-      <div className="flex justify-end mt-6">
+      {/* Status and Button */}
+      <div className="flex justify-between items-center mt-6">
+        <div className="text-sm text-gray-500 dark:text-gray-400">
+          {backendLoading && (
+            <span className="flex items-center gap-2">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#01a982]"></div>
+              Loading AI recommendations...
+            </span>
+          )}
+        </div>
+
         <button
           onClick={handleDownloadReport}
-          className="flex items-center gap-2 px-5 py-2 border-2 border-[#01a982] text-black font-medium rounded-full hover:bg-[#01a982] hover:text-white transition-colors"
+          disabled={backendLoading}
+          className="flex items-center gap-2 px-5 py-2 border-2 border-[#01a982] text-black font-medium rounded-full hover:bg-[#01a982] hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <span className="hidden sm:inline">Recommendations</span>
+          <span className="hidden sm:inline">
+            Recommendations
+          </span>
           <Download className="w-4 h-4" />
           <span className="sm:hidden">Report</span>
         </button>
