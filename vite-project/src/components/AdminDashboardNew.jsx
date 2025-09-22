@@ -98,7 +98,7 @@ const AdminDashboardNew = ({
 
   // State for top processes data
   const [topProcesses, setTopProcesses] = useState([]);
-  
+
   // State for showing and hiding the Walkthrough Modal
   const [showModal, setShowModal] = useState(false);
 
@@ -109,9 +109,9 @@ const AdminDashboardNew = ({
     return () => clearTimeout(timer);
   }, []);
 
-useEffect(() => {
-  console.log('showModal:', showModal);
-}, [showModal]);
+  useEffect(() => {
+    console.log('showModal:', showModal);
+  }, [showModal]);
 
   // Generate AI-powered process-specific recommendations
   const generateProcessRecommendations = (processName, power, cost, process) => {
@@ -711,11 +711,11 @@ useEffect(() => {
     };
   };
 
-  
+
   // State for optimized data from backend
   const [systemOverview, setSystemOverview] = useState(null);
   const [chartData, setChartData] = useState(null);
-  
+
   // Fetch optimized system overview from backend
   const fetchSystemOverview = async () => {
     try {
@@ -998,21 +998,26 @@ useEffect(() => {
 
   return (
     <>
-    {showModal && <CardModal showModal={showModal} onClose={() => setShowModal(false)} />}
+      {showModal && <CardModal showModal={showModal} onClose={() => setShowModal(false)} />}
       <div className={`space-y-6 max-w-full overflow-hidden transition-opacity duration-300 ${showModal ? 'pointer-events-none opacity-50' : 'opacity-100'}`}></div>
-          <div className="space-y-4 max-w-full overflow-hidden">
-      {/* Top Right-Aligned Toolbar */}
-      <div className="bg-gray-50 dark:bg-gray-800 px-3 py-2">
-        <div className="flex justify-end">
-          <div className="flex flex-nowrap items-center space-x-4">
+      <div className="space-y-4 max-w-full overflow-hidden">
+        {/* Top Right-Aligned Toolbar */}
+        <div className="bg-gray-50 dark:bg-gray-800 px-3 py-2">
+          <div className="flex justify-between items-center gap-2">
+            <div>
+              <h1 className="text-4xl font-medium items-center text-left" style={{ color: '#16a34a' }}>
+                GreenMatrix Panel
+              </h1>
+            </div>
+            <div className="flex flex-nowrap items-center space-x-4">
 
-            {/* Cost Calculation Region */}
+              {/* Cost Calculation Region */}
               <select
                 value={selectedRegion}
                 onChange={(e) => setSelectedRegion(e.target.value)}
-              className="px-6 py-2.5 bg-gray-50 dark:bg-gray-700 text-xl font-lite text-gray-500 dark:text-white rounded-lg border border-gray-400 dark:border-gray-600 text-sm w-90 h-12 focus:ring-2 focus:ring-[#01a982]"
+                className="px-6 py-2.5 bg-gray-50 dark:bg-gray-700 text-[16px] font-lite text-gray-600 dark:text-white rounded-lg border-[1.5px] border-gray-400 dark:border-gray-600 w-90 h-10 focus:ring-2 focus:ring-[#01a982]"
               >
-              <option default value="">Cost Calculation Region</option>
+                <option default value="">Cost Calculation Region</option>
                 {availableRegions.map(region => (
                   <option key={region.code} value={region.code}>
                     {region.code} - {region.currency}
@@ -1020,29 +1025,29 @@ useEffect(() => {
                 ))}
               </select>
 
-            {/* View Mode Dropdown */}
+              {/* View Mode Dropdown */}
               <select
                 value={viewMode}
                 onChange={(e) => setViewMode(e.target.value)}
-              className="px-4 py-2.5 bg-gray-50 dark:bg-gray-700 text-xl font-lite text-gray-500 dark:text-white rounded-lg border border-gray-400 dark:border-gray-600 text-xl w-85 h-12 focus:ring-2 focus:ring-[#01a982]"
+                className="px-4 py-2.5 bg-gray-50 dark:bg-gray-700 text-[16px] font-lite text-gray-600 dark:text-white rounded-lg border-[1.5px] border-gray-400 dark:border-gray-600  w-85 h-10 focus:ring-2 focus:ring-[#01a982]"
               >
                 <option value="day">Daily</option>
                 <option value="week">Weekly</option>
                 <option value="month">Monthly</option>
               </select>
 
-            {/* Start Date Picker */}
+              {/* Start Date Picker */}
               <DatePicker
                 selected={dateRange.start}
                 onChange={(date) => setDateRange(prev => ({ ...prev, start: date }))}
                 minDate={minDate}
                 maxDate={maxDate}
-              className="max-w-32 px-4 py-2.5 bg-gray-50 dark:bg-gray-700 text-xl font-lite text-gray-500 dark:text-white rounded-lg border border-gray-400 dark:border-gray-600 text-xl h-12 focus:ring-2 focus:ring-[#01a982]"
-              placeholderText="mm/dd/yyyy"
-              dateFormat="MM/dd/yyyy"
+                className="max-w-32 px-4 py-2.5 bg-gray-50 dark:bg-gray-700 text-[16px] font-lite text-gray-600 dark:text-white rounded-lg border-[1.5px] border-gray-400 dark:border-gray-600 h-10 focus:ring-2 focus:ring-[#01a982]"
+                placeholderText="mm/dd/yyyy"
+                dateFormat="MM/dd/yyyy"
               />
 
-            {/* End Date Picker */}
+              {/* End Date Picker */}
               <DatePicker
                 selected={dateRange.end}
                 onChange={(date) => setDateRange(prev => ({ ...prev, end: date }))}
@@ -1051,17 +1056,17 @@ useEffect(() => {
                 endDate={dateRange.end}
                 minDate={dateRange.start || minDate}
                 maxDate={maxDate}
-              className="max-w-32 px-4 py-2.5 bg-gray-50 dark:bg-gray-700 text-xl font-lite text-gray-500 dark:text-white rounded-lg border border-gray-400 dark:border-gray-600 text-xl h-12 focus:ring-2 focus:ring-[#01a982]"
-              placeholderText="mm/dd/yyyy"
-              dateFormat="MM/dd/yyyy"
+                className="max-w-32 px-4 py-2.5 bg-gray-50 dark:bg-gray-700 text-[16px] font-lite text-gray-600 dark:text-white rounded-lg border-[1.5px] border-gray-400 dark:border-gray-600 h-10 focus:ring-2 focus:ring-[#01a982]"
+                placeholderText="mm/dd/yyyy"
+                dateFormat="MM/dd/yyyy"
               />
-            {/* Report Button */}
+              {/* Report Button */}
               <button
                 onClick={handleDownloadReport}
-              className="px-6 py-2.5 bg-[#008060] hover:bg-[#00694d] text-white rounded-full text-base font-medium flex items-center gap-2 h-11 transition-colors"
+                className="px-6 ml-[20px] py-2.5 bg-[#008060] hover:bg-[#00694d] text-white rounded-full text-base font-medium flex items-center gap-2 h-11 transition-colors"
               >
                 Report
-              <Download className="w-5 h-5" />
+                <Download className="w-5 h-5" />
               </button>
             </div>
           </div>
@@ -1069,13 +1074,13 @@ useEffect(() => {
 
 
         {/* System Overview Section */}
-      {/* <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+        {/* <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
           <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">System Overview</h2>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6"> */}
 
-            {/* Live Performance Metrics (Left) */}
-      {/* <div className="relative">
+        {/* Live Performance Metrics (Left) */}
+        {/* <div className="relative">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Live Performance Metrics</h3>
                 <div className="flex items-center gap-2">
@@ -1114,8 +1119,8 @@ useEffect(() => {
               </div>
           </div> */}
 
-            {/* Hardware Details (Right) */}
-      {/* <div className="relative">
+        {/* Hardware Details (Right) */}
+        {/* <div className="relative">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Hardware Details</h3>
                 <div className="flex items-center gap-2">
@@ -1157,166 +1162,165 @@ useEffect(() => {
                   );
                 })}
             </div> */}
-      {/* </div>
+        {/* </div>
               </div>
       </div> */}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-        {/* Hardware Overview (Left, wider card) */}
-        <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 flex flex-col h-full">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-[24px] font-normal text-gray-900 dark:text-white">Hardware Overview</h3>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setHardwareCardIndex(Math.max(0, hardwareCardIndex - 1))}
-                disabled={hardwareCardIndex === 0}
-                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setHardwareCardIndex(Math.min(hardwareDetails.length - 2, hardwareCardIndex + 1))}
-                disabled={hardwareCardIndex >= hardwareDetails.length - 2}
-                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
+          {/* Hardware Overview (Left, wider card) */}
+          <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 pt-4 flex flex-col h-full">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-[24px] font-normal text-gray-900 dark:text-white">Hardware Overview</h3>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setHardwareCardIndex(Math.max(0, hardwareCardIndex - 1))}
+                  disabled={hardwareCardIndex === 0}
+                  className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setHardwareCardIndex(Math.min(hardwareDetails.length - 2, hardwareCardIndex + 1))}
+                  disabled={hardwareCardIndex >= hardwareDetails.length - 2}
+                  className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
             </div>
-          </div>
 
-          <div className="grid grid-cols-3 gap-4 flex-grow">
-            {hardwareDetails
-              .slice(hardwareCardIndex, hardwareCardIndex + 3)
-              .map((detail, index) => {
-                const IconComponent = detail.icon;
+            <div className="grid grid-cols-3 gap-4 flex-grow">
+              {hardwareDetails
+                .slice(hardwareCardIndex, hardwareCardIndex + 3)
+                .map((detail, index) => {
+                  const IconComponent = detail.icon;
 
-                // Optional: Assign colors dynamically by type or index
-                const bgColor =
-                  detail.label === 'CPU Model'
-                    ? 'bg-pink-100 dark:bg-pink-900'
-                    : detail.type === 'GPU Model'
-                      ? 'bg-orange-100 dark:bg-orange-900'
-                      : detail.type === 'Memory'
-                        ? 'bg-teal-100 dark:bg-teal-900'
-                        : detail.type === 'Storage'
-                          ? 'bg-indigo-100 dark:bg-indigo-900'
-                          : detail.label === 'Operating System'
-                            ? 'bg-yellow-100 dark:bg-yellow-900'
-                            : ['bg-gray-100 dark:bg-gray-700', 'bg-purple-100 dark:bg-purple-900', 'bg-green-100 dark:bg-green-900'][index % 3]; // fallback colors
+                  // Optional: Assign colors dynamically by type or index
+                  const bgColor =
+                    detail.label === 'CPU Model'
+                      ? 'bg-pink-100 dark:bg-pink-900'
+                      : detail.type === 'GPU Model'
+                        ? 'bg-orange-100 dark:bg-orange-900'
+                        : detail.type === 'Memory'
+                          ? 'bg-teal-100 dark:bg-teal-900'
+                          : detail.type === 'Storage'
+                            ? 'bg-indigo-100 dark:bg-indigo-900'
+                            : detail.label === 'Operating System'
+                              ? 'bg-yellow-100 dark:bg-yellow-900'
+                              : ['bg-gray-100 dark:bg-gray-700', 'bg-purple-100 dark:bg-purple-900', 'bg-green-100 dark:bg-green-900'][index % 3]; // fallback colors
 
-                return (
-                  <div
-                    key={index}
-                    className={`${bgColor} rounded-lg p-4 text-center cursor-pointer hover:brightness-95 transition-colors`}
-                    onClick={() => handleHardwareCardClick(detail)}
-                    title={`Click for detailed ${detail.label} information`}
-                  >
-                    <div className="flex justify-left mb-2">
-                      <IconComponent className="w-8 h-8 text-gray-600 dark:text-gray-600" />
-                    </div>
-                    <div className="flex flex-col items-start">
-                      <div className="text-lg text-gray-900 font-medium dark:text-gray-400 py-2">
-                        {detail.label}
+                  return (
+                    <div
+                      key={index}
+                      className={`${bgColor} rounded-lg p-4 text-center cursor-pointer hover:brightness-95 transition-colors`}
+                      onClick={() => handleHardwareCardClick(detail)}
+                      title={`Click for detailed ${detail.label} information`}
+                    >
+                      <div className="flex justify-left mb-2">
+                        <IconComponent className="w-8 h-8 text-gray-600 dark:text-gray-600" />
                       </div>
-                      <div className="text-sm font-semibold text-gray-500 dark:text-white truncate">
-                        {hardwareLoading ? 'Loading...' : detail.value}
-          </div>
-        </div>
+                      <div className="flex flex-col items-start">
+                        <div className="text-lg text-gray-900 font-medium dark:text-gray-400 py-2">
+                          {detail.label}
+                        </div>
+                        <div className="text-sm font-semibold text-gray-500 dark:text-white truncate">
+                          {hardwareLoading ? 'Loading...' : detail.value}
+                        </div>
+                      </div>
 
-                  </div>
-                );
-              })}
-          </div>
-        </div>
-
-        {/* Power & Cost Overview (Right, narrower card) */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 flex flex-col h-full">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-[24px] font-normal text-gray-900 dark:text-white">
-              Power & Cost Overview
-            </h3>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setCostCardIndex(Math.max(0, costCardIndex - 2))}
-                disabled={costCardIndex === 0}
-                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() =>
-                  setCostCardIndex(
-                    Math.min(powerCostDetails.length - 2, costCardIndex + 2)
-                  )
-                }
-                disabled={costCardIndex >= powerCostDetails.length - 2}
-                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
+                    </div>
+                  );
+                })}
             </div>
           </div>
 
-          {/* Cards Grid */}
-          <div className="grid grid-cols-2 gap-4 flex-grow">
-            {powerCostDetails
-              .slice(costCardIndex, costCardIndex + 2)
-              .map((detail, index) => {
-                const IconComponent = detail.icon;
-                return (
-                  <div
-                    key={index}
-                    className="bg-white rounded-lg p-4 text-left shadow-sm border dark:bg-gray-800 border-gray-200 dark:border-gray-700 bocursor-pointer hover:brightness-95 transition-colors"
-                    title={`Click for detailed ${detail.label} information`}
-                  >
-                    <div className="flex justify-left mb-2">
-                      <IconComponent className="w-8 h-8" />
-                    </div>
-                    <div className="flex flex-col items-start">
-                      <h4 className="text-[18px] font-semibold text-gray-900 dark:text-white py-2">
-                        {detail.label}
-                      </h4>
-                      <p className="text-green-600 dark:text-green-400 font-bold text-md py-1">
-                        {detail.value}
-                      </p>
-                      {/* Extra details */}
-                      {detail.details?.map((d, i) => (
-                        <p
-                          key={i}
-                          className="text-xs text-gray-500 dark:text-gray-400"
-                        >
-                          {d}
+          {/* Power & Cost Overview (Right, narrower card) */}
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 flex flex-col h-full">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-[24px] font-normal text-gray-900 dark:text-white">
+                Power & Cost Overview
+              </h3>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCostCardIndex(Math.max(0, costCardIndex - 2))}
+                  disabled={costCardIndex === 0}
+                  className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() =>
+                    setCostCardIndex(
+                      Math.min(powerCostDetails.length - 2, costCardIndex + 2)
+                    )
+                  }
+                  disabled={costCardIndex >= powerCostDetails.length - 2}
+                  className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Cards Grid */}
+            <div className="grid grid-cols-2 gap-4 flex-grow">
+              {powerCostDetails
+                .slice(costCardIndex, costCardIndex + 2)
+                .map((detail, index) => {
+                  const IconComponent = detail.icon;
+                  return (
+                    <div
+                      key={index}
+                      className="bg-white rounded-lg p-4 text-left shadow-sm border dark:bg-gray-800 border-gray-200 dark:border-gray-700 bocursor-pointer hover:brightness-95 transition-colors"
+                      title={`Click for detailed ${detail.label} information`}
+                    >
+                      <div className="flex justify-left mb-2">
+                        <IconComponent className="w-8 h-8" />
+                      </div>
+                      <div className="flex flex-col items-start">
+                        <h4 className="text-[18px] font-semibold text-gray-900 dark:text-white py-2">
+                          {detail.label}
+                        </h4>
+                        <p className="text-green-600 dark:text-green-400 font-bold text-md py-1">
+                          {detail.value}
                         </p>
-                      ))}
+                        {/* Extra details */}
+                        {detail.details?.map((d, i) => (
+                          <p
+                            key={i}
+                            className="text-xs text-gray-500 dark:text-gray-400"
+                          >
+                            {d}
+                          </p>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+            </div>
           </div>
+
         </div>
-
-      </div>
-
 
         {/* Middle Section: Performance Analytics (Left) + VM Monitoring & Insights (Right) */}
-      <div className="grid grid-cols-5 gap-6">
+        <div className="grid grid-cols-5 gap-6" style={{ marginTop: '24px'}}>
 
-        {/* Performance Analytics (Revised Layout) */}
-        <div className="col-span-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 pt-4 w-full max-w-xl">
-          {/* Title at top-left */}
-          <div className="flex items-center justify-between mb-8">
-            <h3 className="text-[24px] font-normal text-gray-900 dark:text-white">
-              Performance Analytics
-            </h3>
-          </div>
+          {/* Performance Analytics (Revised Layout) */}
+          <div className="col-span-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 pt-4 w-full max-w-xl">
+            {/* Title at top-left */}
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-[24px] font-normal text-gray-900 dark:text-white">
+                Performance Analytics
+              </h3>
+            </div>
 
-          {/* Dropdown centered below title */}
-          <div className="flex justify-center mb-6">
+            {/* Dropdown centered below title */}
+            <div className="flex justify-center mb-6">
               <select
                 value={selectedGraph}
                 onChange={(e) => setSelectedGraph(e.target.value)}
-              className="px-6 py-2 my-3 text-lg bg-white dark:bg-gray-700 text-gray-700 dark:text-white rounded-md border border-gray-400 dark:border-gray-600 w-120 h-10 focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982]"
+                className="px-6 py-2 my-3 text-lg bg-white dark:bg-gray-700 text-gray-700 dark:text-white rounded-md border border-gray-400 dark:border-gray-600 w-120 h-10 focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982]"
               >
                 {graphOptions.map(option => (
                   <option key={option.value} value={option.value}>
@@ -1326,39 +1330,39 @@ useEffect(() => {
               </select>
             </div>
 
-          {/* Bar chart centered below dropdown */}
-          <div className="h-80 flex justify-center items-center">
+            {/* Bar chart centered below dropdown */}
+            <div className="h-80 flex justify-center items-center">
               {chartData ? (
-              <div className="w-full">
-                <Bar
-                  data={chartData}
-                  options={{
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                      legend: { display: false },
-                      tooltip: {
-                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                        titleColor: 'white',
-                        bodyColor: 'white',
-                      }
-                    },
-                    scales: {
-                      x: {
-                        ticks: { maxRotation: 45, minRotation: 45, font: { size: 10 } },
-                        grid: { display: false }
+                <div className="w-full">
+                  <Bar
+                    data={chartData}
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                          titleColor: 'white',
+                          bodyColor: 'white',
+                        }
                       },
-                      y: {
-                        beginAtZero: true,
-                        grid: { color: 'rgba(0, 0, 0, 0.05)' }
+                      scales: {
+                        x: {
+                          ticks: { maxRotation: 45, minRotation: 45, font: { size: 10 } },
+                          grid: { display: false }
+                        },
+                        y: {
+                          beginAtZero: true,
+                          grid: { color: 'rgba(0, 0, 0, 0.05)' }
+                        }
+                      },
+                      elements: {
+                        bar: { borderRadius: 4 }
                       }
-                    },
-                    elements: {
-                      bar: { borderRadius: 4 }
-                    }
-                  }}
-                />
-              </div>
+                    }}
+                  />
+                </div>
               ) : (
                 <div className="flex items-center justify-center h-full">
                   <div className="text-center">
@@ -1372,23 +1376,23 @@ useEffect(() => {
 
 
           {/* Right Column: VM Monitoring + System Insights */}
-        <div className="col-span-3 grid grid-rows-2 gap-6 h-full">
+          <div className="col-span-3 grid grid-rows-2 gap-6 h-full">
 
             {/* VM Monitoring Section (Top Right) */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 pt-4 h-full">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 pt-4 h-full">
               <div className="flex items-center justify-between mb-4">
-              {/* Header left */}
-              <h3 className="text-[24px] font-normal text-gray-900 dark:text-white">
-                Current VM Instances
-              </h3>
+                {/* Header left */}
+                <h3 className="text-[24px] font-normal text-gray-900 dark:text-white">
+                  Current VM Instances
+                </h3>
 
-              {/* Button right */}
+                {/* Button right */}
                 <button
                   onClick={fetchVMData}
-                className="flex items-center justify-center w-8 h-8 rounded-full border border-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  className="flex items-center justify-center w-8 h-8 rounded-full border border-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                   disabled={vmDataLoading}
                 >
-                <div className={`text-sm ${vmDataLoading ? 'animate-spin' : ''}`}>⟳</div>
+                  <div className={`text-sm ${vmDataLoading ? 'animate-spin' : ''}`}>⟳</div>
                 </button>
               </div>
 
@@ -1407,7 +1411,7 @@ useEffect(() => {
                     <p className="text-gray-500 dark:text-gray-400 mb-4">No VM Instances Found</p>
                     <button
                       onClick={fetchVMData}
-                    className="px-4 py-2 bg-green-30 text-white rounded-lg hover:bg-green-30 transition-colors btn3"
+                      className="px-4 py-2 bg-green-30 text-white rounded-lg hover:bg-green-30 transition-colors btn3"
                     >
                       Retry
                     </button>
@@ -1456,106 +1460,106 @@ useEffect(() => {
             </div>
 
             {/* System Insights & Recommendations (Bottom Right) */}
-          <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 pt-4 h-full">
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 pt-4 h-full">
               <SystemInsightsGenerator
                 processData={topProcesses}
                 vmData={vmData || []}
                 selectedDate={selectedDate || 'today'}
                 viewMode={viewMode || 'daily'}
-              hostMetrics={hostMetrics}
+                hostMetrics={hostMetrics}
               />
             </div>
           </div>
         </div>
 
         {/* Process Monitoring Section */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl  shadow-sm border border-gray-200 dark:border-gray-700">
-        <div className="px-6 py-4 border-b border-gray-200 dark:text-white dark:border-gray-700">
-          <div className="flex items-center justify-between mb-12">
-            <h3 className="text-[24px] dark:text-white font-normal text-gray-900">
-              Process Performance & Cost Analysis
-            </h3>
+        <div className="bg-white dark:bg-gray-800 rounded-xl  shadow-sm border border-gray-200 dark:border-gray-700" style={{ marginTop: '24px'}}>
+          <div className="px-6 py-4 border-b border-gray-200 dark:text-white dark:border-gray-700">
+            <div className="flex items-center justify-between mb-8">
+              <h3 className="text-[24px] dark:text-white font-normal text-gray-900">
+                Process Performance & Cost Analysis
+              </h3>
             </div>
 
 
             {/* Search and Filter Bar */}
-          <div className="mt-2 flex items-center gap-3">
-            {/* Search Input with Icon */}
-            <div className="relative w-[400px]"> {/* wider input */}
+            <div className="mt-2 flex items-center gap-3">
+              {/* Search Input with Icon */}
+              <div className="relative w-[400px]"> {/* wider input */}
                 <input
                   type="text"
-                placeholder="Search"
-                className="w-full pl-10 pr-4 py-2 border border-gray-400 dark:bg-gray-800 dark:border-gray-700 rounded-lg text-gray-700 placeholder-gray-500 text-base focus:outline-none focus:ring-1 focus:ring-gray-500"
-              />
-              <Search
-                className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5  font-bolder text-gray-900"
-                  />
+                  placeholder="Search"
+                  className="w-full pl-10 pr-4 py-2 border border-gray-400 dark:bg-gray-800 dark:border-gray-700 rounded-lg text-gray-700 placeholder-gray-500 text-base focus:outline-none focus:ring-1 focus:ring-gray-500"
+                />
+                <Search
+                  className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5  font-bolder text-gray-900"
+                />
               </div>
 
-            {/* Filter Button */}
-            <button className="p-2 border border-gray-400 rounded-lg hover:bg-gray-100 transition-colors">
-              <Funnel className="w-5 h-5 text-gray-600" />
+              {/* Filter Button */}
+              <button className="p-2 border border-gray-400 rounded-lg hover:bg-gray-100 transition-colors">
+                <Funnel className="w-5 h-5 text-gray-600" />
               </button>
             </div>
 
           </div>
 
           <div className="overflow-x-auto">
-          <table className="w-full border-collapse justify-center">
-            <thead>
-              <tr className="bg-gray-50 dark:bg-gray-800 border-b border-gray-300">
-                <th className="px-4 py-3 text-left text-[18px] font-medium dark:text-gray-300 text-gray-900">
-                  Process
-                </th>
-                <th className="px-4 py-3 text-left text-[18px] font-medium dark:text-gray-300 text-gray-900">
-                  User
-                </th>
-                <th className="px-4 py-3 text-left text-[18px] font-medium dark:text-gray-300 text-gray-900">
-                  CPU %
-                </th>
-                <th className="px-4 py-3 text-left text-[18px] font-medium  dark:text-gray-300 text-gray-900">
-                  Memory
-                </th>
-                <th className="px-4 py-3 text-left text-[18px] font-medium dark:text-gray-300 text-gray-900">
-                  Status
-                </th>
+            <table className="w-full border-collapse justify-center">
+              <thead>
+                <tr className="bg-gray-50 dark:bg-gray-800 border-b border-gray-300">
+                  <th className="px-4 py-3 text-left text-[18px] font-medium dark:text-gray-300 text-gray-900">
+                    Process
+                  </th>
+                  <th className="px-4 py-3 text-left text-[18px] font-medium dark:text-gray-300 text-gray-900">
+                    User
+                  </th>
+                  <th className="px-4 py-3 text-left text-[18px] font-medium dark:text-gray-300 text-gray-900">
+                    CPU %
+                  </th>
+                  <th className="px-4 py-3 text-left text-[18px] font-medium  dark:text-gray-300 text-gray-900">
+                    Memory
+                  </th>
+                  <th className="px-4 py-3 text-left text-[18px] font-medium dark:text-gray-300 text-gray-900">
+                    Status
+                  </th>
                 </tr>
               </thead>
-            <tbody>
+              <tbody>
                 {topProcesses.slice(0, 5).map((process, index) => (
                   <tr
                     key={process['Process ID'] || index}
                     onClick={() => handleProcessClick(process)}
-                  className={
-                    index % 2 === 1
-                      ? "bg-gray-50 cursor-pointer"
-                      : "bg-white cursor-pointer"
-                  }
+                    className={
+                      index % 2 === 1
+                        ? "bg-gray-50 cursor-pointer"
+                        : "bg-white cursor-pointer"
+                    }
                   >
-                  <td className="px-4 py-3 text-md text-gray-600">
-                    {process['Process Name'] || 'Unknown'} PID: {process['Process ID']}
+                    <td className="px-4 py-3 text-md text-gray-600">
+                      {process['Process Name'] || 'Unknown'} PID: {process['Process ID']}
                     </td>
-                  <td className="px-4 py-3 text-md text-gray-600">
+                    <td className="px-4 py-3 text-md text-gray-600">
                       {process['Username'] || 'System'}
                     </td>
-                  <td className="px-4 py-3 text-md text-gray-600">
+                    <td className="px-4 py-3 text-md text-gray-600">
                       {(process['CPU Usage (%)'] || 0).toFixed(1)}%
                     </td>
-                  <td className="px-4 py-3 text-md text-gray-600">
-                    {(process['Memory Usage (MB)'] || 0).toFixed(1)}MB,{" "}
-                    {(process['Memory Usage (%)'] || 0).toFixed(1)}%
+                    <td className="px-4 py-3 text-md text-gray-600">
+                      {(process['Memory Usage (MB)'] || 0).toFixed(1)}MB,{" "}
+                      {(process['Memory Usage (%)'] || 0).toFixed(1)}%
                     </td>
-                  <td className="px-4 py-3 text-md font-medium">
-                    <span
-                      className={
-                        process.Status === "Running"
-                          ? "text-green-600"
-                          : process.Status === "Idle"
-                            ? "text-yellow-500"
-                            : "text-red-600"
-                      }
-                    >
-                      {process.Status || "Unknown"}
+                    <td className="px-4 py-3 text-md font-medium">
+                      <span
+                        className={
+                          process.Status === "Running"
+                            ? "text-green-600"
+                            : process.Status === "Idle"
+                              ? "text-yellow-500"
+                              : "text-red-600"
+                        }
+                      >
+                        {process.Status || "Unknown"}
                       </span>
                     </td>
                   </tr>
@@ -1570,7 +1574,7 @@ useEffect(() => {
             <div className="flex justify-end">
               <button
                 onClick={() => navigate('/processes')}
-              className="px-6 py-2.5 bg-[#008060] hover:bg-[#00694d] text-white font-bold rounded-full text-md flex items-center gap-2 h-11 transition-colors"
+                className="px-6 py-2.5 bg-[#008060] hover:bg-[#00694d] text-white font-bold rounded-full text-md flex items-center gap-2 h-11 transition-colors"
               >
                 View All
               </button>
@@ -1645,13 +1649,13 @@ useEffect(() => {
               setSelectedVMForRecommendations(null);
             }}
             vmName={selectedVMForRecommendations.name}
-          timeRangeDays={7}
-          selectedDate={dateRange.start ? dateRange.start.toISOString().split('T')[0] : 'today'}
-          endDate={dateRange.end ? dateRange.end.toISOString().split('T')[0] : null}
+            timeRangeDays={7}
+            selectedDate={dateRange.start ? dateRange.start.toISOString().split('T')[0] : 'today'}
+            endDate={dateRange.end ? dateRange.end.toISOString().split('T')[0] : null}
           />
         )}
       </div>
-      </>
+    </>
   );
 };
 
