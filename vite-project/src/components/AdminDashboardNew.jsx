@@ -463,16 +463,26 @@ useEffect(() => {
 
   // Fetch hardware specifications
   const fetchHardwareSpecs = async () => {
+    console.log('fetchHardwareSpecs called'); // Debug log
     try {
       setHardwareLoading(true);
-      const response = await apiClient.get('/hardware-specs/latest');
+      console.log('Making hardware specs API call...'); // Debug log
+      const response = await fetch('/api/hardware-specs/latest');
+      console.log('Hardware specs response:', response.status); // Debug log
+      const data = await response.json();
+      console.log('Hardware specs data:', data); // Debug log
 
-      if (response.data && response.data.success && response.data.data) {
-        setHardwareSpecs(response.data.data);
+      if (data && data.success && data.data) {
+        console.log('Setting hardware specs data:', data.data); // Debug log
+        setHardwareSpecs(data.data);
+      } else {
+        console.log('No hardware specs data received, setting empty state'); // Debug log
+        setHardwareSpecs(null);
       }
     } catch (error) {
       console.error('Error fetching hardware specs:', error);
     } finally {
+      console.log('Setting hardwareLoading to false'); // Debug log
       setHardwareLoading(false);
     }
   };
@@ -580,6 +590,8 @@ useEffect(() => {
 
   // Initial data fetching
   useEffect(() => {
+    console.log('Dashboard useEffect running - initial data fetch'); // Debug log
+
     // Always fetch latest data (not date-range dependent)
     fetchCostModels();
     fetchHardwareSpecs(); // Always latest hardware specs
@@ -597,6 +609,12 @@ useEffect(() => {
 
     const vmInterval = setInterval(fetchVMData, 10000);
 
+    // Add hardware specs interval (every 60 seconds)
+    const hardwareInterval = setInterval(() => {
+      console.log('Hardware specs 60-second interval triggered'); // Debug log
+      fetchHardwareSpecs();
+    }, 60000);
+
     // Periodic update for date-range dependent data (less frequent)
     const aggregatedInterval = setInterval(() => {
       fetchChartData();
@@ -606,6 +624,7 @@ useEffect(() => {
     return () => {
       clearInterval(realtimeInterval);
       clearInterval(vmInterval);
+      clearInterval(hardwareInterval);
       clearInterval(aggregatedInterval);
     };
   }, []);
