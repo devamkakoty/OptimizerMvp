@@ -255,7 +255,7 @@ const SimulateTab = () => {
   return (
     <div className="main">
       <div className="para">
-      <h1 className="text-4xl font-medium mb-6" style={{ color: '#16a34a' }}>
+      <h1 className="text-4xl font-medium mb-6 text-left" style={{ color: '#16a34a' }}>
         GreenMatrix Panel
       </h1>
 

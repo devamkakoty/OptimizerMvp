@@ -290,13 +290,13 @@ const PerformanceTab = () => {
   }
 
   return (
-    <div className="p-4">
+    <div>
       {/* GreenMatrix Panel label (outside the box) */}
-      <h1 className="text-4xl font-medium mb-6 ml-4" style={{ color: '#16a34a' }}>
+      <h1 className="text-4xl font-medium mb-6 text-left" style={{ color: '#16a34a' }}>
         GreenMatrix Panel
       </h1>
       <div className="w-full mx-auto bg-white rounded-lg shadow-sm border border-gray-200 p-6 para1">
-        <div className="space-y-6">
+        <div className="space-y-2">
           <div className="flex justify-between items-center">
             <h2 className="text-[24px] font-normal text-gray-900 dark:text-white">
               Performance Monitor
