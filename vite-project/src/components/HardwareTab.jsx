@@ -279,7 +279,7 @@ const HardwareTab = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <h1 className="text-4xl font-medium mb-6" style={{ color: '#16a34a' }}>
+      <h1 className="text-4xl font-medium mb-6 text-left" style={{ color: '#16a34a' }}>
         GreenMatrix Panel
       </h1>
       <div className="w-full mx-auto bg-white rounded-lg shadow-sm border border-gray-200 p-6 para1">
