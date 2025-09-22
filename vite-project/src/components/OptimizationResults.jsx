@@ -21,8 +21,18 @@ const OptimizationResults = ({ results, mode }) => {
 
   const exportData = (format) => {
     if (format === 'json') {
-      // Export as JSON
-      const jsonData = JSON.stringify(results, null, 2);
+      // Export comprehensive JSON including all data from HTML report
+      const comprehensiveData = {
+        ...results,
+        exportMetadata: {
+          exportDate: new Date().toISOString(),
+          reportType: mode,
+          includesAdvancedStats: !!results.advancedStats,
+          includesHostMetrics: !!results.hostMetrics
+        }
+      };
+
+      const jsonData = JSON.stringify(comprehensiveData, null, 2);
       const blob = new Blob([jsonData], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -32,20 +42,70 @@ const OptimizationResults = ({ results, mode }) => {
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-      
+
     } else if (format === 'csv') {
-      // Export as CSV
-      const headers = ['Hardware', 'Full Name', 'Inference Time (ms)', 'Cost per 1000', 'Status'];
-      const csvContent = [
-        headers.join(','),
-        ...alternativeOptions.map(hw => [
-          hw.hardware,
-          hw.fullName,
-          hw.inferenceTime,
-          hw.costPer1000,
-          hw.status
-        ].join(','))
-      ].join('\n');
+      // Export comprehensive CSV including advanced metrics for post-deployment mode
+      let csvContent = '';
+
+      if (mode === 'post-deployment' && (results.hostMetrics || results.vmMetrics) && (results.advancedStats || results.advancedVmStats)) {
+        // Enhanced CSV for post-deployment with advanced stats (both bare metal and VM)
+        const isVM = !!results.vmMetrics;
+        const metrics = results.vmMetrics || results.hostMetrics;
+        const advStats = results.advancedVmStats || results.advancedStats;
+
+        const headers = [
+          'Section', 'Metric', 'Value', 'Unit', 'Category'
+        ];
+
+        const rows = [
+          // Current Metrics (VM or Host)
+          [`Current ${isVM ? 'VM' : 'Host'} Metrics`, 'GPU Utilization', metrics.gpuUtilization || 'N/A', '%', 'Real-time'],
+          [`Current ${isVM ? 'VM' : 'Host'} Metrics`, 'GPU Memory Usage', metrics.gpuMemoryUsage || 'N/A', '%', 'Real-time'],
+          [`Current ${isVM ? 'VM' : 'Host'} Metrics`, 'CPU Utilization', metrics.cpuUtilization || 'N/A', '%', 'Real-time'],
+          [`Current ${isVM ? 'VM' : 'Host'} Metrics`, 'CPU Memory Usage', metrics.cpuMemoryUsage || 'N/A', '%', 'Real-time'],
+          [`Current ${isVM ? 'VM' : 'Host'} Metrics`, 'Disk IOPS', metrics.diskIops || 'N/A', 'IOPS', 'Real-time'],
+          [`Current ${isVM ? 'VM' : 'Host'} Metrics`, 'Network Bandwidth', metrics.networkBandwidth || 'N/A', 'MB/s', 'Real-time'],
+
+          // Advanced Statistics (VM or Host)
+          ['Advanced Analytics', 'Average CPU', (advStats.avg_cpu_usage || advStats.avg_host_cpu_percent) || 0, '%', '7-day average'],
+          ['Advanced Analytics', 'CPU 95th Percentile', (advStats.cpu_95th_percentile || advStats.host_cpu_95th_percentile) || 0, '%', '7-day statistics'],
+          ['Advanced Analytics', 'CPU Volatility', (advStats.cpu_volatility || advStats.host_cpu_volatility) || 0, '%', '7-day statistics'],
+          ['Advanced Analytics', 'Average Memory', (advStats.avg_memory_usage || advStats.avg_host_ram_percent) || 0, '%', '7-day average'],
+          ['Advanced Analytics', 'Memory 95th Percentile', (advStats.memory_95th_percentile || advStats.host_ram_95th_percentile) || 0, '%', '7-day statistics'],
+          ['Advanced Analytics', 'Memory Volatility', (advStats.memory_volatility || advStats.host_ram_volatility) || 0, '%', '7-day statistics'],
+          ['Advanced Analytics', 'Average GPU', (advStats.avg_gpu_usage || advStats.avg_host_gpu_percent) || 0, '%', '7-day average'],
+          ['Advanced Analytics', 'GPU 95th Percentile', (advStats.gpu_95th_percentile || advStats.host_gpu_95th_percentile) || 0, '%', '7-day statistics'],
+          ['Advanced Analytics', 'Average Power', (advStats.avg_power_consumption || advStats.avg_process_power_watts) || 0, 'W', '7-day average'],
+          ['Advanced Analytics', 'Peak Power', (advStats.max_power_consumption || advStats.max_process_power_watts) || 0, 'W', '7-day peak'],
+          ['Advanced Analytics', 'Total Energy', (advStats.total_energy_kwh || advStats.total_energy_kwh) || 0, 'kWh', '7-day total'],
+
+          // Threshold Breaches
+          ['Threshold Analysis', 'CPU Critical Breaches', (advStats.cpu_critical_breach_percent || advStats.cpu_critical_breach_percent) || 0, '% of time', '>90% threshold'],
+          ['Threshold Analysis', 'CPU Warning Breaches', (advStats.cpu_warning_breach_percent || advStats.cpu_warning_breach_percent) || 0, '% of time', '>80% threshold'],
+          ['Threshold Analysis', 'Memory Critical Breaches', (advStats.memory_critical_breach_percent || advStats.memory_critical_breach_percent) || 0, '% of time', '>90% threshold'],
+          ['Threshold Analysis', 'Memory Warning Breaches', (advStats.memory_warning_breach_percent || advStats.memory_warning_breach_percent) || 0, '% of time', '>80% threshold'],
+
+          // Recommendation
+          ['Recommendation', 'Recommended Action', recommendedConfiguration.recommendedInstance, '', 'ML Model Output'],
+          ['Recommendation', 'Expected Inference Time', recommendedConfiguration.expectedInferenceTime, '', 'Performance'],
+          ['Recommendation', 'Cost per 1000 Inferences', recommendedConfiguration.costPer1000, '', 'Economics']
+        ];
+
+        csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+      } else {
+        // Basic CSV for pre-deployment or VM-level mode
+        const headers = ['Hardware', 'Full Name', 'Inference Time (ms)', 'Cost per 1000', 'Status'];
+        csvContent = [
+          headers.join(','),
+          ...alternativeOptions.map(hw => [
+            hw.hardware,
+            hw.fullName,
+            hw.inferenceTime || hw.latency,
+            hw.costPer1000,
+            hw.status
+          ].join(','))
+        ].join('\n');
+      }
       
       const blob = new Blob([csvContent], { type: 'text/csv' });
       const url = URL.createObjectURL(blob);
@@ -246,36 +306,161 @@ const OptimizationResults = ({ results, mode }) => {
 
     ${mode === 'post-deployment' ? `
     <div class="section">
-        <h2>Bare Metal Host Metrics</h2>
-        <p>Real-time resource utilization metrics from the bare metal host machine at the time of analysis.</p>
+        <h2>${results.vmMetrics ? 'Current VM Resource Metrics' : 'Current Host Metrics'}</h2>
+        <p>${results.vmMetrics ? 'Real-time resource utilization metrics from the virtual machine at the time of analysis.' : 'Real-time resource utilization metrics from the bare metal host machine at the time of analysis.'}</p>
 
         <div class="metrics-grid">
             <div class="metric-item">
                 <div class="metric-label">GPU Utilization</div>
-                <div class="metric-value">${results.hostMetrics?.gpuUtilization || 'N/A'}%</div>
+                <div class="metric-value">${(results.vmMetrics?.gpuUtilization || results.hostMetrics?.gpuUtilization) || 'N/A'}%</div>
             </div>
             <div class="metric-item">
                 <div class="metric-label">GPU Memory Usage</div>
-                <div class="metric-value">${results.hostMetrics?.gpuMemoryUsage || 'N/A'}%</div>
+                <div class="metric-value">${(results.vmMetrics?.gpuMemoryUsage || results.hostMetrics?.gpuMemoryUsage) || 'N/A'}%</div>
             </div>
             <div class="metric-item">
                 <div class="metric-label">CPU Utilization</div>
-                <div class="metric-value">${results.hostMetrics?.cpuUtilization || 'N/A'}%</div>
+                <div class="metric-value">${(results.vmMetrics?.cpuUtilization || results.hostMetrics?.cpuUtilization) || 'N/A'}%</div>
             </div>
             <div class="metric-item">
                 <div class="metric-label">CPU Memory Usage</div>
-                <div class="metric-value">${results.hostMetrics?.cpuMemoryUsage || 'N/A'}%</div>
+                <div class="metric-value">${(results.vmMetrics?.cpuMemoryUsage || results.hostMetrics?.cpuMemoryUsage) || 'N/A'}%</div>
             </div>
             <div class="metric-item">
                 <div class="metric-label">Disk IOPS</div>
-                <div class="metric-value">${results.hostMetrics?.diskIops || 'N/A'}</div>
+                <div class="metric-value">${(results.vmMetrics?.diskIops || results.hostMetrics?.diskIops) || 'N/A'}</div>
             </div>
             <div class="metric-item">
                 <div class="metric-label">Network Bandwidth</div>
-                <div class="metric-value">${results.hostMetrics?.networkBandwidth || 'N/A'} MB/s</div>
+                <div class="metric-value">${(results.vmMetrics?.networkBandwidth || results.hostMetrics?.networkBandwidth) || 'N/A'} MB/s</div>
             </div>
         </div>
     </div>
+
+    ${(results.advancedStats || results.advancedVmStats) ? `
+    <div class="section">
+        <h2>${results.vmMetrics ? 'Advanced VM Analytics (Last 7 Days)' : 'Advanced Host Analytics (Last 7 Days)'}</h2>
+        <p>${results.vmMetrics ? 'Comprehensive statistical analysis of virtual machine performance metrics and workload patterns.' : 'Comprehensive statistical analysis of bare metal host performance metrics and workload patterns.'}</p>
+
+        <div class="section">
+            <h3>Resource Utilization Statistics</h3>
+            <div class="metrics-grid">
+                <div class="metric-item">
+                    <div class="metric-label">CPU Analysis</div>
+                    <div class="metric-value">
+                        Avg: ${(results.advancedVmStats?.avg_cpu_usage || results.advancedStats?.avg_host_cpu_percent) || 0}% |
+                        95th: ${(results.advancedVmStats?.cpu_95th_percentile || results.advancedStats?.host_cpu_95th_percentile) || 0}% |
+                        Volatility: ${(results.advancedVmStats?.cpu_volatility || results.advancedStats?.host_cpu_volatility) || 0}%
+                    </div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Memory Analysis</div>
+                    <div class="metric-value">
+                        Avg: ${(results.advancedVmStats?.avg_memory_usage || results.advancedStats?.avg_host_ram_percent) || 0}% |
+                        95th: ${(results.advancedVmStats?.memory_95th_percentile || results.advancedStats?.host_ram_95th_percentile) || 0}% |
+                        Volatility: ${(results.advancedVmStats?.memory_volatility || results.advancedStats?.host_ram_volatility) || 0}%
+                    </div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">GPU Performance</div>
+                    <div class="metric-value">
+                        Avg: ${(results.advancedVmStats?.avg_gpu_usage || results.advancedStats?.avg_host_gpu_percent) || 0}% |
+                        95th: ${(results.advancedVmStats?.gpu_95th_percentile || results.advancedStats?.host_gpu_95th_percentile) || 0}% |
+                        Temp: ${(results.advancedVmStats?.avg_gpu_temperature || results.advancedStats?.avg_gpu_temperature_celsius) || 0}°C
+                    </div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Power Consumption</div>
+                    <div class="metric-value">
+                        Avg: ${(results.advancedVmStats?.avg_power_consumption || results.advancedStats?.avg_process_power_watts) || 0}W |
+                        Peak: ${(results.advancedVmStats?.max_power_consumption || results.advancedStats?.max_process_power_watts) || 0}W |
+                        Total: ${(results.advancedVmStats?.total_energy_kwh || results.advancedStats?.total_energy_kwh) || 0} kWh
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>Threshold Breach Analysis</h3>
+            <div class="metrics-grid">
+                <div class="metric-item">
+                    <div class="metric-label">CPU Threshold Breaches</div>
+                    <div class="metric-value">
+                        Critical (>90%): ${results.advancedStats.cpu_critical_breach_percent || 0}% of time<br>
+                        Warning (>80%): ${results.advancedStats.cpu_warning_breach_percent || 0}% of time<br>
+                        Elevated (>70%): ${results.advancedStats.cpu_elevated_breach_percent || 0}% of time
+                    </div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Memory Threshold Breaches</div>
+                    <div class="metric-value">
+                        Critical (>90%): ${results.advancedStats.memory_critical_breach_percent || 0}% of time<br>
+                        Warning (>80%): ${results.advancedStats.memory_warning_breach_percent || 0}% of time
+                    </div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">GPU Threshold Breaches</div>
+                    <div class="metric-value">
+                        Critical (>90%): ${results.advancedStats.gpu_critical_breach_percent || 0}% of time<br>
+                        Warning (>80%): ${results.advancedStats.gpu_warning_breach_percent || 0}% of time
+                    </div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Temperature Breaches</div>
+                    <div class="metric-value">
+                        Critical (>85°C): ${results.advancedStats.temp_critical_breach_percent || 0}% of time<br>
+                        Warning (>80°C): ${results.advancedStats.temp_warning_breach_percent || 0}% of time
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        ${results.advancedStats.process_efficiency_data && results.advancedStats.process_efficiency_data.length > 0 ? `
+        <div class="section">
+            <h3>Process Efficiency Analysis</h3>
+            <div class="hardware-analysis">
+                <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
+                    <thead>
+                        <tr style="background: #f3f4f6; border-bottom: 2px solid #d1d5db;">
+                            <th style="padding: 12px; text-align: left; font-weight: 600;">Process</th>
+                            <th style="padding: 12px; text-align: left; font-weight: 600;">Avg Power (W)</th>
+                            <th style="padding: 12px; text-align: left; font-weight: 600;">CPU %</th>
+                            <th style="padding: 12px; text-align: left; font-weight: 600;">Efficiency (CPU/W)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${results.advancedStats.process_efficiency_data.slice(0, 10).map(proc => `
+                            <tr style="border-bottom: 1px solid #e5e7eb;">
+                                <td style="padding: 10px;">${proc.process_name}</td>
+                                <td style="padding: 10px;">${proc.avg_power_watts}W</td>
+                                <td style="padding: 10px;">${proc.avg_cpu_percent}%</td>
+                                <td style="padding: 10px;">${proc.efficiency_score}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        ` : ''}
+
+        ${results.advancedStats.peak_usage_hours && results.advancedStats.peak_usage_hours.length > 0 ? `
+        <div class="section">
+            <h3>Peak Usage Pattern Analysis</h3>
+            <div class="metrics-grid">
+                ${results.advancedStats.peak_usage_hours.slice(0, 6).map(hour => `
+                    <div class="metric-item">
+                        <div class="metric-label">Hour ${hour.hour}:00</div>
+                        <div class="metric-value">
+                            Avg CPU: ${hour.avg_cpu}% | Peak: ${hour.peak_cpu}% |
+                            High Usage Events: ${hour.high_cpu_count}
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+        ` : ''}
+    </div>
+    ` : ''}
     ` : ''}
 
     ${hardwareAnalysis ? `

@@ -875,6 +875,51 @@ const OptimizeTab = () => {
               ];
             }
 
+            // Fetch fresh VM metrics for the report to ensure current data
+            let freshVmMetrics = {
+              gpuUtilization: vmGpuUtilization || 'N/A',
+              gpuMemoryUsage: vmGpuMemoryUsage || 'N/A',
+              cpuUtilization: vmCpuUtilization || 'N/A',
+              cpuMemoryUsage: vmCpuMemoryUsage || 'N/A',
+              diskIops: vmDiskIops || 'N/A',
+              networkBandwidth: vmNetworkBandwidth || 'N/A'
+            };
+
+            try {
+              console.log('Fetching fresh VM metrics for report generation...');
+              const vmMetricsResponse = await apiClient.get(`/v1/metrics/vm/${encodeURIComponent(selectedVM.value)}/latest`);
+              if (vmMetricsResponse.data && vmMetricsResponse.data.success && vmMetricsResponse.data.metrics) {
+                const metrics = vmMetricsResponse.data.metrics;
+                freshVmMetrics = {
+                  gpuUtilization: metrics.gpu_utilization?.toString() || '0',
+                  gpuMemoryUsage: metrics.gpu_memory_usage?.toString() || '0',
+                  cpuUtilization: metrics.cpu_utilization?.toString() || '0',
+                  cpuMemoryUsage: metrics.cpu_memory_usage?.toString() || '0',
+                  diskIops: metrics.disk_iops?.toString() || '0',
+                  networkBandwidth: metrics.network_bandwidth?.toString() || '0'
+                };
+                console.log('Fresh VM metrics retrieved for report:', freshVmMetrics);
+              }
+            } catch (vmMetricsError) {
+              console.log('Could not fetch fresh VM metrics for report, using cached values:', vmMetricsError.message);
+            }
+
+            // Get current VM metrics for the report
+            const currentVmMetrics = freshVmMetrics;
+
+            // Try to get advanced VM statistics from VM recommendations API
+            let vmAdvancedStats = null;
+            try {
+              console.log('Fetching advanced VM statistics for report...');
+              const vmRecommendationsResponse = await apiClient.get(`/recommendations/vm/${encodeURIComponent(selectedVM.value)}?time_range_days=7`);
+              if (vmRecommendationsResponse.data && vmRecommendationsResponse.data.success) {
+                vmAdvancedStats = vmRecommendationsResponse.data.vm_analysis;
+                console.log('Advanced VM statistics retrieved:', vmAdvancedStats);
+              }
+            } catch (vmStatsError) {
+              console.log('Could not fetch advanced VM statistics:', vmStatsError.message);
+            }
+
             // Format results for VM-level optimization
             const vmFormattedResults = {
               recommendedConfiguration: {
@@ -883,6 +928,8 @@ const OptimizeTab = () => {
                 expectedInferenceTime: `${optimizationSummary.expected_latency_ms || costAnalysis.latency_ms || 'Calculating...'} ms`,
                 costPer1000: `$${optimizationSummary.optimized_cost_per_1000_inferences || costAnalysis.optimized_cost_per_1000 || 'Calculating...'}`
               },
+              vmMetrics: currentVmMetrics,
+              advancedVmStats: vmAdvancedStats,
               hardwareAnalysis: {
                 name: `${vmConfig.vm_name} on ${vmConfig.host_hardware}`,
                 memory: `${vmConfig.current_vram_gb} GB VRAM, ${vmConfig.current_ram_gb} GB RAM`,
@@ -1053,6 +1100,29 @@ const OptimizeTab = () => {
               // Keep default 'Unable to calculate' values
             }
 
+            // Get current host metrics for the report
+            const currentHostMetrics = {
+              gpuUtilization: gpuUtilization,
+              gpuMemoryUsage: gpuMemoryUsage,
+              cpuUtilization: cpuUtilization,
+              cpuMemoryUsage: cpuMemoryUsage,
+              diskIops: diskIops,
+              networkBandwidth: networkBandwidth
+            };
+
+            // Try to get advanced statistics from host recommendations API
+            let advancedStats = null;
+            try {
+              console.log('Fetching advanced host statistics for report...');
+              const hostRecommendationsResponse = await apiClient.get('/recommendations/host?time_range_days=7');
+              if (hostRecommendationsResponse.data && hostRecommendationsResponse.data.success) {
+                advancedStats = hostRecommendationsResponse.data.host_analysis;
+                console.log('Advanced statistics retrieved:', advancedStats);
+              }
+            } catch (statsError) {
+              console.log('Could not fetch advanced statistics:', statsError.message);
+            }
+
             // Format results for post-deployment
             const formattedResults = {
               recommendedConfiguration: {
@@ -1070,6 +1140,8 @@ const OptimizeTab = () => {
                 considerations: considerations,
                 useCase: `Post-deployment optimization for ${optimizationMode} workload`
               },
+              hostMetrics: currentHostMetrics,
+              advancedStats: advancedStats,
               alternativeOptions: [{
                 hardware: recommendedHardware,
                 fullName: recommendedHardware,
