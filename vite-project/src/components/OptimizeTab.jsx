@@ -879,7 +879,7 @@ const OptimizeTab = () => {
             const vmFormattedResults = {
               recommendedConfiguration: {
                 description: vmDescription,
-                recommendedInstance: `VM: ${vmConfig.vm_name} (${primaryRecommendation})`,
+                recommendedInstance: primaryRecommendation,
                 expectedInferenceTime: `${optimizationSummary.expected_latency_ms || costAnalysis.latency_ms || 'Calculating...'} ms`,
                 costPer1000: `$${optimizationSummary.optimized_cost_per_1000_inferences || costAnalysis.optimized_cost_per_1000 || 'Calculating...'}`
               },
@@ -991,10 +991,67 @@ const OptimizeTab = () => {
               ];
             }
 
-            // Extract numerical metrics from the API response
-            const metrics = response.data.metrics || {};
-            const recommendedLatency = metrics.recommended_latency || 'Calculating...';
-            const recommendedCost = metrics.recommended_cost || 'Calculating...';
+            // Get performance metrics by calling simulate-performance API for bare metal
+            let recommendedLatency = 'Unable to calculate';
+            let recommendedCost = 'Unable to calculate';
+
+            try {
+              // Prepare simulation parameters using the same model data
+              const simulationParams = {
+                Model: modelName,
+                Framework: framework,
+                Task_Type: taskType,
+                Scenario: scenario || 'Single Stream',
+                Total_Parameters_Millions: parseFloat(parameters) || 0,
+                Model_Size_MB: parseFloat(modelSize) || 0,
+                Architecture_type: architectureType || 'transformer',
+                Model_Type: modelType || 'Unknown',
+                Embedding_Vector_Dimension: parseInt(embeddingDimension) || 0,
+                Precision: precision || 'FP32',
+                Vocabulary_Size: parseInt(vocabularySize) || 1000,
+                FFN_Dimension: parseInt(ffnDimension) || 0,
+                Activation_Function: activationFunction || 'relu',
+                Number_of_hidden_Layers: parseInt(hiddenLayers) || 0,
+                Number_of_Attention_Layers: parseInt(attentionLayers) || 0,
+                GFLOPs_Billions: parseFloat(flops) || 0
+              };
+
+              // Add Training-specific fields if task type is Training
+              if (taskType === 'Training') {
+                simulationParams.Batch_Size = parseInt(batchSize) || 1;
+                simulationParams.Input_Size = parseInt(inputSize) || 256;
+                simulationParams.Full_Training = isFullTraining === 'Yes' ? 1 : 0;
+              }
+
+              console.log('Calling simulate-performance for bare metal cost/latency calculation...');
+              const simResponse = await apiClient.post('/model/simulate-performance', simulationParams);
+
+              if (simResponse.data && simResponse.data.status === 'success' && simResponse.data.performance_results) {
+                // Find the recommended hardware in simulation results
+                const perfResults = simResponse.data.performance_results;
+                const matchingResult = perfResults.find(result =>
+                  result.GPU && recommendedHardware.toLowerCase().includes(result.GPU.toLowerCase())
+                ) || perfResults.find(result =>
+                  result['Hardware Name'] && recommendedHardware.toLowerCase().includes(result['Hardware Name'].toLowerCase())
+                ) || perfResults[0]; // Fallback to first result
+
+                if (matchingResult) {
+                  recommendedLatency = matchingResult['Latency (ms)'] !== 'N/A' ?
+                    `${parseFloat(matchingResult['Latency (ms)']).toFixed(2)} ms` : 'Unable to calculate';
+                  recommendedCost = matchingResult['Total Cost'] !== 'N/A' && matchingResult['Total Cost'] !== '0' ?
+                    `$${parseFloat(matchingResult['Total Cost']).toFixed(4)}` : 'Unable to calculate';
+
+                  console.log('Found matching performance data:', {
+                    hardware: matchingResult.GPU || matchingResult['Hardware Name'],
+                    latency: recommendedLatency,
+                    cost: recommendedCost
+                  });
+                }
+              }
+            } catch (simError) {
+              console.log('Could not fetch performance metrics from simulate-performance:', simError.message);
+              // Keep default 'Unable to calculate' values
+            }
 
             // Format results for post-deployment
             const formattedResults = {
@@ -1016,7 +1073,7 @@ const OptimizeTab = () => {
               alternativeOptions: [{
                 hardware: recommendedHardware,
                 fullName: recommendedHardware,
-                inferenceTime: recommendedLatency,
+                latency: recommendedLatency,
                 costPer1000: recommendedCost,
                 status: 'ML Model Recommended',
                 recommended: true,

@@ -230,7 +230,7 @@ const OptimizationResults = ({ results, mode }) => {
 
         <div class="recommended-config">
             <div class="config-card">
-                <h3>RECOMMENDED INSTANCE</h3>
+                <h3>RECOMMENDED CONFIGURATION</h3>
                 <div class="value">${recommendedConfiguration.recommendedInstance}</div>
             </div>
             <div class="config-card">
@@ -510,7 +510,7 @@ const OptimizationResults = ({ results, mode }) => {
                 <div className="flex items-center justify-center mb-2">
                   <Cpu className="w-8 h-8 text-gray-600 dark:text-gray-400" />
                 </div>
-                <h4 className="text-sm text-gray-600 dark:text-gray-400 mb-2">RECOMMENDED INSTANCE</h4>
+                <h4 className="text-sm text-gray-600 dark:text-gray-400 mb-2">RECOMMENDED CONFIGURATION</h4>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">{recommendedConfiguration.recommendedInstance}</p>
               </div>
 
