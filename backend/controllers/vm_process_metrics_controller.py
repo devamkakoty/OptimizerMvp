@@ -528,6 +528,7 @@ class VMProcessMetricsController:
             result = db.query(
                 VMProcessMetric.vm_name,
                 func.max(VMProcessMetric.timestamp).label('timestamp'),
+                func.avg(VMProcessMetric.cpu_usage_percent).label('avg_cpu'),         # Add process-level CPU for fallback
                 func.sum(VMProcessMetric.memory_usage_mb).label('total_memory_mb'),    # Sum memory usage in MB for process-level calculation
                 func.sum(VMProcessMetric.gpu_memory_usage_mb).label('total_gpu_memory_mb'), # Sum GPU memory
                 func.sum(VMProcessMetric.iops).label('total_iops'),                    # Sum IOPS
@@ -578,8 +579,14 @@ class VMProcessMetricsController:
                     # Fallback to VM-level VRAM usage if available
                     gpu_memory_usage_percent = round(float(result.vm_vram_usage_percent or 0), 2)
                 
-                # Use accurate VM-level CPU utilization instead of process aggregation
-                cpu_utilization = round(float(result.vm_overall_cpu_percent or 0), 2)
+                # Use VM-level CPU utilization if available, fallback to process-level aggregation
+                if result.vm_overall_cpu_percent and result.vm_overall_cpu_percent > 0:
+                    cpu_utilization = round(float(result.vm_overall_cpu_percent), 2)
+                    self.logger.info(f"Using VM-level CPU utilization: {cpu_utilization}%")
+                else:
+                    # Fallback: Calculate from process-level CPU usage
+                    cpu_utilization = round(float(result.avg_cpu or 0), 2)
+                    self.logger.info(f"VM overall CPU not available, using process-level fallback: {cpu_utilization}%")
                 
                 # Use accurate VM-level GPU utilization instead of process aggregation
                 gpu_utilization = round(float(result.vm_overall_gpu_utilization or 0), 2)
