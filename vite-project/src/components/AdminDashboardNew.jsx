@@ -65,6 +65,10 @@ const AdminDashboardNew = ({
   const [availableRegions, setAvailableRegions] = useState([]);
   const [costModels, setCostModels] = useState([]);
 
+  // Cache flags for static data to avoid unnecessary refetches
+  const [costModelsCached, setCostModelsCached] = useState(false);
+  const [hardwareSpecsCached, setHardwareSpecsCached] = useState(false);
+
   // State for hardware specs and host metrics
   const [hardwareSpecs, setHardwareSpecs] = useState(null);
   const [hostMetrics, setHostMetrics] = useState(null);
@@ -280,9 +284,16 @@ const AdminDashboardNew = ({
     setProcessModalOpen(true);
   };
 
-  // Fetch cost models from database
+  // Fetch cost models from database (cached to avoid unnecessary calls)
   const fetchCostModels = async () => {
+    // Skip if already cached in this session
+    if (costModelsCached) {
+      console.log('Cost models already cached, skipping fetch');
+      return;
+    }
+
     try {
+      console.log('Fetching cost models...');
       const response = await fetch('/api/cost-models?resource_name=ELECTRICITY_KWH');
       const data = await response.json();
 
@@ -304,6 +315,10 @@ const AdminDashboardNew = ({
         if (regions.length > 0 && !regions.find(r => r.code === selectedRegion)) {
           setSelectedRegion(regions[0].code);
         }
+
+        // Mark as cached
+        setCostModelsCached(true);
+        console.log('Cost models cached successfully');
       }
     } catch (error) {
       console.error('Error fetching cost models:', error);
@@ -311,6 +326,7 @@ const AdminDashboardNew = ({
       setAvailableRegions([
         { code: 'US', name: 'United States', currency: 'USD', rate: 0.12, description: 'Default US rate' }
       ]);
+      setCostModelsCached(true); // Cache even fallback to avoid retries
     }
   };
 
@@ -357,15 +373,17 @@ const AdminDashboardNew = ({
     },
   ];
 
-  // Hardware details cards data with correct API field mappings
+  // Combined hardware details with both specs and real-time metrics
   const hardwareDetails = [
     {
-      label: 'CPU Model',
-      value: hardwareSpecs?.CPU || 'Loading...',
+      label: 'CPU',
+      value: hardwareSpecs?.CPU || 'Hardware specs not available',
+      currentUsage: `${hostMetrics?.host_cpu_usage_percent?.toFixed(1) || '0'}% usage`,
       icon: Cpu,
       details: {
-        'Brand': hardwareSpecs?.cpu_brand || 'N/A',
+        'Current Usage': `${hostMetrics?.host_cpu_usage_percent?.toFixed(1) || '0'}%`,
         'Model': hardwareSpecs?.CPU || 'N/A',
+        'Brand': hardwareSpecs?.cpu_brand || 'N/A',
         'Physical Cores': hardwareSpecs?.cpu_physical_cores || 'N/A',
         'Total Cores': hardwareSpecs?.['CPU Total cores (Including Logical cores)'] || 'N/A',
         'Base Clock': hardwareSpecs?.['CPU Base clock(GHz)'] ? `${hardwareSpecs['CPU Base clock(GHz)']} GHz` : 'N/A',
@@ -378,43 +396,58 @@ const AdminDashboardNew = ({
       }
     },
     {
-      label: 'GPU Model',
-      value: hardwareSpecs?.GPU || 'Loading...',
+      label: 'GPU',
+      value: hardwareSpecs?.GPU || 'Hardware specs not available',
+      currentUsage: `${hostMetrics?.host_gpu_utilization_percent?.toFixed(1) || '0'}% usage`,
       icon: Monitor,
       details: {
-        'Brand': hardwareSpecs?.gpu_brand || 'N/A',
+        'Current Usage': `${hostMetrics?.host_gpu_utilization_percent?.toFixed(1) || '0'}%`,
+        'GPU Memory Usage': `${hostMetrics?.host_gpu_memory_utilization_percent?.toFixed(1) || '0'}%`,
+        'Temperature': `${hostMetrics?.host_gpu_temperature_celsius?.toFixed(1) || '0'}°C`,
+        'Power Draw': `${hostMetrics?.host_gpu_power_draw_watts?.toFixed(1) || '0'}W`,
         'Model': hardwareSpecs?.GPU || 'N/A',
+        'Brand': hardwareSpecs?.gpu_brand || 'N/A',
         'Number of GPUs': hardwareSpecs?.['# of GPU'] || 'N/A',
         'VRAM': hardwareSpecs?.['GPU Memory Total - VRAM (MB)'] ? `${(hardwareSpecs['GPU Memory Total - VRAM (MB)'] / 1024).toFixed(1)} GB` : 'N/A',
         'Graphics Clock': hardwareSpecs?.['GPU Graphics clock'] ? `${hardwareSpecs['GPU Graphics clock']} MHz` : 'N/A',
         'Memory Clock': hardwareSpecs?.['GPU Memory clock'] ? `${hardwareSpecs['GPU Memory clock']} MHz` : 'N/A',
         'CUDA Cores': hardwareSpecs?.['GPU CUDA Cores'] || 'N/A',
         'SM Cores': hardwareSpecs?.['GPU SM Cores'] || 'N/A',
-        'Driver Version': hardwareSpecs?.gpu_driver_version || 'N/A',
-        'Power Consumption': hardwareSpecs?.['GPUPower Consumption'] ? `${hardwareSpecs['GPUPower Consumption']}W` : 'N/A'
+        'Driver Version': hardwareSpecs?.gpu_driver_version || 'N/A'
       }
     },
     {
       label: 'Memory',
-      value: hardwareSpecs?.total_ram_gb ? `${hardwareSpecs.total_ram_gb.toFixed(1)} GB` : 'Loading...',
+      value: hardwareSpecs?.total_ram_gb ? `${hardwareSpecs.total_ram_gb.toFixed(1)} GB` : 'Hardware specs not available',
+      currentUsage: `${hostMetrics?.host_ram_usage_percent?.toFixed(1) || '0'}% usage`,
       icon: MemoryStick,
       details: {
+        'Current Usage': `${hostMetrics?.host_ram_usage_percent?.toFixed(1) || '0'}%`,
         'Total RAM': hardwareSpecs?.total_ram_gb ? `${hardwareSpecs.total_ram_gb.toFixed(1)} GB` : 'N/A'
       }
     },
     {
       label: 'Storage',
-      value: hardwareSpecs?.total_storage_gb ? `${hardwareSpecs.total_storage_gb.toFixed(0)} GB` : 'Loading...',
+      value: hardwareSpecs?.total_storage_gb ? `${hardwareSpecs.total_storage_gb.toFixed(0)} GB` : 'Hardware specs not available',
+      currentUsage: hostMetrics ? `${Math.round(((hostMetrics.host_disk_read_count || 0) + (hostMetrics.host_disk_write_count || 0)) / 1000)} IOPS` : '0 IOPS',
       icon: HardDrive,
       details: {
+        'Current IOPS': hostMetrics ? `${Math.round(((hostMetrics.host_disk_read_count || 0) + (hostMetrics.host_disk_write_count || 0)) / 1000)}` : '0',
+        'Read Bytes': hostMetrics?.host_disk_read_bytes ? `${(hostMetrics.host_disk_read_bytes / 1024 / 1024 / 1024).toFixed(2)} GB` : 'N/A',
+        'Write Bytes': hostMetrics?.host_disk_write_bytes ? `${(hostMetrics.host_disk_write_bytes / 1024 / 1024 / 1024).toFixed(2)} GB` : 'N/A',
         'Total Storage': hardwareSpecs?.total_storage_gb ? `${hardwareSpecs.total_storage_gb.toFixed(0)} GB` : 'N/A'
       }
     },
     {
-      label: 'Operating System',
-      value: hardwareSpecs?.os_name || 'Loading...',
+      label: 'Network',
+      value: hardwareSpecs?.os_name || 'Hardware specs not available',
+      currentUsage: hostMetrics ? `${Math.round((hostMetrics.host_network_bytes_sent + hostMetrics.host_network_bytes_received) / 1024 / 1024 / 1024)} GB total` : '0 GB',
       icon: Server,
       details: {
+        'Bytes Sent': hostMetrics?.host_network_bytes_sent ? `${(hostMetrics.host_network_bytes_sent / 1024 / 1024 / 1024).toFixed(2)} GB` : 'N/A',
+        'Bytes Received': hostMetrics?.host_network_bytes_received ? `${(hostMetrics.host_network_bytes_received / 1024 / 1024 / 1024).toFixed(2)} GB` : 'N/A',
+        'Packets Sent': hostMetrics?.host_network_packets_sent ? hostMetrics.host_network_packets_sent.toLocaleString() : 'N/A',
+        'Packets Received': hostMetrics?.host_network_packets_received ? hostMetrics.host_network_packets_received.toLocaleString() : 'N/A',
         'OS Name': hardwareSpecs?.os_name || 'N/A',
         'OS Version': hardwareSpecs?.os_version || 'N/A',
         'Architecture': hardwareSpecs?.os_architecture || 'N/A',
@@ -424,32 +457,58 @@ const AdminDashboardNew = ({
     }
   ];
 
-  // Power and Cost details cards data
+  // Calculate total power consumption from all processes
+  const totalPowerConsumption = topProcesses.reduce((total, process) => {
+    return total + (parseFloat(process['Power Consumption (W)']) || 0);
+  }, 0);
+
+  // Find top energy consuming process
+  const topEnergyConsumer = topProcesses.reduce((max, process) => {
+    const currentPower = parseFloat(process['Power Consumption (W)']) || 0;
+    const maxPower = parseFloat(max?.['Power Consumption (W)']) || 0;
+    return currentPower > maxPower ? process : max;
+  }, topProcesses[0]);
+
+  // Calculate potential cost savings based on region optimization
+  const currentRate = currentRegion.rate;
+  const cheapestRegion = availableRegions.reduce((min, region) =>
+    region.rate < min.rate ? region : min, currentRegion);
+  const potentialSavings = currentRate > cheapestRegion.rate
+    ? Math.round(((currentRate - cheapestRegion.rate) / currentRate) * 100)
+    : 0;
+
+  // Power and Cost details cards data with real calculations
   const powerCostDetails = [
     {
       label: 'Total Energy Cost',
-      value: '$10',
+      value: `$${totalSystemCost.toFixed(4)}`,
       icon: DollarSign,
-      details: ['Processes analyzed', 'Real-time calculation']
+      details: [`${topProcesses.length} processes analyzed`, 'Real-time calculation']
     },
     {
       label: 'Power Consumption',
-      value: '0 W',
+      value: `${totalPowerConsumption.toFixed(1)} W`,
       icon: BatteryCharging,
-      details: ['Processes analyzed', 'Real-time calculation']
+      details: [`${topProcesses.length} processes analyzed`, 'Real-time calculation']
     },
     {
       label: 'Top Energy Consumer',
-      value: 'lxd',
+      value: topEnergyConsumer?.['Process Name'] || 'No data',
       icon: Factory,
-      details: ['0.00W', 'Current power usage']
+      details: [
+        `${(parseFloat(topEnergyConsumer?.['Power Consumption (W)']) || 0).toFixed(2)}W`,
+        'Current power usage'
+      ]
     },
     {
       label: 'Cost Saving',
-      value: '0%',
+      value: `${potentialSavings}%`,
       icon: Lightbulb,
-      details:
-        ['Potential savings Via region optimization']
+      details: [
+        potentialSavings > 0
+          ? `Switch to ${cheapestRegion.code} region`
+          : 'Already in cheapest region'
+      ]
     },
   ];
 
@@ -461,8 +520,14 @@ const AdminDashboardNew = ({
     { value: 'power', label: 'Power Consumption (Top 5)' },
   ];
 
-  // Fetch hardware specifications
+  // Fetch hardware specifications (cached to avoid unnecessary calls)
   const fetchHardwareSpecs = async () => {
+    // Skip if already cached in this session
+    if (hardwareSpecsCached) {
+      console.log('Hardware specs already cached, skipping fetch');
+      return;
+    }
+
     console.log('fetchHardwareSpecs called'); // Debug log
     try {
       setHardwareLoading(true);
@@ -475,16 +540,35 @@ const AdminDashboardNew = ({
       if (data && data.success && data.data) {
         console.log('Setting hardware specs data:', data.data); // Debug log
         setHardwareSpecs(data.data);
+        // Mark as cached
+        setHardwareSpecsCached(true);
+        console.log('Hardware specs cached successfully');
       } else {
         console.log('No hardware specs data received, setting empty state'); // Debug log
         setHardwareSpecs(null);
+        setHardwareSpecsCached(true); // Cache even null state to avoid retries
       }
     } catch (error) {
       console.error('Error fetching hardware specs:', error);
+      setHardwareSpecsCached(true); // Cache error state to avoid retries
     } finally {
       console.log('Setting hardwareLoading to false'); // Debug log
       setHardwareLoading(false);
     }
+  };
+
+  // Manual refresh function for static data (when needed)
+  const refreshStaticData = async () => {
+    console.log('Manually refreshing static data...');
+    setCostModelsCached(false);
+    setHardwareSpecsCached(false);
+
+    await Promise.allSettled([
+      fetchCostModels(),
+      fetchHardwareSpecs()
+    ]);
+
+    console.log('Static data refresh completed');
   };
 
   // Handle hardware card click for detailed popup
@@ -524,35 +608,40 @@ const AdminDashboardNew = ({
     }
   };
 
-  // Fetch VM data
+  // Fetch VM data with optimized parallel processing
   const fetchVMData = async () => {
     try {
       setVmDataLoading(true);
+      console.log('Fetching VM data...');
+      const startTime = Date.now();
+
       const response = await fetch('/api/v1/metrics/vms/active');
       const data = await response.json();
 
       if (data.success && data.active_vms) {
-        const transformedVMs = await Promise.all(
-          data.active_vms.map(async (vm) => {
-            try {
-              let summaryUrl = `/api/v1/metrics/vm/${encodeURIComponent(vm.vm_name)}/summary?hours=1`;
+        // Use Promise.allSettled for better error handling and parallel execution
+        const vmPromises = data.active_vms.map(async (vm) => {
+          try {
+            let summaryUrl = `/api/v1/metrics/vm/${encodeURIComponent(vm.vm_name)}/summary?hours=1`;
 
-              // Add date range parameters if available
-              if (dateRange.start || dateRange.end) {
-                const params = new URLSearchParams([['hours', '1']]);
-                if (dateRange.start) {
-                  params.append('start_date', dateRange.start.toISOString().split('T')[0]);
-                }
-                if (dateRange.end) {
-                  params.append('end_date', dateRange.end.toISOString().split('T')[0]);
-                }
-                summaryUrl = `/api/v1/metrics/vm/${encodeURIComponent(vm.vm_name)}/summary?${params.toString()}`;
+            // Add date range parameters if available
+            if (dateRange.start || dateRange.end) {
+              const params = new URLSearchParams([['hours', '1']]);
+              if (dateRange.start) {
+                params.append('start_date', dateRange.start.toISOString().split('T')[0]);
               }
+              if (dateRange.end) {
+                params.append('end_date', dateRange.end.toISOString().split('T')[0]);
+              }
+              summaryUrl = `/api/v1/metrics/vm/${encodeURIComponent(vm.vm_name)}/summary?${params.toString()}`;
+            }
 
-              const summaryResponse = await fetch(summaryUrl);
-              const summaryData = await summaryResponse.json();
+            const summaryResponse = await fetch(summaryUrl);
+            const summaryData = await summaryResponse.json();
 
-              return {
+            return {
+              success: true,
+              data: {
                 id: vm.vm_name,
                 name: vm.vm_name,
                 type: vm.vm_name.includes('Web') ? 'Web Server' :
@@ -563,22 +652,39 @@ const AdminDashboardNew = ({
                 ramUsagePercent: summaryData.success ? summaryData.metrics?.avg_memory_usage || 0 : 0,
                 lastSeen: vm.last_seen ? new Date(vm.last_seen).toLocaleString() : 'Unknown',
                 processCount: vm.process_count || 0,
-              };
-            } catch (error) {
-              console.error(`Error fetching details for VM ${vm.vm_name}:`, error);
-              return {
+              }
+            };
+          } catch (error) {
+            console.error(`Error fetching details for VM ${vm.vm_name}:`, error);
+            return {
+              success: false,
+              data: {
                 id: vm.vm_name,
                 name: vm.vm_name,
                 type: 'Virtual Machine',
-                status: 'Running',
+                status: 'Error',
                 cpuUsage: 0,
                 ramUsagePercent: 0,
                 lastSeen: vm.last_seen ? new Date(vm.last_seen).toLocaleString() : 'Unknown',
                 processCount: vm.process_count || 0,
-              };
-            }
-          })
-        );
+              }
+            };
+          }
+        });
+
+        const results = await Promise.allSettled(vmPromises);
+        const transformedVMs = results.map(result => {
+          if (result.status === 'fulfilled') {
+            return result.value.data;
+          } else {
+            console.error('VM processing failed:', result.reason);
+            return null;
+          }
+        }).filter(vm => vm !== null);
+
+        const endTime = Date.now();
+        console.log(`VM data fetched for ${transformedVMs.length} VMs in ${endTime - startTime}ms`);
+
         setVmData(transformedVMs);
       }
     } catch (error) {
@@ -588,19 +694,40 @@ const AdminDashboardNew = ({
     }
   };
 
-  // Initial data fetching
+  // Initial data fetching with parallelization and smart caching
   useEffect(() => {
-    console.log('Dashboard useEffect running - initial data fetch'); // Debug log
+    console.log('Dashboard useEffect running - initial data fetch with parallelization'); // Debug log
 
-    // Always fetch latest data (not date-range dependent)
-    fetchCostModels();
-    fetchHardwareSpecs(); // Always latest hardware specs
-    fetchHostMetrics(); // Always latest real-time metrics
-    fetchVMData();
+    // Parallelize all initial API calls for faster loading
+    const initializeDashboard = async () => {
+      try {
+        console.log('Starting parallel API calls...');
+        const startTime = Date.now();
 
-    // Fetch date-range dependent data
-    fetchChartData();
-    fetchTopProcesses();
+        // Execute all API calls in parallel instead of sequentially
+        await Promise.allSettled([
+          // Static data (cached after first load)
+          fetchCostModels(),
+          fetchHardwareSpecs(),
+
+          // Real-time data (always fresh)
+          fetchHostMetrics(),
+          fetchVMData(),
+
+          // Date-range dependent data
+          fetchChartData(),
+          fetchTopProcesses()
+        ]);
+
+        const endTime = Date.now();
+        console.log(`All API calls completed in ${endTime - startTime}ms`);
+      } catch (error) {
+        console.error('Error during dashboard initialization:', error);
+      }
+    };
+
+    // Start the parallel loading
+    initializeDashboard();
 
     // Set up intervals for real-time updates (always latest, ignore date range)
     const realtimeInterval = setInterval(() => {
@@ -609,11 +736,8 @@ const AdminDashboardNew = ({
 
     const vmInterval = setInterval(fetchVMData, 10000);
 
-    // Add hardware specs interval (every 60 seconds)
-    const hardwareInterval = setInterval(() => {
-      console.log('Hardware specs 60-second interval triggered'); // Debug log
-      fetchHardwareSpecs();
-    }, 60000);
+    // Remove hardware specs from regular intervals since it's static and cached
+    // Only refresh hardware specs manually or on explicit user action
 
     // Periodic update for date-range dependent data (less frequent)
     const aggregatedInterval = setInterval(() => {
@@ -624,7 +748,6 @@ const AdminDashboardNew = ({
     return () => {
       clearInterval(realtimeInterval);
       clearInterval(vmInterval);
-      clearInterval(hardwareInterval);
       clearInterval(aggregatedInterval);
     };
   }, []);
@@ -1220,12 +1343,15 @@ const AdminDashboardNew = ({
                       <div className="flex justify-left mb-2">
                         <IconComponent className="w-8 h-8 text-gray-600 dark:text-gray-600" />
                       </div>
-                      <div className="flex flex-col items-start">
-                        <div className="text-lg text-gray-900 font-medium dark:text-gray-400 py-2">
+                      <div className="flex flex-col items-start w-full">
+                        <div className="text-lg text-gray-900 font-medium dark:text-gray-400 py-2 w-full">
                           {detail.label}
                         </div>
-                        <div className="text-sm font-semibold text-gray-500 dark:text-white truncate">
+                        <div className="text-sm font-semibold text-gray-500 dark:text-white w-full break-words leading-tight">
                           {hardwareLoading ? 'Loading...' : detail.value}
+                        </div>
+                        <div className="text-xs font-medium text-gray-500 dark:text-white mt-1 w-full">
+                          {hardwareLoading ? '' : detail.currentUsage}
                         </div>
                       </div>
 
