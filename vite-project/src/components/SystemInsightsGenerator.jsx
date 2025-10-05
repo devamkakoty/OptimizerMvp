@@ -919,11 +919,52 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode, 
     `;
   };
 
+  // Helper function to convert breach percentage to time duration
+  const breachPercentToTime = (percent, days = 7) => {
+    const totalMinutes = days * 24 * 60;
+    const breachMinutes = (percent / 100) * totalMinutes;
+
+    if (breachMinutes < 60) {
+      return `${Math.round(breachMinutes)} minutes`;
+    } else if (breachMinutes < 1440) {
+      return `${(breachMinutes / 60).toFixed(1)} hours`;
+    } else {
+      return `${(breachMinutes / 1440).toFixed(1)} days`;
+    }
+  };
+
+  // Helper function to assess workload stability
+  const getWorkloadStability = (volatility) => {
+    if (volatility < 10) return 'Stable';
+    if (volatility < 20) return 'Moderately Variable';
+    return 'Highly Variable';
+  };
+
+  // Helper function to assess resource status
+  const getResourceStatus = (avgUsage, peakUsage) => {
+    if (peakUsage > 90) return 'Critical - At Capacity';
+    if (peakUsage > 80) return 'Warning - High Usage';
+    if (avgUsage < 30 && peakUsage < 50) return 'Underutilized';
+    return 'Healthy';
+  };
+
   // Generate HTML report for backend recommendations
   const generateBackendHTMLReport = (backendData) => {
     const hostAnalysis = backendData.host_analysis || {};
     const recommendations = backendData.recommendations || [];
     const analysisDate = backendData.analysis_period || `Last ${timeRangeDays} days`;
+
+    // Calculate combined system power
+    const totalSystemPower = (hostAnalysis.avg_process_power_watts || 0) + (hostAnalysis.avg_gpu_power_watts || 0);
+    const peakSystemPower = (hostAnalysis.max_process_power_watts || 0);
+
+    // Calculate workload stability assessments
+    const cpuStability = getWorkloadStability(hostAnalysis.host_cpu_volatility || 0);
+    const memoryStability = getWorkloadStability(hostAnalysis.host_ram_volatility || 0);
+
+    // Calculate resource status
+    const cpuStatus = getResourceStatus(hostAnalysis.avg_host_cpu_percent || 0, hostAnalysis.max_host_cpu_percent || 0);
+    const memoryStatus = getResourceStatus(hostAnalysis.avg_host_ram_percent || 0, hostAnalysis.max_host_ram_percent || 0);
 
     return `
       <!DOCTYPE html>
@@ -931,19 +972,31 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode, 
       <head>
         <title>GreenMatrix Host Analysis Report</title>
         <style>
-          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 20px; color: #1f2937; line-height: 1.5; }
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 20px; color: #1f2937; line-height: 1.6; }
           .header { text-align: center; margin-bottom: 30px; border-bottom: 3px solid #10b981; padding-bottom: 20px; }
           .header h1 { color: #111827; margin: 0; font-size: 32px; font-weight: 700; }
           .header p { color: #6b7280; margin: 8px 0; font-size: 14px; }
           .section { margin: 30px 0; }
           .section h2 { color: #374151; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px; font-size: 20px; font-weight: 600; margin-bottom: 20px; }
-          .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 12px 0; }
-          .card { border: 1px solid #d1d5db; padding: 15px; border-radius: 6px; background: #ffffff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); }
-          .card h3 { margin: 0 0 10px 0; color: #111827; font-size: 14px; font-weight: 600; }
-          .metric { margin: 6px 0; color: #374151; font-size: 13px; }
+          .subsection { margin: 20px 0; padding: 15px; background: #f9fafb; border-left: 3px solid #10b981; }
+          .subsection h3 { color: #111827; margin: 0 0 8px 0; font-size: 16px; font-weight: 600; }
+          .subsection p { color: #6b7280; margin: 4px 0; font-size: 13px; line-height: 1.5; }
+          .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 15px 0; }
+          .card { border: 1px solid #d1d5db; padding: 18px; border-radius: 6px; background: #ffffff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); }
+          .card h3 { margin: 0 0 12px 0; color: #111827; font-size: 15px; font-weight: 600; }
+          .metric { margin: 8px 0; color: #374151; font-size: 13px; line-height: 1.5; }
           .metric strong { color: #10b981; font-weight: 600; }
-          .recommendation { border: 1px solid #e5e7eb; padding: 20px; border-radius: 8px; margin: 15px 0; background: #f9fafb; }
+          .metric-explanation { margin: 4px 0 0 0; color: #6b7280; font-size: 12px; font-style: italic; }
+          .status-indicator { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: 600; margin-left: 8px; }
+          .status-healthy { background: #d1fae5; color: #065f46; }
+          .status-warning { background: #fef3c7; color: #92400e; }
+          .status-critical { background: #fee2e2; color: #991b1b; }
+          .status-underutilized { background: #dbeafe; color: #1e40af; }
+          .recommendation { border: 1px solid #e5e7eb; padding: 20px; border-radius: 8px; margin: 15px 0; background: #ffffff; }
           .recommendation h4 { color: #111827; margin: 0 0 10px 0; font-size: 18px; font-weight: 600; }
+          .recommendation .what-it-means { background: #eff6ff; padding: 12px; border-radius: 6px; margin: 10px 0; border-left: 3px solid #3b82f6; }
+          .recommendation .what-it-means h5 { margin: 0 0 6px 0; color: #1e40af; font-size: 14px; font-weight: 600; }
+          .recommendation .what-it-means p { margin: 0; color: #1e3a8a; font-size: 13px; line-height: 1.5; }
           .priority-high { border-left: 4px solid #ef4444; }
           .priority-medium { border-left: 4px solid #f59e0b; }
           .priority-low { border-left: 4px solid #10b981; }
@@ -951,7 +1004,7 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode, 
           .actions ul { margin: 10px 0; padding-left: 20px; }
           .actions li { margin: 5px 0; color: #4b5563; }
           .table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-          .table th, .table td { border: 1px solid #e5e7eb; padding: 12px 8px; text-align: left; }
+          .table th, .table td { border: 1px solid #e5e7eb; padding: 12px 8px; text-align: left; font-size: 13px; }
           .table th { background-color: #f9fafb; color: #374151; font-weight: 600; }
           .footer { text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 12px; }
         </style>
@@ -962,102 +1015,121 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode, 
           <p><strong>Bare Metal Host:</strong> ${hostAnalysis.host_name || 'bare-metal-host'}</p>
           <p><strong>Analysis Period:</strong> ${analysisDate}</p>
           <p><strong>Generated:</strong> ${new Date().toLocaleString()}</p>
+          <p><strong>Data Points Analyzed:</strong> ${(hostAnalysis.process_data_points || 0).toLocaleString()} process metrics, ${(hostAnalysis.overall_data_points || 0).toLocaleString()} system snapshots</p>
         </div>
 
         <div class="section">
-          <h2>Resource Utilization Analysis</h2>
+          <h2>Resource Utilization Summary</h2>
+
+          <div class="subsection">
+            <h3>Understanding These Metrics</h3>
+            <p><strong>Average Usage:</strong> The typical resource consumption during the monitoring period. This represents normal operating conditions.</p>
+            <p><strong>Peak Usage:</strong> The highest resource consumption observed. Important for capacity planning to prevent bottlenecks.</p>
+            <p><strong>95th Percentile:</strong> 95% of the time, usage was below this value. Better than simple averages because it shows typical peak demand while excluding rare spikes.</p>
+            <p><strong>Workload Stability:</strong> Indicates how consistent resource usage is. Stable workloads are predictable; variable workloads may benefit from auto-scaling.</p>
+          </div>
+
           <div class="grid">
             <div class="card">
-              <h3>CPU Performance</h3>
-              <div class="metric"><strong>Average Usage:</strong> ${hostAnalysis.avg_host_cpu_percent || 0}%</div>
-              <div class="metric"><strong>Peak Usage:</strong> ${hostAnalysis.max_host_cpu_percent || 0}%</div>
-              <div class="metric"><strong>95th Percentile:</strong> ${hostAnalysis.host_cpu_95th_percentile || 0}%</div>
-              <div class="metric"><strong>Process-level Avg:</strong> ${hostAnalysis.avg_process_cpu_percent || 0}%</div>
-              <div class="metric"><strong>Volatility (σ):</strong> ${hostAnalysis.host_cpu_volatility || 0}%</div>
+              <h3>CPU Performance <span class="status-indicator status-${cpuStatus.toLowerCase().replace(/[^a-z]/g, '')}">${cpuStatus}</span></h3>
+              <div class="metric"><strong>Average Usage:</strong> ${(hostAnalysis.avg_host_cpu_percent || 0).toFixed(1)}%</div>
+              <div class="metric"><strong>Peak Usage:</strong> ${(hostAnalysis.max_host_cpu_percent || 0).toFixed(1)}%</div>
+              <div class="metric"><strong>95th Percentile:</strong> ${(hostAnalysis.host_cpu_95th_percentile || 0).toFixed(1)}%</div>
+              <div class="metric-explanation">Typical peak usage - useful for capacity planning</div>
+              <div class="metric"><strong>Workload Stability:</strong> ${cpuStability}</div>
+              <div class="metric-explanation">${cpuStability === 'Stable' ? 'Predictable CPU usage patterns' : cpuStability === 'Moderately Variable' ? 'Some fluctuation in CPU demand' : 'Highly unpredictable CPU usage - consider auto-scaling'}</div>
             </div>
+
             <div class="card">
-              <h3>Memory Utilization</h3>
-              <div class="metric"><strong>Average Usage:</strong> ${hostAnalysis.avg_host_ram_percent || 0}%</div>
-              <div class="metric"><strong>Peak Usage:</strong> ${hostAnalysis.max_host_ram_percent || 0}%</div>
-              <div class="metric"><strong>95th Percentile:</strong> ${hostAnalysis.host_ram_95th_percentile || 0}%</div>
-              <div class="metric"><strong>Process Avg:</strong> ${hostAnalysis.avg_process_memory_mb || 0} MB</div>
-              <div class="metric"><strong>Volatility (σ):</strong> ${hostAnalysis.host_ram_volatility || 0}%</div>
+              <h3>Memory Utilization <span class="status-indicator status-${memoryStatus.toLowerCase().replace(/[^a-z]/g, '')}">${memoryStatus}</span></h3>
+              <div class="metric"><strong>Average Usage:</strong> ${(hostAnalysis.avg_host_ram_percent || 0).toFixed(1)}%</div>
+              <div class="metric"><strong>Peak Usage:</strong> ${(hostAnalysis.max_host_ram_percent || 0).toFixed(1)}%</div>
+              <div class="metric"><strong>95th Percentile:</strong> ${(hostAnalysis.host_ram_95th_percentile || 0).toFixed(1)}%</div>
+              <div class="metric-explanation">Shows typical memory pressure during peak demand</div>
+              <div class="metric"><strong>Workload Stability:</strong> ${memoryStability}</div>
+              <div class="metric-explanation">${memoryStability === 'Stable' ? 'Consistent memory usage' : memoryStability === 'Moderately Variable' ? 'Some variation in memory demand' : 'Significant memory fluctuations detected'}</div>
             </div>
+
+            ${(hostAnalysis.avg_host_gpu_percent || 0) > 0 ? `
             <div class="card">
               <h3>GPU Performance</h3>
-              <div class="metric"><strong>Average Usage:</strong> ${hostAnalysis.avg_host_gpu_percent || 0}%</div>
-              <div class="metric"><strong>Peak Usage:</strong> ${hostAnalysis.max_host_gpu_percent || 0}%</div>
-              <div class="metric"><strong>95th Percentile:</strong> ${hostAnalysis.host_gpu_95th_percentile || 0}%</div>
-              <div class="metric"><strong>Avg Temperature:</strong> ${hostAnalysis.avg_gpu_temperature_celsius || 0}°C</div>
-              <div class="metric"><strong>Peak Temperature:</strong> ${hostAnalysis.max_gpu_temperature_celsius || 0}°C</div>
+              <div class="metric"><strong>Average Utilization:</strong> ${(hostAnalysis.avg_host_gpu_percent || 0).toFixed(1)}%</div>
+              <div class="metric"><strong>Peak Utilization:</strong> ${(hostAnalysis.max_host_gpu_percent || 0).toFixed(1)}%</div>
+              <div class="metric"><strong>95th Percentile:</strong> ${(hostAnalysis.host_gpu_95th_percentile || 0).toFixed(1)}%</div>
+              <div class="metric"><strong>Average Temperature:</strong> ${(hostAnalysis.avg_gpu_temperature_celsius || 0).toFixed(1)}°C</div>
+              <div class="metric-explanation">Normal operating range: 60-80°C. Above 85°C requires attention.</div>
+              <div class="metric"><strong>Peak Temperature:</strong> ${(hostAnalysis.max_gpu_temperature_celsius || 0).toFixed(1)}°C</div>
             </div>
+            ` : ''}
+
             <div class="card">
-              <h3>Power Consumption</h3>
-              <div class="metric"><strong>Average Power:</strong> ${hostAnalysis.avg_process_power_watts || 0}W</div>
-              <div class="metric"><strong>Peak Power:</strong> ${hostAnalysis.max_process_power_watts || 0}W</div>
-              <div class="metric"><strong>GPU Power:</strong> ${hostAnalysis.avg_gpu_power_watts || 0}W</div>
-              <div class="metric"><strong>Power Volatility (σ):</strong> ${hostAnalysis.power_volatility || 0}W</div>
-              <div class="metric"><strong>Total Energy:</strong> ${hostAnalysis.total_energy_kwh || 0} kWh</div>
+              <h3>Power & Energy Consumption</h3>
+              <div class="metric"><strong>Average System Power:</strong> ${totalSystemPower.toFixed(1)}W</div>
+              <div class="metric-explanation">Combined CPU and GPU power draw</div>
+              <div class="metric"><strong>Peak System Power:</strong> ${peakSystemPower.toFixed(1)}W</div>
+              <div class="metric"><strong>Total Energy Consumed:</strong> ${(hostAnalysis.total_energy_kwh || 0).toFixed(2)} kWh</div>
+              <div class="metric-explanation">Total electricity used during analysis period</div>
+              <div class="metric"><strong>Projected Monthly Energy:</strong> ${((hostAnalysis.total_energy_kwh || 0) / (hostAnalysis.time_range_days || 7) * 30).toFixed(2)} kWh</div>
             </div>
           </div>
         </div>
 
         <div class="section">
-          <h2>Threshold Breach Analysis</h2>
-          <div class="grid">
-            <div class="card">
-              <h3>CPU Threshold Breaches</h3>
-              <div class="metric"><strong>Critical (>90%):</strong> ${hostAnalysis.cpu_critical_breach_percent || 0}% of time</div>
-              <div class="metric"><strong>Warning (>80%):</strong> ${hostAnalysis.cpu_warning_breach_percent || 0}% of time</div>
-              <div class="metric"><strong>Elevated (>70%):</strong> ${hostAnalysis.cpu_elevated_breach_percent || 0}% of time</div>
-            </div>
-            <div class="card">
-              <h3>Memory Threshold Breaches</h3>
-              <div class="metric"><strong>Critical (>90%):</strong> ${hostAnalysis.memory_critical_breach_percent || 0}% of time</div>
-              <div class="metric"><strong>Warning (>80%):</strong> ${hostAnalysis.memory_warning_breach_percent || 0}% of time</div>
-            </div>
-            <div class="card">
-              <h3>GPU Threshold Breaches</h3>
-              <div class="metric"><strong>Critical (>90%):</strong> ${hostAnalysis.gpu_critical_breach_percent || 0}% of time</div>
-              <div class="metric"><strong>Warning (>80%):</strong> ${hostAnalysis.gpu_warning_breach_percent || 0}% of time</div>
-            </div>
-            <div class="card">
-              <h3>Temperature Breaches</h3>
-              <div class="metric"><strong>Critical (>85°C):</strong> ${hostAnalysis.temp_critical_breach_percent || 0}% of time</div>
-              <div class="metric"><strong>Warning (>80°C):</strong> ${hostAnalysis.temp_warning_breach_percent || 0}% of time</div>
-            </div>
-          </div>
-        </div>
+          <h2>Resource Pressure Analysis</h2>
 
-        <div class="section">
-          <h2>System Performance Statistics</h2>
+          <div class="subsection">
+            <h3>Understanding Resource Pressure</h3>
+            <p><strong>Critical Threshold (>90%):</strong> System is at or near maximum capacity. Performance degradation and instability risks are high. Immediate action required.</p>
+            <p><strong>Warning Threshold (>80%):</strong> System is operating under high load. Consider capacity upgrades to prevent future issues.</p>
+            <p><strong>Time Measurements:</strong> Shows actual duration (hours/days) the system spent above these thresholds, not just percentages.</p>
+          </div>
+
           <div class="grid">
             <div class="card">
-              <h3>Data Collection</h3>
-              <div class="metric"><strong>Process Metrics:</strong> ${hostAnalysis.process_data_points || 0} data points</div>
-              <div class="metric"><strong>Overall Metrics:</strong> ${hostAnalysis.overall_data_points || 0} data points</div>
-              <div class="metric"><strong>Monitoring Period:</strong> ${hostAnalysis.time_range_days || 7} days</div>
-              <div class="metric"><strong>Unique Processes:</strong> ${hostAnalysis.unique_processes || 0}</div>
+              <h3>CPU Resource Pressure</h3>
+              <div class="metric"><strong>Critical Load (>90%):</strong> ${breachPercentToTime(hostAnalysis.cpu_critical_breach_percent || 0, hostAnalysis.time_range_days || 7)}</div>
+              <div class="metric-explanation">${(hostAnalysis.cpu_critical_breach_percent || 0).toFixed(1)}% of monitoring period - System at capacity</div>
+              <div class="metric"><strong>High Load (>80%):</strong> ${breachPercentToTime(hostAnalysis.cpu_warning_breach_percent || 0, hostAnalysis.time_range_days || 7)}</div>
+              <div class="metric-explanation">${(hostAnalysis.cpu_warning_breach_percent || 0).toFixed(1)}% of monitoring period - Plan for expansion</div>
             </div>
+
             <div class="card">
-              <h3>Resource Variability</h3>
-              <div class="metric"><strong>CPU Volatility:</strong> ${hostAnalysis.host_cpu_volatility || 0}% (σ)</div>
-              <div class="metric"><strong>Memory Volatility:</strong> ${hostAnalysis.host_ram_volatility || 0}% (σ)</div>
-              <div class="metric"><strong>Power Volatility:</strong> ${hostAnalysis.power_volatility || 0}W (σ)</div>
-              <div class="metric"><strong>GPU Power Volatility:</strong> ${hostAnalysis.gpu_power_volatility || 0}W (σ)</div>
+              <h3>Memory Resource Pressure</h3>
+              <div class="metric"><strong>Critical Pressure (>90%):</strong> ${breachPercentToTime(hostAnalysis.memory_critical_breach_percent || 0, hostAnalysis.time_range_days || 7)}</div>
+              <div class="metric-explanation">${(hostAnalysis.memory_critical_breach_percent || 0).toFixed(1)}% of monitoring period - Risk of swapping/crashes</div>
+              <div class="metric"><strong>High Pressure (>80%):</strong> ${breachPercentToTime(hostAnalysis.memory_warning_breach_percent || 0, hostAnalysis.time_range_days || 7)}</div>
+              <div class="metric-explanation">${(hostAnalysis.memory_warning_breach_percent || 0).toFixed(1)}% of monitoring period - Consider memory upgrade</div>
             </div>
+
+            ${(hostAnalysis.avg_host_gpu_percent || 0) > 0 ? `
             <div class="card">
-              <h3>Efficiency Analysis</h3>
-              <div class="metric"><strong>Processes Analyzed:</strong> ${(hostAnalysis.process_efficiency_data || []).length}</div>
-              ${(hostAnalysis.process_efficiency_data || []).slice(0, 3).map(proc =>
-                `<div class="metric"><strong>${proc.process_name}:</strong> ${proc.cpu_efficiency_per_watt} CPU%/W</div>`
-              ).join('')}
+              <h3>GPU Resource Pressure</h3>
+              <div class="metric"><strong>Critical Load (>90%):</strong> ${breachPercentToTime(hostAnalysis.gpu_critical_breach_percent || 0, hostAnalysis.time_range_days || 7)}</div>
+              <div class="metric-explanation">${(hostAnalysis.gpu_critical_breach_percent || 0).toFixed(1)}% of monitoring period</div>
+              <div class="metric"><strong>High Load (>80%):</strong> ${breachPercentToTime(hostAnalysis.gpu_warning_breach_percent || 0, hostAnalysis.time_range_days || 7)}</div>
+              <div class="metric-explanation">${(hostAnalysis.gpu_warning_breach_percent || 0).toFixed(1)}% of monitoring period</div>
             </div>
+
+            <div class="card">
+              <h3>GPU Temperature Monitoring</h3>
+              <div class="metric"><strong>Critical Temp (>85°C):</strong> ${breachPercentToTime(hostAnalysis.temp_critical_breach_percent || 0, hostAnalysis.time_range_days || 7)}</div>
+              <div class="metric-explanation">${(hostAnalysis.temp_critical_breach_percent || 0).toFixed(1)}% of monitoring period - Risk of thermal throttling</div>
+              <div class="metric"><strong>High Temp (>80°C):</strong> ${breachPercentToTime(hostAnalysis.temp_warning_breach_percent || 0, hostAnalysis.time_range_days || 7)}</div>
+              <div class="metric-explanation">${(hostAnalysis.temp_warning_breach_percent || 0).toFixed(1)}% of monitoring period - Check cooling system</div>
+            </div>
+            ` : ''}
           </div>
         </div>
 
         <div class="section">
           <h2>Top Power Consuming Processes</h2>
+
+          <div class="subsection">
+            <h3>About This Analysis</h3>
+            <p>This table shows processes that consumed the most power during the monitoring period. High power consumption may indicate optimization opportunities or processes that could benefit from scheduling during off-peak hours.</p>
+            <p><strong>Monitored:</strong> ${hostAnalysis.unique_processes || 0} unique processes across ${(hostAnalysis.process_data_points || 0).toLocaleString()} measurements</p>
+          </div>
+
           <table class="table">
             <thead>
               <tr>
@@ -1065,66 +1137,88 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode, 
                 <th>Avg Power (W)</th>
                 <th>Avg CPU (%)</th>
                 <th>Avg Memory (MB)</th>
-                <th>Occurrences</th>
-                <th>CPU Efficiency (CPU%/W)</th>
+                <th>Sample Count</th>
               </tr>
             </thead>
             <tbody>
-              ${(hostAnalysis.top_processes || []).map(proc => {
-                const efficiency = (hostAnalysis.process_efficiency_data || []).find(eff => eff.process_name === proc.process_name);
-                return `
-                  <tr>
-                    <td>${proc.process_name}</td>
-                    <td>${proc.avg_power_watts}</td>
-                    <td>${proc.avg_cpu_percent}</td>
-                    <td>${proc.avg_memory_mb}</td>
-                    <td>${proc.occurrences}</td>
-                    <td>${efficiency ? efficiency.cpu_efficiency_per_watt : 'N/A'}</td>
-                  </tr>
-                `;
-              }).join('')}
+              ${(hostAnalysis.top_processes || []).map(proc => `
+                <tr>
+                  <td>${proc.process_name}</td>
+                  <td>${proc.avg_power_watts.toFixed(1)}</td>
+                  <td>${proc.avg_cpu_percent.toFixed(1)}</td>
+                  <td>${proc.avg_memory_mb.toFixed(0)}</td>
+                  <td>${proc.occurrences.toLocaleString()}</td>
+                </tr>
+              `).join('')}
             </tbody>
           </table>
         </div>
 
         <div class="section">
-          <h2>Recommendations and Insights</h2>
-          ${recommendations.map(rec => `
+          <h2>Recommendations and Optimization Opportunities</h2>
+
+          <div class="subsection">
+            <h3>How to Use These Recommendations</h3>
+            <p>Each recommendation includes an explanation of what the issue means, why it matters for your infrastructure, and specific actionable steps to address it. Recommendations are prioritized by urgency and potential impact.</p>
+            <p><strong>Priority Levels:</strong></p>
+            <p>• <strong>High:</strong> Immediate action recommended - performance or stability risks present</p>
+            <p>• <strong>Medium:</strong> Plan to address within 1-2 months - optimization opportunity identified</p>
+            <p>• <strong>Low:</strong> Long-term consideration - potential for cost savings or efficiency gains</p>
+          </div>
+
+          ${recommendations.length === 0 ? `
+            <div class="card" style="padding: 30px; text-align: center; background: #f0fdf4; border: 1px solid #86efac;">
+              <h3 style="color: #15803d; margin-bottom: 10px;">No Critical Issues Detected</h3>
+              <p style="color: #166534;">Your system appears to be operating within normal parameters. Continue monitoring for optimal performance.</p>
+            </div>
+          ` : recommendations.map(rec => `
             <div class="recommendation priority-${rec.priority}">
               <h4>${rec.title}</h4>
-              <p>${rec.description}</p>
-              <div class="actions">
-                <div class="detail-row">
-                  <strong>Category:</strong> ${rec.category}
-                </div>
-                <div class="detail-row">
-                  <strong>Priority:</strong> ${rec.priority.toUpperCase()}
-                </div>
-                <div class="detail-row">
-                  <strong>Impact:</strong> ${rec.impact || 'Performance and efficiency improvement'}
-                </div>
-                ${rec.potential_savings ? `
-                  <div class="detail-row">
-                    <strong>Potential Savings:</strong> ${rec.potential_savings}
-                  </div>
-                ` : ''}
-                ${rec.statistics ? `
-                  <div class="detail-row">
-                    <strong>Supporting Data:</strong>
-                    <ul style="margin: 5px 0 0 20px;">
-                      ${Object.entries(rec.statistics).map(([key, value]) =>
-                        `<li>${key.replace(/_/g, ' ')}: ${value}</li>`
-                      ).join('')}
-                    </ul>
-                  </div>
-                ` : ''}
-                <div class="detail-row">
-                  <strong>Recommended Actions:</strong>
-                  <ul style="margin: 5px 0 0 20px;">
-                    ${(rec.recommendations || []).map(action => `<li>${action}</li>`).join('')}
-                  </ul>
-                </div>
+              <p style="color: #4b5563; margin: 10px 0;">${rec.description}</p>
+
+              <div class="what-it-means">
+                <h5>What This Means</h5>
+                <p><strong>Category:</strong> ${rec.category.charAt(0).toUpperCase() + rec.category.slice(1).replace(/_/g, ' ')}</p>
+                <p><strong>Priority Level:</strong> ${rec.priority.toUpperCase()}</p>
+                <p><strong>Impact:</strong> ${rec.impact || 'Performance and efficiency improvement'}</p>
+                ${rec.potential_savings ? `<p><strong>Potential Savings:</strong> ${rec.potential_savings}</p>` : ''}
+                ${rec.environmental_impact ? `<p><strong>Environmental Impact:</strong> ${rec.environmental_impact}</p>` : ''}
               </div>
+
+              ${rec.analysis ? `
+                <div style="margin: 15px 0; padding: 12px; background: #fef3c7; border-radius: 6px; border-left: 3px solid #f59e0b;">
+                  <h5 style="margin: 0 0 8px 0; color: #92400e; font-size: 14px;">Supporting Analysis</h5>
+                  ${Object.entries(rec.analysis).map(([key, value]) => {
+                    const formattedKey = key.replace(/_/g, ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+                    return `<p style="margin: 4px 0; color: #78350f; font-size: 13px;"><strong>${formattedKey}:</strong> ${typeof value === 'number' ? value.toFixed(1) : value}</p>`;
+                  }).join('')}
+                </div>
+              ` : rec.statistics ? `
+                <div style="margin: 15px 0; padding: 12px; background: #fef3c7; border-radius: 6px; border-left: 3px solid #f59e0b;">
+                  <h5 style="margin: 0 0 8px 0; color: #92400e; font-size: 14px;">Key Metrics</h5>
+                  ${Object.entries(rec.statistics).map(([key, value]) => {
+                    const formattedKey = key.replace(/_/g, ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+                    return `<p style="margin: 4px 0; color: #78350f; font-size: 13px;"><strong>${formattedKey}:</strong> ${typeof value === 'number' ? value.toFixed(1) : value}</p>`;
+                  }).join('')}
+                </div>
+              ` : ''}
+
+              <div class="actions">
+                <h5 style="margin: 15px 0 8px 0; color: #111827; font-size: 14px; font-weight: 600;">Recommended Actions</h5>
+                <ul style="margin: 8px 0; padding-left: 20px;">
+                  ${(rec.recommendations || []).map(action => `<li style="margin: 6px 0; color: #374151; line-height: 1.5;">${action}</li>`).join('')}
+                </ul>
+              </div>
+
+              ${rec.cost_analysis ? `
+                <div style="margin: 15px 0; padding: 12px; background: #d1fae5; border-radius: 6px; border-left: 3px solid #10b981;">
+                  <h5 style="margin: 0 0 8px 0; color: #065f46; font-size: 14px;">Cost Impact Analysis</h5>
+                  <p style="margin: 4px 0; color: #064e3b;"><strong>Current Monthly Cost:</strong> $${rec.cost_analysis.current_monthly_cost}</p>
+                  <p style="margin: 4px 0; color: #064e3b;"><strong>Target Monthly Cost:</strong> $${rec.cost_analysis.target_monthly_cost}</p>
+                  <p style="margin: 4px 0; color: #065f46; font-weight: 600;"><strong>Monthly Savings:</strong> $${rec.cost_analysis.monthly_savings}</p>
+                  <p style="margin: 4px 0; color: #065f46; font-weight: 600;"><strong>Annual Savings:</strong> $${rec.cost_analysis.annual_savings}</p>
+                </div>
+              ` : ''}
             </div>
           `).join('')}
         </div>
