@@ -1233,7 +1233,7 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode, 
     `;
   };
 
-  const handleDownloadReport = () => {
+  const handleDownloadReport = async () => {
     let htmlContent;
     let filename;
 
@@ -1247,25 +1247,41 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode, 
     console.log('- backendError:', backendError);
     console.log('- backendLoading:', backendLoading);
 
+    // Determine which data to use for report
+    let reportData = backendRecommendations;
+
+    // If backend recommendations are null and no error, try fetching fresh data
+    if (!reportData && !backendError) {
+      console.log('- Backend data not loaded, fetching now...');
+      try {
+        let queryParams = `time_range_days=${timeRangeDays}`;
+        if (selectedDate !== 'today' && selectedDate !== null && selectedDate !== undefined) {
+          queryParams = `start_date=${selectedDate}&end_date=${selectedDate}`;
+        }
+        const response = await fetch(`/api/recommendations/host?${queryParams}`);
+        if (response.ok) {
+          reportData = await response.json();
+          console.log('- Fresh data fetched successfully');
+        }
+      } catch (error) {
+        console.log('- Failed to fetch fresh data:', error);
+      }
+    }
+
     // Check if backend is available (not a network/connection error)
     const isBackendAvailable = !backendError ||
       (backendError && !backendError.includes('Failed to fetch') && !backendError.includes('NetworkError'));
 
-    // Use backend report structure if backend is reachable, even if no data found
-    if (isBackendAvailable) {
+    // Use backend report structure if backend is reachable and has data
+    if (isBackendAvailable && reportData && reportData.host_analysis) {
       console.log('- Using backend report structure (sophisticated format)');
-      // If we have recommendations, use them; otherwise create empty structure
-      const reportData = backendRecommendations || {
-        host_analysis: {},
-        recommendations: [],
-        analysis_period: `Last ${timeRangeDays} days`,
-        generated_at: new Date().toISOString(),
-        summary: { total_recommendations: 0 }
-      };
+      console.log('- Backend data keys:', Object.keys(reportData));
+      console.log('- Host analysis keys:', Object.keys(reportData.host_analysis || {}));
       htmlContent = generateBackendHTMLReport(reportData);
       filename = `GreenMatrix_Host_Report_${dateLabel}_${timestamp}.html`;
     } else {
-      console.log('- Falling back to basic client-side report (backend not reachable)');
+      console.log('- Falling back to basic client-side report');
+      console.log('- Reason: Backend available?', isBackendAvailable, 'Has data?', !!reportData, 'Has host_analysis?', !!(reportData && reportData.host_analysis));
       const insightsData = generateInsightsData();
       htmlContent = generateHTMLReport(insightsData);
       filename = `HPE_GreenMatrix_Insights_${dateLabel}_${timestamp}.html`;
