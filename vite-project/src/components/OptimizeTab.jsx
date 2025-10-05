@@ -92,6 +92,7 @@ const OptimizeTab = () => {
   // Optimization results state
   const [optimizationResults, setOptimizationResults] = useState(null);
   const [isRunningOptimization, setIsRunningOptimization] = useState(false);
+  const [selectedAction, setSelectedAction] = useState(null); // 'recommendations' | 'simulation'
 
   // Helper function to create descriptive hardware names
   const getHardwareName = (hardware) => {
@@ -529,7 +530,12 @@ const OptimizeTab = () => {
   }, [modelName, taskType]);
 
   // Handle Get Recommendations
-  const handleGetRecommendations = async () => {
+  const handleGetRecommendations = async (actionType) => {
+    // Set the selected action for loading state and results handling
+    setSelectedAction(actionType);
+
+    // Clear previous results when starting new action
+    setOptimizationResults(null);
     if (!modelName || !taskType) {
       setError('Please select both model name and task type');
       return;
@@ -716,13 +722,21 @@ const OptimizeTab = () => {
         }
       }
 
-      // Use the correct endpoint based on mode
-      const endpoint = optimizationMode === 'pre-deployment'
-        ? '/model/recommend-hardware'
-        : '/deployment/post-deployment-optimization';
+      // Use the correct endpoint based on mode and action
+      let endpoint;
+      if (optimizationMode === 'pre-deployment') {
+        if (actionType === 'recommendations') {
+          endpoint = '/model/recommend-hardware';
+        } else if (actionType === 'simulation') {
+          endpoint = '/model/simulate-performance';
+        }
+      } else {
+        endpoint = '/deployment/post-deployment-optimization';
+      }
 
       // Debug logging
       console.log('Optimization mode:', optimizationMode);
+      console.log('Action type:', actionType);
       console.log('Endpoint:', endpoint);
       console.log('Request params:', optimizationParams);
       console.log('Request JSON:', JSON.stringify(optimizationParams, null, 2));
@@ -740,13 +754,13 @@ const OptimizeTab = () => {
         console.log('Found optimization response:', response.data);
 
         if (optimizationMode === 'pre-deployment') {
-          // Handle pre-deployment hardware recommendation response (same format as simulate-performance)
+          // Handle pre-deployment responses based on action type
           if (response.data.performance_results && response.data.performance_results.length > 0) {
-            console.log('Raw Hardware Recommendations:', response.data.performance_results);
+            console.log('Raw Performance Results:', response.data.performance_results);
 
-            // Format hardware recommendation results (top 3 sorted by cost per 1000)
+            // Format results (same format for both recommendations and simulation)
             const hardwareComparison = response.data.performance_results.map(result => {
-              console.log(`Processing hardware recommendation:`, result);
+              console.log(`Processing result:`, result);
 
               return {
                 name: result.GPU || result['Hardware Name'] || 'Unknown Hardware',
@@ -776,10 +790,10 @@ const OptimizeTab = () => {
               hardwareComparison: hardwareComparison
             };
 
-            console.log('Formatted hardware recommendation results:', formattedResults);
+            console.log(`Formatted ${actionType} results:`, formattedResults);
             setOptimizationResults(formattedResults);
           } else {
-            setError('Hardware recommendations completed but no results were returned.');
+            setError(`${actionType === 'recommendations' ? 'Hardware recommendations' : 'Performance simulation'} completed but no results were returned.`);
           }
 
         } else {
@@ -1207,6 +1221,7 @@ const OptimizeTab = () => {
       setError(errorMessage);
     } finally {
       setIsRunningOptimization(false);
+      setSelectedAction(null);
     }
   };
 
@@ -2690,20 +2705,56 @@ const OptimizeTab = () => {
 
           {/* Action Buttons */}
           <div className="mt-8 flex justify-end gap-4 my-3">
-            <button
-              onClick={handleGetRecommendations}
-              disabled={isLoadingModelData || isLoadingDropdowns || isRunningOptimization || !modelName || !taskType}
-              className="px-5 py-2.5 bg-gray-100 hover:bg-gray-300 text-emerald-700 rounded-full border text-lg font-medium flex items-center gap-2 h-11 transition-colors"
-            >
-              {isRunningOptimization ? (
-                <div className="flex items-center gap-2">
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Getting Recommendations...
-                </div>
-              ) : (
-                optimizationMode === 'pre-deployment' ? 'Configuration' : 'Configuration'
-              )}
-            </button>
+            {optimizationMode === 'pre-deployment' ? (
+              // Pre-deployment: Two buttons for different actions
+              <>
+                <button
+                  onClick={() => handleGetRecommendations('recommendations')}
+                  disabled={isLoadingModelData || isLoadingDropdowns || isRunningOptimization || !modelName || !taskType}
+                  className="px-5 py-2.5 bg-gray-100 hover:bg-gray-300 text-emerald-700 rounded-full border text-lg font-medium flex items-center gap-2 h-11 transition-colors"
+                >
+                  {(isRunningOptimization && selectedAction === 'recommendations') ? (
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Getting Recommendations...
+                    </div>
+                  ) : (
+                    'Get Top 3 Recommendations'
+                  )}
+                </button>
+
+                <button
+                  onClick={() => handleGetRecommendations('simulation')}
+                  disabled={isLoadingModelData || isLoadingDropdowns || isRunningOptimization || !modelName || !taskType}
+                  className="px-5 py-2.5 bg-gray-100 hover:bg-gray-300 text-emerald-700 rounded-full border text-lg font-medium flex items-center gap-2 h-11 transition-colors"
+                >
+                  {(isRunningOptimization && selectedAction === 'simulation') ? (
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Exploring Performance...
+                    </div>
+                  ) : (
+                    'Explore All Hardware Performance'
+                  )}
+                </button>
+              </>
+            ) : (
+              // Post-deployment: Single button as before
+              <button
+                onClick={() => handleGetRecommendations('recommendations')}
+                disabled={isLoadingModelData || isLoadingDropdowns || isRunningOptimization || !modelName || !taskType}
+                className="px-5 py-2.5 bg-gray-100 hover:bg-gray-300 text-emerald-700 rounded-full border text-lg font-medium flex items-center gap-2 h-11 transition-colors"
+              >
+                {isRunningOptimization ? (
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Getting Recommendations...
+                  </div>
+                ) : (
+                  'Configuration'
+                )}
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -2713,8 +2764,8 @@ const OptimizeTab = () => {
         optimizationMode === 'pre-deployment' ? (
           <SimulationResults
             results={optimizationResults}
-            title="Top 3 Hardware Recommendations"
-            subtitle="Hardware configurations sorted by cost per 1000 inferences"
+            title={selectedAction === 'simulation' ? "Hardware Performance Analysis" : "Top 3 Hardware Recommendations"}
+            subtitle={selectedAction === 'simulation' ? "Complete performance analysis across all hardware configurations" : "Hardware configurations sorted by cost per 1000 inferences"}
           />
         ) : (
           <OptimizationResults results={optimizationResults} mode={optimizationMode} />

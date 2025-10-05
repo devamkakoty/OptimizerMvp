@@ -3,13 +3,12 @@ import { Hpe, Moon, Sun, Notification, HelpOption, User} from 'grommet-icons';
 import { Link } from 'react-router-dom';
 import logo from '../assets/logo.png';
 import { useDarkMode } from '../contexts/DarkModeContext';
-import SimulateTab from './SimulateTab';
 import OptimizeTab from './OptimizeTab';
 import ModelTab from './ModelTab';
 import Sidebar from './Sidebar';
 
 const AIWorkloadOptimizer = () => {
-  const [activeTab, setActiveTab] = useState('simulate');
+  const [activeTab, setActiveTab] = useState('optimize');
   const { isDarkMode, toggleDarkMode } = useDarkMode();
 
   // Navigation state for sidebar
@@ -78,9 +77,7 @@ const AIWorkloadOptimizer = () => {
                 Green Matrix
               </h1>
               <p className="text-lg text-gray-600 dark:text-gray-300">
-                {activeTab === 'simulate' 
-                  ? 'Simulate AI workload performance on different hardware configurations.'
-                  : activeTab === 'optimize'
+                {activeTab === 'optimize'
                   ? 'Find the most cost-effective hardware configuration and optimize running workloads.'
                   : activeTab === 'model'
                   ? 'Optimize your AI models for better performance and efficiency.'
@@ -126,7 +123,6 @@ const AIWorkloadOptimizer = () => {
 
             {/* Content */}
             <div className="w-full mx-auto px-6 mt-8 mb-8">
-              {activeTab === 'simulate' && <SimulateTab />}
               {activeTab === 'optimize' && <OptimizeTab />}
               {activeTab === 'model' && <ModelTab />}
             </div>

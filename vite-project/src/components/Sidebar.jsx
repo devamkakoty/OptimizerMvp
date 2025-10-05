@@ -69,14 +69,8 @@ const Sidebar = ({ activeSection, setActiveSection, activeTab, setActiveTab, isC
     },
     // GreenMatrix components
     {
-      id: 'simulate',
-      label: 'Simulate Performance',
-      icon: KeyboardMusicIcon,
-      type: 'single'
-    },
-    {
       id: 'optimize',
-      label: 'Recommend Hardware',
+      label: 'Hardware Recommendations',
       icon: Target,
       type: 'single'
     },
@@ -112,7 +106,7 @@ const Sidebar = ({ activeSection, setActiveSection, activeTab, setActiveTab, isC
       return;
     }
     // Handle GreenMatrix components
-    else if (['simulate', 'optimize', 'model'].includes(item.id)) {
+    else if (['optimize', 'model'].includes(item.id)) {
       // If we're already on GreenMatrix page, just switch tabs
       if (window.location.pathname === '/workload') {
         setActiveSection('greenmatrix');
@@ -138,7 +132,7 @@ const Sidebar = ({ activeSection, setActiveSection, activeTab, setActiveTab, isC
     }
 
     // Handle GreenMatrix components
-    if (['simulate', 'optimize', 'model'].includes(item.id)) {
+    if (['optimize', 'model'].includes(item.id)) {
       return activeSection === 'greenmatrix' && activeTab === item.id;
     }
 
