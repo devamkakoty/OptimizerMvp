@@ -22,7 +22,8 @@ import {
   HandCoinsIcon,
   SparklesIcon,
   KeyboardMusicIcon,
-  MonitorCogIcon
+  MonitorCogIcon,
+  ClipboardList
 } from 'lucide-react';
 
 const Sidebar = ({ activeSection, setActiveSection, activeTab, setActiveTab, isCollapsed, setIsCollapsed }) => {
@@ -30,7 +31,14 @@ const Sidebar = ({ activeSection, setActiveSection, activeTab, setActiveTab, isC
   const { isDarkMode } = useDarkMode();
 
   const navigationItems = [
-    // Dashboard components (at the top)
+    // User Goals (at the top)
+    {
+      id: 'user-goals',
+      label: 'User Goals',
+      icon: ClipboardList,
+      type: 'single'
+    },
+    // Dashboard components
     {
       id: 'dashboard',
       label: 'Dashboard',
@@ -83,8 +91,8 @@ const Sidebar = ({ activeSection, setActiveSection, activeTab, setActiveTab, isC
   ];
 
   const handleItemClick = (item, child = null) => {
-    // Handle dashboard components
-    if (['dashboard', 'performance', 'hardware', 'costs', 'models'].includes(item.id)) {
+    // Handle User Goals and dashboard components
+    if (['user-goals', 'dashboard', 'performance', 'hardware', 'costs', 'models'].includes(item.id)) {
       // Special handling for Process Metrics - navigate to dedicated page
       if (item.id === 'processes') {
         navigate('/processes');
@@ -126,8 +134,8 @@ const Sidebar = ({ activeSection, setActiveSection, activeTab, setActiveTab, isC
       return activeSection === item.id && activeTab === child.id;
     }
 
-    // Handle dashboard components
-    if (['dashboard', 'performance', 'hardware', 'costs', 'models'].includes(item.id)) {
+    // Handle User Goals and dashboard components
+    if (['user-goals', 'dashboard', 'performance', 'hardware', 'costs', 'models'].includes(item.id)) {
       return activeSection === 'administration' && activeTab === item.id;
     }
 

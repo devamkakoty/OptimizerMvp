@@ -9,6 +9,7 @@ import HardwareTab from './HardwareTab';
 import CostManagementTab from './CostManagementTab';
 import PerformanceTab from './PerformanceTab';
 import AIModelManagementTab from './AIModelManagementTab';
+import UserGoalsTab from './UserGoalsTab';
 import Sidebar from './Sidebar';
 import 'react-datepicker/dist/react-datepicker.css';
 import '../styles/datepicker.css';
@@ -399,6 +400,10 @@ const AdminPage = () => {
 
                 {/* Admin Content */}
                 <div className="w-full mx-auto px-6 mt-2 mb-8 flex-1">
+                  {activeAdminTab === 'user-goals' && (
+                    <UserGoalsTab />
+                  )}
+
                   {activeAdminTab === 'dashboard' && (
                     <AdminDashboardNew
                       processData={processData}

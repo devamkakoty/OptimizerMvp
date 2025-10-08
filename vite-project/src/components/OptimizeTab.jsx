@@ -4,6 +4,7 @@ import apiClient from '../config/axios';
 import OptimizationResults from './OptimizationResults';
 import SimulationResults from './SimulationResults';
 import { useDropdownData } from '../hooks/useDropdownData';
+import { useModelConfigAutoPopulate, useHasUserGoals } from '../hooks/useModelConfigAutoPopulate';
 
 const OptimizeTab = () => {
   const [optimizationMode, setOptimizationMode] = useState('pre-deployment');
@@ -47,6 +48,33 @@ const OptimizeTab = () => {
     isLoading: isLoadingDropdowns,
     error: dropdownError
   } = useDropdownData();
+
+  // Auto-populate fields from User Goals configuration
+  const hasUserGoals = useHasUserGoals();
+  const userGoalsConfig = useModelConfigAutoPopulate({
+    // Common fields
+    setModelName,
+    setTaskType,
+    setFramework,
+    setParameters,
+    setModelSize,
+    setArchitectureType,
+    setModelType,
+    setPrecision,
+    setVocabularySize,
+    setActivationFunction,
+    setFlops, // Maps to gflops in User Goals
+    setHiddenLayers,
+    setAttentionLayers,
+    setEmbeddingDimension,
+    setFfnDimension,
+    // Inference-specific
+    setInputSize, // Maps to inferenceInputSize
+    setScenario, // Maps to deploymentScenario
+    setBatchSize, // Maps to inferenceBatchSize
+    // Training-specific
+    setIsFullTraining,
+  });
 
   // Post-deployment specific state - using the specific fields provided
   const [gpuMemoryUsage, setGpuMemoryUsage] = useState('');
@@ -458,9 +486,16 @@ const OptimizeTab = () => {
   }, [optimizationMode]);
 
   // Auto-fill model data when both model name and task type are selected
+  // Note: Skip this if data already came from User Goals
   useEffect(() => {
     const fetchModelData = async () => {
       if (!modelName || !taskType) {
+        return;
+      }
+
+      // Skip fetching if User Goals already populated the fields
+      if (hasUserGoals && userGoalsConfig.modelName === modelName && userGoalsConfig.taskType === taskType) {
+        console.log('[OptimizeTab] Skipping backend fetch - data already populated from User Goals');
         return;
       }
 
@@ -527,7 +562,7 @@ const OptimizeTab = () => {
     };
 
     fetchModelData();
-  }, [modelName, taskType]);
+  }, [modelName, taskType, hasUserGoals, userGoalsConfig]);
 
   // Handle Get Recommendations
   const handleGetRecommendations = async (actionType) => {

@@ -3,6 +3,7 @@ import { Info, Loader2 } from 'lucide-react';
 import apiClient from '../config/axios';
 import ModelOptimizerResults from './ModelOptimizerResults';
 import { useDropdownData } from '../hooks/useDropdownData';
+import { useModelConfigAutoPopulate, useHasUserGoals } from '../hooks/useModelConfigAutoPopulate';
 import '../styles/AdminDashboardNew.css';
 
 const ModelTab = () => {
@@ -43,6 +44,33 @@ const ModelTab = () => {
     error: dropdownError
   } = useDropdownData();
 
+  // Auto-populate fields from User Goals configuration
+  const hasUserGoals = useHasUserGoals();
+  const userGoalsConfig = useModelConfigAutoPopulate({
+    // Common fields
+    setModelName,
+    setTaskType,
+    setFramework,
+    setParameters,
+    setModelSize,
+    setArchitectureType,
+    setModelType,
+    setPrecision,
+    setVocabularySize,
+    setActivationFunction,
+    setFlops, // Maps to gflops in User Goals
+    setHiddenLayers,
+    setAttentionLayers,
+    setEmbeddingDimension,
+    setFfnDimension,
+    // Inference-specific
+    setInputSize, // Maps to inferenceInputSize
+    setScenario, // Maps to deploymentScenario
+    setBatchSize, // Maps to inferenceBatchSize
+    // Training-specific
+    setIsFullTraining,
+  });
+
   // Loading and error states
   const [isLoadingModelData, setIsLoadingModelData] = useState(false);
   const [error, setError] = useState('');
@@ -59,9 +87,16 @@ const ModelTab = () => {
   }, [dropdownError]);
 
   // Auto-fill model data when both model name and task type are selected
+  // Note: Skip this if data already came from User Goals
   useEffect(() => {
     const fetchModelData = async () => {
       if (!modelName || !taskType) {
+        return;
+      }
+
+      // Skip fetching if User Goals already populated the fields
+      if (hasUserGoals && userGoalsConfig.modelName === modelName && userGoalsConfig.taskType === taskType) {
+        console.log('[ModelTab] Skipping backend fetch - data already populated from User Goals');
         return;
       }
 
@@ -135,7 +170,7 @@ const ModelTab = () => {
     };
 
     fetchModelData();
-  }, [modelName, taskType]);
+  }, [modelName, taskType, hasUserGoals, userGoalsConfig]);
 
   // Handle Optimize Model
   const handleOptimizeModel = async () => {
