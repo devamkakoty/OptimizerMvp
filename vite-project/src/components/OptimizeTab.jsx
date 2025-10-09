@@ -5,6 +5,7 @@ import OptimizationResults from './OptimizationResults';
 import SimulationResults from './SimulationResults';
 import { useDropdownData } from '../hooks/useDropdownData';
 import { useModelConfigAutoPopulate, useHasUserGoals } from '../hooks/useModelConfigAutoPopulate';
+import { useModelConfig } from '../contexts/ModelConfigContext';
 
 const OptimizeTab = () => {
   const [optimizationMode, setOptimizationMode] = useState('pre-deployment');
@@ -23,8 +24,9 @@ const OptimizeTab = () => {
   const [batchSize, setBatchSize] = useState('');
   const [showTooltip, setShowTooltip] = useState('');
 
-  // Training-specific fields
+  // Inference and Training specific fields
   const [inputSize, setInputSize] = useState('');
+  const [outputSize, setOutputSize] = useState('');
   const [isFullTraining, setIsFullTraining] = useState('No');
 
   // Additional parameters state
@@ -49,9 +51,12 @@ const OptimizeTab = () => {
     error: dropdownError
   } = useDropdownData();
 
+  // Get user goals from ModelConfigContext
+  const { config: userGoalsConfig } = useModelConfig();
+
   // Auto-populate fields from User Goals configuration
   const hasUserGoals = useHasUserGoals();
-  const userGoalsConfig = useModelConfigAutoPopulate({
+  useModelConfigAutoPopulate({
     // Common fields
     setModelName,
     setTaskType,
@@ -70,6 +75,7 @@ const OptimizeTab = () => {
     setFfnDimension,
     // Inference-specific
     setInputSize, // Maps to inferenceInputSize
+    setOutputSize, // Maps to inferenceOutputSize - FIXED: was missing
     setScenario, // Maps to deploymentScenario
     setBatchSize, // Maps to inferenceBatchSize
     // Training-specific
@@ -362,7 +368,7 @@ const OptimizeTab = () => {
     }
   }, [selectedVM]);
 
-  // Auto-refresh VM metrics every 10 seconds when VM is selected and not in override mode
+  // Auto-refresh VM metrics every 5 seconds when VM is selected and not in override mode
   useEffect(() => {
     // Clear any existing interval
     if (vmMetricsRefreshInterval) {
@@ -372,14 +378,29 @@ const OptimizeTab = () => {
 
     // Set up new interval if VM is selected and not in override mode
     if (selectedVM && selectedVM.vm_name && !isVmOverrideEnabled) {
-      console.log(`Starting auto-refresh for VM metrics: ${selectedVM.vm_name} (every 10 seconds)`);
+      console.log(`Starting auto-refresh for VM metrics: ${selectedVM.vm_name} (every 5 seconds)`);
 
       const intervalId = setInterval(() => {
+        if (document.visibilityState !== 'visible') return;
         console.log(`Auto-refreshing VM metrics for: ${selectedVM.vm_name}`);
         fetchVmMetrics(selectedVM.vm_name);
-      }, 10000); // 10 seconds
+      }, 5000); // 5 seconds
 
       setVmMetricsRefreshInterval(intervalId);
+
+      // Resume polling when tab becomes visible
+      const handleVisibilityChange = () => {
+        if (document.visibilityState === 'visible') {
+          fetchVmMetrics(selectedVM.vm_name);
+        }
+      };
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+
+      // Store cleanup function
+      return () => {
+        clearInterval(intervalId);
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      };
     }
 
     // Cleanup function
@@ -392,7 +413,7 @@ const OptimizeTab = () => {
     };
   }, [selectedVM, isVmOverrideEnabled]);
 
-  // Auto-refresh host metrics every 2 seconds for bare metal mode when not in override mode
+  // Auto-refresh host metrics every 5 seconds for bare metal mode when not in override mode
   useEffect(() => {
     // Clear any existing interval
     if (hostMetricsRefreshInterval) {
@@ -402,14 +423,29 @@ const OptimizeTab = () => {
 
     // Set up new interval if in bare metal mode and not in override mode
     if (optimizationMode === 'post-deployment' && postDeploymentMode === 'bare-metal' && !isOverrideEnabled) {
-      console.log('Starting auto-refresh for host metrics (every 2 seconds)');
+      console.log('Starting auto-refresh for host metrics (every 5 seconds)');
 
       const intervalId = setInterval(() => {
+        if (document.visibilityState !== 'visible') return;
         console.log('Auto-refreshing host metrics');
         fetchHostMetrics();
-      }, 2000); // 2 seconds
+      }, 5000); // 5 seconds
 
       setHostMetricsRefreshInterval(intervalId);
+
+      // Resume polling when tab becomes visible
+      const handleVisibilityChange = () => {
+        if (document.visibilityState === 'visible') {
+          fetchHostMetrics();
+        }
+      };
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+
+      // Store cleanup function
+      return () => {
+        clearInterval(intervalId);
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      };
     }
 
     // Cleanup function
@@ -588,6 +624,22 @@ const OptimizeTab = () => {
     }
 
     if (optimizationMode === 'pre-deployment') {
+      // Validation for Inference task type
+      if (taskType === 'Inference') {
+        if (!inputSize) {
+          setError('Please fill in Input Size (Number of input tokens) for Inference task type. Click "Load More Parameters" to access this field.');
+          return;
+        }
+        if (!outputSize) {
+          setError('Please fill in Output Size (Number of output tokens) for Inference task type. Click "Load More Parameters" to access this field.');
+          return;
+        }
+        if (!batchSize) {
+          setError('Please fill in Batch Size for Inference task type. Click "Load More Parameters" to access this field.');
+          return;
+        }
+      }
+
       // Validation for Training task type
       if (taskType === 'Training') {
         if (!batchSize) {
@@ -680,8 +732,9 @@ const OptimizeTab = () => {
           Scenario: scenario,
           Total_Parameters_Millions: parseFloat(parameters),
           Model_Size_MB: parseFloat(modelSize),
-          Architecture_type: architectureType,
-          Model_Type: modelType || 'Unknown',
+          // NOTE: Architecture_type and Model_Type kept in UI for user reference but NOT sent to PKL files
+          // Architecture_type: architectureType,
+          // Model_Type: modelType || 'Unknown',
           Embedding_Vector_Dimension: parseInt(embeddingDimension),
           Precision: precision,
           Vocabulary_Size: parseInt(vocabularySize),
@@ -692,11 +745,45 @@ const OptimizeTab = () => {
           GFLOPs_Billions: parseFloat(flops)
         };
 
+        // Add Inference-specific fields if task type is Inference
+        if (taskType === 'Inference') {
+          optimizationParams.Input_Size = parseInt(inputSize);
+          optimizationParams.Output_Size = parseInt(outputSize);
+          optimizationParams.Batch_Size = parseInt(batchSize);
+        }
+
         // Add Training-specific fields if task type is Training
         if (taskType === 'Training') {
           optimizationParams.Batch_Size = parseInt(batchSize);
           optimizationParams.Input_Size = parseInt(inputSize);
           optimizationParams.Full_Training = isFullTraining === 'Yes' ? 1 : 0;
+        }
+
+        // NEW: Add user goals/constraints from ModelConfigContext (for "Get Top 3 Recommendations")
+        // These are optional - backend will handle filtering only if constraints are provided
+        if (userGoalsConfig) {
+          // Only add constraints if they have values (not empty strings)
+          if (userGoalsConfig.targetLatency) {
+            optimizationParams.Target_Latency = parseFloat(userGoalsConfig.targetLatency);
+          }
+          if (userGoalsConfig.targetThroughput) {
+            optimizationParams.Target_Throughput = parseFloat(userGoalsConfig.targetThroughput);
+          }
+          if (userGoalsConfig.concurrentUsers) {
+            optimizationParams.Target_Concurrent_Users = parseFloat(userGoalsConfig.concurrentUsers);
+          }
+          if (userGoalsConfig.requestsPerSecond) {
+            optimizationParams.Target_Requests_Per_Second = parseFloat(userGoalsConfig.requestsPerSecond);
+          }
+          if (userGoalsConfig.inferenceBudget) {
+            optimizationParams.Target_Cost = parseFloat(userGoalsConfig.inferenceBudget);
+          }
+          if (userGoalsConfig.timeToFirstToken) {
+            optimizationParams.Target_TTFT = parseFloat(userGoalsConfig.timeToFirstToken);
+          }
+          if (userGoalsConfig.numberOfGpus) {
+            optimizationParams.Number_Of_GPUs = parseInt(userGoalsConfig.numberOfGpus);
+          }
         }
       } else {
         // Post-deployment: Use different endpoints based on bare-metal vs VM-level
@@ -800,8 +887,13 @@ const OptimizeTab = () => {
               return {
                 name: result.GPU || result['Hardware Name'] || 'Unknown Hardware',
                 fullName: `${result.CPU || 'Unknown CPU'} + ${result.GPU || 'Unknown GPU'}`,
+                // Core performance metrics (NEW)
                 latency: result['Latency (ms)'] !== 'N/A' ? `${parseFloat(result['Latency (ms)']).toFixed(2)} ms` : 'N/A',
-                throughput: '0.00 QPS', // Hide throughput as requested
+                throughput: result['Throughput (Tokens/secs)'] !== 'N/A' ? `${parseFloat(result['Throughput (Tokens/secs)']).toFixed(2)} tokens/sec` : 'N/A',
+                requestsPerSec: result['Requests/secs'] !== 'N/A' ? `${parseFloat(result['Requests/secs']).toFixed(2)} req/sec` : 'N/A',
+                ttft: result['TTFT (ms)'] !== 'N/A' ? `${parseFloat(result['TTFT (ms)']).toFixed(2)} ms` : 'N/A',
+                concurrentUsers: result['Concurrent Users'] !== 'N/A' ? `${parseFloat(result['Concurrent Users']).toFixed(2)}` : 'N/A',
+                // Cost and resources
                 costPer1000: result['Total Cost'] !== 'N/A' && result['Total Cost'] !== '0' ? `$${parseFloat(result['Total Cost']).toFixed(4)}` : '$0.0000',
                 memory: `${result['Recommended RAM'] || 0} GB`,
                 status: result.Status || 'Unknown',
@@ -822,7 +914,18 @@ const OptimizeTab = () => {
 
             const formattedResults = {
               minimumVRAM: minimumVRAM,
-              hardwareComparison: hardwareComparison
+              hardwareComparison: hardwareComparison,
+              // User input parameters for report generation
+              modelName: modelName,
+              taskType: taskType,
+              framework: framework,
+              parameters: parameters,
+              modelSize: modelSize,
+              precision: precision,
+              inputSize: taskType === 'Inference' ? inputSize : null,
+              outputSize: taskType === 'Inference' ? outputSize : null,
+              batchSize: batchSize,
+              scenario: taskType === 'Inference' ? scenario : null
             };
 
             console.log(`Formatted ${actionType} results:`, formattedResults);
@@ -2702,6 +2805,99 @@ const OptimizeTab = () => {
                       disabled={isLoadingModelData}
                     />
                   </div>
+
+                  {/* Input Size (Number of input tokens) - For Inference task type */}
+                  {optimizationMode === 'pre-deployment' && taskType === 'Inference' && (
+                    <div>
+                      <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Input Size (Number of input tokens)
+                        <span className="text-red-500">*</span>
+                        <div className="relative">
+                          <Info
+                            className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help"
+                            onMouseEnter={() => setShowTooltip('inputSizeInference')}
+                            onMouseLeave={() => setShowTooltip('')}
+                          />
+                          {showTooltip === 'inputSizeInference' && (
+                            <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
+                              <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
+                              Number of input tokens for inference (e.g., 512, 1024, 2048).
+                            </div>
+                          )}
+                        </div>
+                      </label>
+                      <input
+                        type="number"
+                        value={inputSize}
+                        onChange={(e) => setInputSize(e.target.value)}
+                        placeholder="Enter number of input tokens"
+                        className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={isLoadingModelData}
+                      />
+                    </div>
+                  )}
+
+                  {/* Output Size (Number of output tokens) - For Inference task type */}
+                  {optimizationMode === 'pre-deployment' && taskType === 'Inference' && (
+                    <div>
+                      <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Output Size (Number of output tokens)
+                        <span className="text-red-500">*</span>
+                        <div className="relative">
+                          <Info
+                            className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help"
+                            onMouseEnter={() => setShowTooltip('outputSizeInference')}
+                            onMouseLeave={() => setShowTooltip('')}
+                          />
+                          {showTooltip === 'outputSizeInference' && (
+                            <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
+                              <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
+                              Number of output tokens for inference (e.g., 512, 1024, 2048).
+                            </div>
+                          )}
+                        </div>
+                      </label>
+                      <input
+                        type="number"
+                        value={outputSize}
+                        onChange={(e) => setOutputSize(e.target.value)}
+                        placeholder="Enter number of output tokens"
+                        className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={isLoadingModelData}
+                      />
+                    </div>
+                  )}
+
+                  {/* Batch Size - For Inference task type */}
+                  {optimizationMode === 'pre-deployment' && taskType === 'Inference' && (
+                    <div>
+                      <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Batch Size
+                        <span className="text-red-500">*</span>
+                        <div className="relative">
+                          <Info
+                            className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help"
+                            onMouseEnter={() => setShowTooltip('batchSizeInference')}
+                            onMouseLeave={() => setShowTooltip('')}
+                          />
+                          {showTooltip === 'batchSizeInference' && (
+                            <div className="absolute z-10 w-64 p-3 -top-2 left-6 bg-gray-800 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg">
+                              <div className="absolute w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-gray-800 dark:border-r-gray-700 border-b-[6px] border-b-transparent -left-2 top-3"></div>
+                              Number of samples processed in parallel (e.g., 1, 2, 4, 8).
+                            </div>
+                          )}
+                        </div>
+                      </label>
+                      <input
+                        type="number"
+                        value={batchSize}
+                        onChange={(e) => setBatchSize(e.target.value)}
+                        placeholder="Enter batch size"
+                        className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={isLoadingModelData}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Collapse Buttons */}

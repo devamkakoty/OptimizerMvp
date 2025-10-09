@@ -4,45 +4,80 @@ import math
 from typing import Dict, Any, Tuple
 from sqlalchemy.orm import Session
 
-def outputtable(prediction_output, intervals, user_input, available_HW, db: Session):
+def outputtable(prediction_output_latency, prediction_output_throughput, prediction_output_requests,
+                intervals_latency, intervals_throughput, intervals_requests,
+                user_input, available_HW, db: Session):
     """
     Format simulation results into a comprehensive table with hardware recommendations
-    
+    NEW: Uses 3 separate predictions (latency, throughput, requests) for inference
+    Confidence score is calculated as the average of all 3 models' confidence intervals
+
     Args:
-        prediction_output: Raw predictions from the model
-        intervals: Confidence intervals from the model
+        prediction_output_latency: Latency predictions from the model
+        prediction_output_throughput: Throughput predictions from the model
+        prediction_output_requests: Requests/sec predictions from the model
+        intervals_latency: Confidence intervals for latency
+        intervals_throughput: Confidence intervals for throughput
+        intervals_requests: Confidence intervals for requests
         user_input: User input data as dictionary
         available_HW: Available hardware dataframe
         db: Database session
-        
+
     Returns:
         DataFrame with formatted results including recommendations
     """
-    
-    max_possible_width = 714401.21
+
+    # Max possible widths for each prediction type (calibrated from training data)
+    # These represent the maximum interval width we've observed for each metric
+    max_width_latency = 1000.0  # Latency in ms
+    max_width_throughput = 714401.21  # Throughput in tokens/sec (original value)
+    max_width_requests = 10000.0  # Requests/sec
+
     confidence_percent = []
-    
-    # Calculate confidence scores
-    for i in range(len(prediction_output)):
-        confidence_score = intervals[i][1][0] - intervals[i][0][0]
-        confidence_percent.append((1 - (confidence_score / max_possible_width)) * 100)
+
+    # Calculate confidence score as AVERAGE of all 3 models' confidence intervals
+    for i in range(len(prediction_output_throughput)):
+        # Intervals structure is [[lower_bound], [upper_bound]]
+
+        # Latency confidence
+        interval_width_latency = intervals_latency[i][1][0] - intervals_latency[i][0][0]
+        confidence_latency = (1 - (interval_width_latency / max_width_latency)) * 100
+
+        # Throughput confidence
+        interval_width_throughput = intervals_throughput[i][1][0] - intervals_throughput[i][0][0]
+        confidence_throughput = (1 - (interval_width_throughput / max_width_throughput)) * 100
+
+        # Requests confidence
+        interval_width_requests = intervals_requests[i][1][0] - intervals_requests[i][0][0]
+        confidence_requests = (1 - (interval_width_requests / max_width_requests)) * 100
+
+        # Average of all 3 confidence scores
+        avg_confidence = (confidence_latency + confidence_throughput + confidence_requests) / 3
+        confidence_percent.append(avg_confidence)
 
     confidence_percent = np.array(confidence_percent)
-    
-    # Create final table with predictions and confidence scores
-    # Apply absolute value fix for negative latency predictions
-    prediction_output_fixed = [abs(pred) for pred in prediction_output]
-    final_table = pd.concat([available_HW, pd.DataFrame(prediction_output_fixed, columns=['Latency (ms)'])], axis=1)
-    final_table = pd.concat([final_table, pd.DataFrame(confidence_percent, columns=['Confidence Score'])], axis=1)
-    
-    # Computing RAM, VRAM and Storage recommendations
+
+    # Build final_table by concatenating all required columns
+    # Apply abs() to convert negative predictions to positive
+    prediction_output_latency_fixed = [abs(pred) for pred in prediction_output_latency]
+    prediction_output_throughput_fixed = [abs(pred) for pred in prediction_output_throughput]
+    prediction_output_requests_fixed = [abs(pred) for pred in prediction_output_requests]
+
+    final_table = pd.concat([
+        available_HW.reset_index(drop=True),  # Reset index to ensure proper concatenation
+        pd.DataFrame(prediction_output_latency_fixed, columns=['Latency (ms)']),
+        pd.DataFrame(prediction_output_throughput_fixed, columns=['Throughput (Tokens/secs)']),
+        pd.DataFrame(prediction_output_requests_fixed, columns=['Requests/secs']),
+        pd.DataFrame(np.abs(confidence_percent), columns=['Confidence Score'])
+    ], axis=1)
+
+    # Computing RAM, VRAM and Storage:
     def recommend_hw(size_gb):
         if size_gb <= 1:
             return 1
         exponent = math.ceil(math.log2(size_gb))
         return 2**exponent
 
-    # Bytes per parameter for different precision types
     bytes_per_param_dict = {
         # Floating Point Types
         "FP64": 8,        # 64-bit float
@@ -74,83 +109,106 @@ def outputtable(prediction_output, intervals, user_input, available_HW, db: Sess
         "BOOL": 1         # Boolean (typically stored as 1 byte)
     }
 
-    # Get precision from user input
-    precision = user_input.get('Precision', 'FP32')
-    bytes_per_param = bytes_per_param_dict.get(precision, 4)  # Default to FP32
-
-    # Calculate memory requirements
-    total_params = float(user_input.get('Total Parameters (Millions)', 0)) * 1e6
-    
-    estimated_vram_gb = ((total_params * bytes_per_param) * 1.2) / 1e9
-    estimated_ram_gb = estimated_vram_gb * 1.5
-    
+    # Convert user_input dict to DataFrame for processing
     user_input_df = pd.DataFrame([user_input])
-    user_input_df['Estimated_VRAM (GB)'] = estimated_vram_gb
-    user_input_df['Estimated_RAM (GB)'] = estimated_ram_gb
-    
-    # Calculate recommendations
-    model_size_gb = float(user_input.get('Model Size (MB)', 0)) / 1024
-    
-    recommended_storage = recommend_hw(model_size_gb)
-    recommended_ram = recommend_hw(estimated_ram_gb)
-    estimated_vram_recommended = recommend_hw(estimated_vram_gb)
-    estimated_ram_recommended = recommend_hw(estimated_ram_gb)
-    
-    # Add power consumption calculation
-    gpu_power = user_input.get('GPU Power Consumption', 300)
-    cpu_power = user_input.get('CPU Power Consumption', 185)
-    total_power = gpu_power + cpu_power
-    
-    # Use the reusable cost computation function (defined at the bottom of this file)
-    
-    # Remove duplicates
-    final_table.drop_duplicates(inplace=True)
-    
-    # Add recommendations to final table
-    final_table['Recommended Storage'] = recommended_storage
-    final_table['Recommended RAM'] = recommended_ram
-    final_table['Estimated_VRAM (GB)'] = estimated_vram_recommended
-    final_table['Estimated_RAM (GB)'] = estimated_ram_recommended
-    final_table['Total power consumption'] = total_power
-    final_table['Status'] = 'This model will run on this GPU'
-    
-    # Calculate total cost for each hardware configuration
-    for index, rows in final_table.iterrows():
-        if pd.notna(rows['Latency (ms)']) and rows['Latency (ms)'] != 'N/A':
-            final_table.at[index, 'Total Cost'] = cost_compute(total_power, float(rows['Latency (ms)']))
-        else:
-            final_table.at[index, 'Total Cost'] = 0
-    
-    # Sort by total cost
-    final_table = final_table.sort_values(by=['Total Cost'], ascending=[True])
-    
-    # Check if model will fit on GPU VRAM
-    for index, row in final_table.iterrows():
-        gpu_memory_mb = row.get('GPU Memory Total - VRAM (MB)', 0)
-        if gpu_memory_mb > 0:  # Only check for GPUs
-            estimated_vram_gb_row = row.get('Estimated_VRAM (GB)', estimated_vram_gb)
-            estimated_vram_mb = estimated_vram_gb_row * 1024
-            if estimated_vram_mb > gpu_memory_mb:
-                final_table.at[index, 'Status'] = 'This model wont run on this GPU'
-                final_table.at[index, 'Latency (ms)'] = 'N/A'
-                final_table.at[index, 'Recommended Storage'] = 'N/A'
-                final_table.at[index, 'Recommended RAM'] = 'N/A'
-                final_table.at[index, 'Estimated_VRAM (GB)'] = 'N/A'
-                final_table.at[index, 'Estimated_RAM (GB)'] = 'N/A'
-                final_table.at[index, 'Total power consumption'] = 'N/A'
-                final_table.at[index, 'Total Cost'] = '0'
 
-    # Reset index and sort by performance (lowest latency first, then compatibility)
+    # Assuming 'Precision' is a column in the user_input DataFrame
+    bytes_per_param = bytes_per_param_dict[user_input_df['Precision'].iloc[0]]
+
+    total_params = user_input_df['Total Parameters (Millions)'].iloc[0] * 1e6
+
+    user_input_df['Estimated_VRAM (GB)'] = ((total_params * bytes_per_param) * 1.2) / 1e9
+    user_input_df['Estimated_RAM (GB)'] = user_input_df['Estimated_VRAM (GB)'] * 1.5
+
+    for index, rows in user_input_df.iterrows():
+        user_input_df.loc[index, 'Recommended Storage'] = recommend_hw(user_input_df.loc[index, 'Model Size (MB)'] / 1024)
+        user_input_df.loc[index, 'Recommended RAM'] = recommend_hw(user_input_df.loc[index, 'Estimated_RAM (GB)'])
+        user_input_df.loc[index, 'Estimated_VRAM (GB)'] = recommend_hw(user_input_df.loc[index, 'Estimated_VRAM (GB)'])
+        user_input_df.loc[index, 'Estimated_RAM (GB)'] = recommend_hw(user_input_df.loc[index, 'Estimated_RAM (GB)'])
+
+    # Computing cost/1000 inference:
+    def cost_compute(power_watts, latency_ms, cost_per_kwh=0.12, num_inferences=1000):
+        total_time_seconds = (latency_ms / 1000) * num_inferences
+        total_time_hours = total_time_seconds / 3600
+        power_kw = power_watts / 1000
+        total_cost = power_kw * total_time_hours * cost_per_kwh
+        return total_cost
+
+    # Calculate total power consumption from hardware columns (already in final_table from available_HW)
+    final_table['Total power consumption'] = final_table['GPUPower Consumption'] + final_table['CPU Power Consumption']
+
+    # Add recommended storage, RAM, and VRAM to ALL rows in final_table
+    # (All hardware configs use the same model, so they all have the same requirements)
+    # FIX: Don't use merge - it reduces rows! Just broadcast the values
+    final_table['Recommended Storage'] = user_input_df['Recommended Storage'].iloc[0]
+    final_table['Recommended RAM'] = user_input_df['Recommended RAM'].iloc[0]
+    final_table['Estimated_VRAM (GB)'] = user_input_df['Estimated_VRAM (GB)'].iloc[0]
+    final_table['Status'] = 'This model will run on this GPU'
+
+    for index, rows in final_table.iterrows():
+        final_table.at[index, 'Total Cost'] = cost_compute(rows['Total power consumption'], rows['Latency (ms)'])
+
+    final_table = final_table.sort_values(by=['Total Cost'], ascending=[True])
+
+    for index, row in final_table.iterrows():
+        # Use Estimated_VRAM (GB) from the merged final_table for comparison
+        # Convert GB to MB for comparison (Estimated_VRAM is in GB, GPU Memory is in MB)
+        estimated_vram_mb = row['Estimated_VRAM (GB)'] * 1024
+        gpu_vram_mb = row['GPU Memory Total - VRAM (MB)']
+
+        if estimated_vram_mb > gpu_vram_mb:
+            final_table.at[index, 'Status'] = 'This model wont run on this GPU'
+            final_table.at[index, 'Latency (ms)'] = 'N/A'
+            final_table.at[index, 'Throughput (Tokens/secs)'] = 'N/A'
+            final_table.at[index, 'Requests/secs'] = 'N/A'
+            final_table.at[index, 'Recommended Storage'] = 'N/A'
+            final_table.at[index, 'Recommended RAM'] = 'N/A'
+            final_table.at[index, 'Total power consumption'] = 'N/A'
+            final_table.at[index, 'Total Cost'] = '0'  # Set cost to 0 for hardware that won't run the model
+
     final_table.reset_index(drop=True, inplace=True)
-    
-    # Primary sort: by latency (performance) - lower is better
-    # Secondary sort: by compatibility (compatible configurations first)
-    final_table['compatibility_sorter'] = (final_table == 'N/A').any(axis=1)
-    final_table = final_table.sort_values(
-        by=['Latency (ms)', 'compatibility_sorter'], 
-        ascending=[True, True],  # Lower latency first, compatible first
-        kind='mergesort'
-    ).drop('compatibility_sorter', axis=1)
+
+    final_table['Total Cost'] = pd.to_numeric(final_table['Total Cost'], errors='coerce').fillna(0)
+    final_table['sorter'] = (final_table['Status'] == 'This model wont run on this GPU')
+    final_table = final_table.sort_values(by=['sorter', 'Total Cost'], ascending=[True, True], kind='mergesort').drop('sorter', axis=1)
+
+    # Calculate Concurrent Users for each row (handle 'N/A' values)
+    concurrent_users = []
+    for index, row in final_table.iterrows():
+        if row['Requests/secs'] != 'N/A' and row['Latency (ms)'] != 'N/A':
+            try:
+                requests_val = float(row['Requests/secs'])
+                latency_val = float(row['Latency (ms)'])
+                concurrent = requests_val * (latency_val / 1000)
+                concurrent_users.append(concurrent)
+            except (ValueError, TypeError):
+                concurrent_users.append('N/A')
+        else:
+            concurrent_users.append('N/A')
+
+    final_table['Concurrent Users'] = concurrent_users
+
+    # Set OutputSize for ALL hardware rows (all use same output size from model config)
+    output_size = user_input_df['Output size (Number of output tokens)'].iloc[0]
+    final_table['OutputSize'] = output_size
+
+    # Calculate TTFT (Time To First Token) for each hardware configuration
+    for index, row in final_table.iterrows():
+        # Only calculate TTFT if the model will run on this hardware (not 'N/A')
+        if row['Latency (ms)'] != 'N/A' and row['Throughput (Tokens/secs)'] != 'N/A':
+            try:
+                latency_val = float(row['Latency (ms)'])
+                throughput_val = float(row['Throughput (Tokens/secs)'])
+                output_size_val = float(row['OutputSize'])
+                ttft = abs(latency_val - (((output_size_val - 1) / throughput_val) * 1000))
+                final_table.at[index, 'TTFT (ms)'] = ttft
+            except (ValueError, ZeroDivisionError, TypeError) as e:
+                final_table.at[index, 'TTFT (ms)'] = 'N/A'
+        else:
+            final_table.at[index, 'TTFT (ms)'] = 'N/A'
+
+    # Drop temporary OutputSize column
+    final_table.drop(columns=['OutputSize'], inplace=True)
 
     return final_table
 

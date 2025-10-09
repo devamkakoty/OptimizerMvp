@@ -98,22 +98,50 @@ const VMProcessMetricsChartJS = () => {
   useEffect(() => {
     // Fetch initial data
     fetchActiveVMs();
-    
-    // Set up interval for active VMs (every 10 seconds)
-    const activeVMsInterval = setInterval(fetchActiveVMs, 10000);
-    
-    return () => clearInterval(activeVMsInterval);
+
+    // Set up interval for active VMs (every 5 seconds)
+    const activeVMsInterval = setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      fetchActiveVMs();
+    }, 5000);
+
+    // Resume polling when tab becomes visible
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchActiveVMs();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(activeVMsInterval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   // Fetch process metrics when VM changes
   useEffect(() => {
     if (selectedVM) {
       fetchVMProcessMetrics();
-      
-      // Set up interval for process metrics (every 1 second)
-      const processMetricsInterval = setInterval(fetchVMProcessMetrics, 1000);
-      
-      return () => clearInterval(processMetricsInterval);
+
+      // Set up interval for process metrics (every 5 seconds)
+      const processMetricsInterval = setInterval(() => {
+        if (document.visibilityState !== 'visible') return;
+        fetchVMProcessMetrics();
+      }, 5000);
+
+      // Resume polling when tab becomes visible
+      const handleVisibilityChange = () => {
+        if (document.visibilityState === 'visible') {
+          fetchVMProcessMetrics();
+        }
+      };
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+
+      return () => {
+        clearInterval(processMetricsInterval);
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      };
     }
   }, [selectedVM]);
 

@@ -48,12 +48,24 @@ class ModelInferenceController:
                 logger.error(f"Models directory not found: {self.models_path}")
                 return
             
-            # Load inference simulation model (correct path)
-            inference_model_path = os.path.join(self.models_path, "Inference_simulation_latency.pkl")
-            if os.path.exists(inference_model_path):
-                with open(inference_model_path, 'rb') as f:
-                    self.loaded_models['inference_simulation'] = pickle.load(f)
+            # Load 3 separate inference simulation models (NEW APPROACH)
+            inference_latency_path = os.path.join(self.models_path, "Inference_simulation_latency.pkl")
+            if os.path.exists(inference_latency_path):
+                with open(inference_latency_path, 'rb') as f:
+                    self.loaded_models['inference_simulation_latency'] = pickle.load(f)
                 logger.info("Loaded inference simulation latency model")
+
+            inference_throughput_path = os.path.join(self.models_path, "Inference_simulation_throughput.pkl")
+            if os.path.exists(inference_throughput_path):
+                with open(inference_throughput_path, 'rb') as f:
+                    self.loaded_models['inference_simulation_throughput'] = pickle.load(f)
+                logger.info("Loaded inference simulation throughput model")
+
+            inference_requests_path = os.path.join(self.models_path, "Inference_simulation_requests.pkl")
+            if os.path.exists(inference_requests_path):
+                with open(inference_requests_path, 'rb') as f:
+                    self.loaded_models['inference_simulation_requests'] = pickle.load(f)
+                logger.info("Loaded inference simulation requests model")
             
             # Load training simulation model (correct path)
             training_model_path = os.path.join(self.models_path, "Training_simulation.pkl")
@@ -245,54 +257,100 @@ class ModelInferenceController:
         return features
     
     def _run_inference_simulation(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Run inference simulation using the loaded model - follows the sample workflow"""
+        """Run inference simulation using 3 separate PKL models for latency, throughput, and requests"""
         try:
-            if 'inference_simulation' not in self.loaded_models:
-                return {"error": "Inference simulation model not loaded"}
-            
+            # Check if all 3 inference models are loaded
+            required_models = ['inference_simulation_latency', 'inference_simulation_throughput', 'inference_simulation_requests']
+            for model_name in required_models:
+                if model_name not in self.loaded_models:
+                    return {"error": f"{model_name} model not loaded"}
+
             if 'simulation_inference_preprocessor' not in self.loaded_models:
                 return {"error": "Simulation inference preprocessor not loaded"}
-            
+
             # Convert input_data to DataFrame (it already contains model + hardware data combined)
             # This matches your sample: user_input_pre_df = pd.DataFrame(user_input_pre, index=[0])
             df = pd.DataFrame([input_data])
-            
+
             logger.info(f"Input dataframe shape: {df.shape}")
             logger.info(f"Input dataframe columns: {list(df.columns)}")
-            
+
+            # DEBUG: Log all field values to identify None values
+            logger.info("="*80)
+            logger.info("DEBUG: Checking for None/NaN values in input data:")
+            for col in df.columns:
+                value = df[col].iloc[0]
+                if pd.isna(value) or value is None:
+                    logger.error(f"  NONE/NaN FOUND -> {col}: {value}")
+                else:
+                    logger.info(f"  OK -> {col}: {value} (type: {type(value).__name__})")
+            logger.info("="*80)
+
             # Apply preprocessing pipeline (matches your sample: pipeline.transform(user_input_pre_df))
             try:
                 preprocessor = self.loaded_models['simulation_inference_preprocessor']
+
+                # Check if preprocessor has expected feature names
+                if hasattr(preprocessor, 'feature_names_in_'):
+                    expected_cols = set(preprocessor.feature_names_in_)
+                    provided_cols = set(df.columns)
+                    missing = expected_cols - provided_cols
+                    extra = provided_cols - expected_cols
+
+                    if missing:
+                        logger.error(f"MISSING COLUMNS: {missing}")
+                    if extra:
+                        logger.warning(f"EXTRA COLUMNS: {extra}")
+
                 processed_features = preprocessor.transform(df)
                 logger.info(f"Processed features shape: {processed_features.shape}")
             except Exception as prep_error:
                 logger.error(f"Simulation inference preprocessor failed: {prep_error}")
                 logger.error(f"Input data keys: {list(input_data.keys())}")
+                logger.error(f"Input data values: {input_data}")
                 return {"error": f"Simulation inference preprocessor failed: {str(prep_error)}"}
-            
-            # Make prediction with confidence intervals 
-            # This matches your sample: prediction_output, intervals = Model.predict(user_input_pre_transformed, alpha=0.20)
-            model = self.loaded_models['inference_simulation']
+
+            # Make predictions with 3 separate models (NEW APPROACH)
+            # Model 1: Latency prediction
             try:
-                prediction_output, intervals = model.predict(processed_features, alpha=0.20)
-                logger.info(f"Prediction output: {prediction_output}")
-                logger.info(f"Confidence intervals available: {intervals is not None}")
+                model_latency = self.loaded_models['inference_simulation_latency']
+                prediction_output_latency, intervals_latency = model_latency.predict(processed_features, alpha=0.20)
+                logger.info(f"Latency prediction output: {prediction_output_latency}")
             except Exception as pred_error:
-                logger.error(f"Model prediction failed: {pred_error}")
-                return {"error": f"Model prediction failed: {str(pred_error)}"}
-            
-            # Return raw predictions and intervals for further processing
-            # This matches your workflow where prediction_output and intervals are used in outputtable()
-            logger.info(f"Raw predictions type: {type(prediction_output)}")
-            logger.info(f"Raw predictions: {prediction_output}")
-            logger.info(f"Confidence intervals available: {intervals is not None}")
-            
+                logger.error(f"Latency model prediction failed: {pred_error}")
+                return {"error": f"Latency model prediction failed: {str(pred_error)}"}
+
+            # Model 2: Throughput prediction
+            try:
+                model_throughput = self.loaded_models['inference_simulation_throughput']
+                prediction_output_throughput, intervals_throughput = model_throughput.predict(processed_features, alpha=0.20)
+                logger.info(f"Throughput prediction output: {prediction_output_throughput}")
+            except Exception as pred_error:
+                logger.error(f"Throughput model prediction failed: {pred_error}")
+                return {"error": f"Throughput model prediction failed: {str(pred_error)}"}
+
+            # Model 3: Requests/sec prediction
+            try:
+                model_requests = self.loaded_models['inference_simulation_requests']
+                prediction_output_requests, intervals_requests = model_requests.predict(processed_features, alpha=0.20)
+                logger.info(f"Requests prediction output: {prediction_output_requests}")
+            except Exception as pred_error:
+                logger.error(f"Requests model prediction failed: {pred_error}")
+                return {"error": f"Requests model prediction failed: {str(pred_error)}"}
+
+            # Return all 3 predictions and their intervals for further processing
+            logger.info(f"All 3 predictions completed successfully")
+
             return {
-                "prediction_output": prediction_output.tolist() if hasattr(prediction_output, 'tolist') else prediction_output,
-                "intervals": intervals.tolist() if intervals is not None and hasattr(intervals, 'tolist') else intervals,
+                "prediction_output_latency": prediction_output_latency.tolist() if hasattr(prediction_output_latency, 'tolist') else prediction_output_latency,
+                "intervals_latency": intervals_latency.tolist() if intervals_latency is not None and hasattr(intervals_latency, 'tolist') else intervals_latency,
+                "prediction_output_throughput": prediction_output_throughput.tolist() if hasattr(prediction_output_throughput, 'tolist') else prediction_output_throughput,
+                "intervals_throughput": intervals_throughput.tolist() if intervals_throughput is not None and hasattr(intervals_throughput, 'tolist') else intervals_throughput,
+                "prediction_output_requests": prediction_output_requests.tolist() if hasattr(prediction_output_requests, 'tolist') else prediction_output_requests,
+                "intervals_requests": intervals_requests.tolist() if intervals_requests is not None and hasattr(intervals_requests, 'tolist') else intervals_requests,
                 "task_type": "inference"
             }
-            
+
         except Exception as e:
             logger.error(f"Error in inference simulation: {str(e)}")
             return {"error": f"Inference simulation failed: {str(e)}"}

@@ -731,24 +731,41 @@ const AdminDashboardNew = ({
 
     // Set up intervals for real-time updates (always latest, ignore date range)
     const realtimeInterval = setInterval(() => {
-      fetchHostMetrics(); // Real-time host metrics every 2 seconds
-    }, 2000);
+      if (document.visibilityState !== 'visible') return;
+      fetchHostMetrics(); // Real-time host metrics every 5 seconds
+    }, 5000);
 
-    const vmInterval = setInterval(fetchVMData, 10000);
+    const vmInterval = setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      fetchVMData();
+    }, 5000);
 
     // Remove hardware specs from regular intervals since it's static and cached
     // Only refresh hardware specs manually or on explicit user action
 
     // Periodic update for date-range dependent data (less frequent)
     const aggregatedInterval = setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
       fetchChartData();
       fetchTopProcesses();
-    }, 30000); // Update every 30 seconds
+    }, 5000); // Update every 5 seconds
+
+    // Resume polling when tab becomes visible
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchHostMetrics();
+        fetchVMData();
+        fetchChartData();
+        fetchTopProcesses();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       clearInterval(realtimeInterval);
       clearInterval(vmInterval);
       clearInterval(aggregatedInterval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
 

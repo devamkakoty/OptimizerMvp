@@ -27,14 +27,14 @@ export const useModelConfigAutoPopulate = (setters = {}) => {
   const hasPopulated = useRef(false); // Track if we've already populated fields
 
   useEffect(() => {
-    // Skip if we've already populated fields once
-    if (hasPopulated.current) {
-      return;
-    }
-
     // Only auto-populate if User Goals has been configured (at minimum, model name and task type)
     if (!config.modelName || !config.taskType) {
       console.log('[useModelConfigAutoPopulate] No User Goals configuration found. Skipping auto-populate.');
+      return;
+    }
+
+    // Skip if we've already populated fields once (ONLY check this AFTER confirming config is ready)
+    if (hasPopulated.current) {
       return;
     }
 

@@ -26,17 +26,21 @@ const SimulationResults = ({ results, title = "Simulation Results" }) => {
       URL.revokeObjectURL(url);
       
     } else if (format === 'csv') {
-      // Export as CSV
-      const headers = ['Hardware', 'Full Name', 'Latency (ms)', 'Throughput (QPS)', 'Cost per 1000', 'Memory (GB)'];
+      // Export as CSV with new metrics
+      const headers = ['Hardware', 'Full Name', 'Latency (ms)', 'Throughput (tokens/sec)', 'Requests/sec', 'Time to 1st Token (ms)', 'Concurrent Users', 'Cost per 1000', 'Memory (GB)', 'Status'];
       const csvContent = [
         headers.join(','),
         ...hardwareComparison.map(hw => [
           hw.name,
           hw.fullName || 'N/A',
           hw.latency.replace(' ms', ''),
-          hw.throughput.replace(' QPS', ''),
+          (hw.throughput || 'N/A').replace(' tokens/sec', ''),
+          (hw.requestsPerSec || 'N/A').replace(' req/sec', ''),
+          (hw.ttft || 'N/A').replace(' ms', ''),
+          hw.concurrentUsers || 'N/A',
           hw.costPer1000,
-          hw.memory.replace(' GB', '')
+          hw.memory.replace(' GB', ''),
+          hw.status && hw.status.includes('wont run') ? 'Incompatible' : 'Compatible'
         ].join(','))
       ].join('\n');
       
@@ -54,14 +58,14 @@ const SimulationResults = ({ results, title = "Simulation Results" }) => {
       // Export as HTML Report
       const timestamp = new Date().toLocaleString();
       const filename = `Simulation_Report_${new Date().toISOString().slice(0, 10)}.html`;
-      
+
       const htmlContent = `
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HPE Simulation Report</title>
+    <title>HPE GreenMatrix Simulation Report</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -69,43 +73,67 @@ const SimulationResults = ({ results, title = "Simulation Results" }) => {
             margin: 0 auto;
             padding: 40px 20px;
             line-height: 1.6;
-            color: #333;
-            background: #f8f9fa;
+            color: #1f2937;
+            background: #f3f4f6;
         }
         .header {
             text-align: center;
             margin-bottom: 40px;
             padding: 30px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #4b5563 0%, #374151 100%);
             color: white;
-            border-radius: 12px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.15);
         }
         .header h1 {
             margin: 0 0 10px 0;
             font-size: 2.5em;
-            font-weight: 700;
+            font-weight: 600;
         }
         .header p {
             margin: 5px 0;
             opacity: 0.9;
-            font-size: 1.1em;
+            font-size: 1.05em;
         }
         .section {
             background: white;
-            border-radius: 12px;
+            border-radius: 8px;
             padding: 30px;
-            margin-bottom: 30px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-            border: 1px solid #e1e5e9;
+            margin-bottom: 25px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            border: 1px solid #e5e7eb;
         }
         .section h2 {
-            color: #6366f1;
+            color: #374151;
             margin-top: 0;
-            margin-bottom: 25px;
-            font-size: 1.8em;
-            border-bottom: 3px solid #6366f1;
+            margin-bottom: 20px;
+            font-size: 1.6em;
+            border-bottom: 2px solid #9ca3af;
             padding-bottom: 10px;
+            font-weight: 600;
+        }
+        .input-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .input-item {
+            padding: 12px;
+            background: #f9fafb;
+            border-radius: 6px;
+            border: 1px solid #e5e7eb;
+        }
+        .input-label {
+            font-size: 0.85em;
+            color: #6b7280;
+            margin-bottom: 4px;
+            font-weight: 500;
+        }
+        .input-value {
+            font-size: 1.05em;
+            color: #111827;
+            font-weight: 600;
         }
         .hardware-grid {
             display: grid;
@@ -114,11 +142,11 @@ const SimulationResults = ({ results, title = "Simulation Results" }) => {
             margin-top: 20px;
         }
         .hardware-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
             color: white;
             padding: 25px;
-            border-radius: 12px;
-            box-shadow: 0 6px 25px rgba(102, 126, 234, 0.25);
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         }
         .hardware-card h3 {
             margin: 0 0 5px 0;
@@ -169,7 +197,7 @@ const SimulationResults = ({ results, title = "Simulation Results" }) => {
             box-shadow: 0 2px 10px rgba(0,0,0,0.05);
         }
         .comparison-table th {
-            background: #6366f1;
+            background: #4b5563;
             color: white;
             padding: 15px 12px;
             text-align: left;
@@ -181,7 +209,7 @@ const SimulationResults = ({ results, title = "Simulation Results" }) => {
             border-bottom: 1px solid #e5e7eb;
         }
         .comparison-table tr:hover {
-            background: #f8f9fa;
+            background: #f9fafb;
         }
         .footer {
             text-align: center;
@@ -189,6 +217,7 @@ const SimulationResults = ({ results, title = "Simulation Results" }) => {
             padding: 20px;
             color: #6b7280;
             font-size: 0.9em;
+            border-top: 2px solid #e5e7eb;
         }
         @media print {
             body { background: white; }
@@ -198,13 +227,63 @@ const SimulationResults = ({ results, title = "Simulation Results" }) => {
 </head>
 <body>
     <div class="header">
-        <h1>🚀 HPE Simulation Report</h1>
+        <h1>HPE GreenMatrix Simulation Report</h1>
         <p>Hardware Performance Comparison Analysis</p>
         <p>Generated on: ${timestamp}</p>
     </div>
 
     <div class="section">
-        <h2>📊 Hardware Performance Cards</h2>
+        <h2>Model Configuration</h2>
+        <div class="input-grid">
+            <div class="input-item">
+                <div class="input-label">Model Name</div>
+                <div class="input-value">${results.hardwareComparison?.[0]?.modelName || results.modelName || 'N/A'}</div>
+            </div>
+            <div class="input-item">
+                <div class="input-label">Task Type</div>
+                <div class="input-value">${results.taskType || 'N/A'}</div>
+            </div>
+            <div class="input-item">
+                <div class="input-label">Framework</div>
+                <div class="input-value">${results.framework || 'N/A'}</div>
+            </div>
+            <div class="input-item">
+                <div class="input-label">Total Parameters (Millions)</div>
+                <div class="input-value">${results.parameters || 'N/A'}</div>
+            </div>
+            <div class="input-item">
+                <div class="input-label">Model Size (MB)</div>
+                <div class="input-value">${results.modelSize || 'N/A'}</div>
+            </div>
+            <div class="input-item">
+                <div class="input-label">Precision</div>
+                <div class="input-value">${results.precision || 'N/A'}</div>
+            </div>
+            ${results.inputSize ? `
+            <div class="input-item">
+                <div class="input-label">Input Size (tokens)</div>
+                <div class="input-value">${results.inputSize}</div>
+            </div>` : ''}
+            ${results.outputSize ? `
+            <div class="input-item">
+                <div class="input-label">Output Size (tokens)</div>
+                <div class="input-value">${results.outputSize}</div>
+            </div>` : ''}
+            ${results.batchSize ? `
+            <div class="input-item">
+                <div class="input-label">Batch Size</div>
+                <div class="input-value">${results.batchSize}</div>
+            </div>` : ''}
+            ${results.scenario ? `
+            <div class="input-item">
+                <div class="input-label">Deployment Scenario</div>
+                <div class="input-value">${results.scenario}</div>
+            </div>` : ''}
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Hardware Performance Cards</h2>
         <div class="hardware-grid">
             ${hardwareComparison.map(hw => `
                 <div class="hardware-card">
@@ -212,29 +291,45 @@ const SimulationResults = ({ results, title = "Simulation Results" }) => {
                     <div class="subtitle">${hw.fullName || 'N/A'}</div>
                     <div class="metrics-grid">
                         <div class="metric">
-                            <div class="metric-label">🕐 Latency</div>
+                            <div class="metric-label">Latency</div>
                             <div class="metric-value">${hw.latency}</div>
                         </div>
                         <div class="metric">
-                            <div class="metric-label">✅ Status</div>
-                            <div class="metric-value" style="color: ${hw.status && hw.status.includes('wont run') ? '#ef4444' : '#10b981'};">${hw.status && hw.status.includes('wont run') ? 'Incompatible' : 'Compatible'}</div>
+                            <div class="metric-label">Throughput</div>
+                            <div class="metric-value">${hw.throughput || 'N/A'}</div>
                         </div>
                         <div class="metric">
-                            <div class="metric-label">💰 Cost per 1000</div>
+                            <div class="metric-label">Requests/sec</div>
+                            <div class="metric-value">${hw.requestsPerSec || 'N/A'}</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">Time to 1st Token</div>
+                            <div class="metric-value">${hw.ttft || 'N/A'}</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">Concurrent Users</div>
+                            <div class="metric-value">${hw.concurrentUsers || 'N/A'}</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">Cost per 1000</div>
                             <div class="metric-value" style="color: #10b981;">${hw.costPer1000}</div>
                         </div>
                         <div class="metric">
-                            <div class="metric-label">🧠 RAM</div>
-                            <div class="metric-value" style="color: #a78bfa;">${hw.memory}</div>
+                            <div class="metric-label">RAM</div>
+                            <div class="metric-value" style="color: #d1d5db;">${hw.memory}</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">Status</div>
+                            <div class="metric-value" style="color: ${hw.status && hw.status.includes('wont run') ? '#ef4444' : '#10b981'};">${hw.status && hw.status.includes('wont run') ? 'Incompatible' : 'Compatible'}</div>
                         </div>
                     </div>
                     ${hw.additionalInfo ? `
                         <div class="additional-info">
                             <div class="info-grid">
-                                ${hw.additionalInfo.arch ? `<div>🏗 Arch: ${hw.additionalInfo.arch}</div>` : ''}
-                                ${hw.additionalInfo.memory ? `<div>📊 Memory: ${hw.additionalInfo.memory}</div>` : ''}
-                                ${hw.additionalInfo.flops ? `<div>⚡ FP16: ${hw.additionalInfo.flops}</div>` : ''}
-                                ${hw.additionalInfo.power ? `<div>🔋 Power: ${hw.additionalInfo.power}</div>` : ''}
+                                ${hw.additionalInfo.arch ? `<div>Architecture: ${hw.additionalInfo.arch}</div>` : ''}
+                                ${hw.additionalInfo.memory ? `<div>Memory: ${hw.additionalInfo.memory}</div>` : ''}
+                                ${hw.additionalInfo.flops ? `<div>FP16 TFLOPS: ${hw.additionalInfo.flops}</div>` : ''}
+                                ${hw.additionalInfo.power ? `<div>Power: ${hw.additionalInfo.power}</div>` : ''}
                             </div>
                         </div>
                     ` : ''}
@@ -244,15 +339,18 @@ const SimulationResults = ({ results, title = "Simulation Results" }) => {
     </div>
 
     <div class="section">
-        <h2>📋 Detailed Comparison Table</h2>
+        <h2>Detailed Comparison Table</h2>
         <table class="comparison-table">
             <thead>
                 <tr>
                     <th>Hardware</th>
                     <th>Full Name</th>
                     <th>Latency (ms)</th>
+                    <th>Throughput (tokens/sec)</th>
+                    <th>Requests/sec</th>
+                    <th>Time to 1st Token (ms)</th>
+                    <th>Concurrent Users</th>
                     <th>Cost per 1000</th>
-                    <th>Recommended RAM (GB)</th>
                     <th>Status</th>
                 </tr>
             </thead>
@@ -262,8 +360,11 @@ const SimulationResults = ({ results, title = "Simulation Results" }) => {
                         <td><strong>${hw.name}</strong></td>
                         <td>${hw.fullName || 'N/A'}</td>
                         <td>${hw.latency}</td>
+                        <td>${hw.throughput || 'N/A'}</td>
+                        <td>${hw.requestsPerSec || 'N/A'}</td>
+                        <td>${hw.ttft || 'N/A'}</td>
+                        <td>${hw.concurrentUsers || 'N/A'}</td>
                         <td style="color: #10b981; font-weight: 600;">${hw.costPer1000}</td>
-                        <td>${hw.memory}</td>
                         <td style="color: ${hw.status && hw.status.includes('wont run') ? '#ef4444' : '#10b981'}; font-weight: 600;">${hw.status && hw.status.includes('wont run') ? 'Incompatible' : 'Compatible'}</td>
                     </tr>
                 `).join('')}
@@ -272,8 +373,8 @@ const SimulationResults = ({ results, title = "Simulation Results" }) => {
     </div>
 
     <div class="footer">
-        <p>📄 This report was generated automatically by the HPE Simulation Dashboard</p>
-        <p>💡 For more details, visit the HPE Analytics Platform</p>
+        <p>This report was generated automatically by the HPE GreenMatrix Dashboard</p>
+        <p>For more details and analysis, visit the HPE GreenMatrix Platform</p>
     </div>
 </body>
 </html>`;
@@ -315,7 +416,47 @@ const SimulationResults = ({ results, title = "Simulation Results" }) => {
             </div>
             <p className="text-lg font-semibold">{hardware.latency}</p>
           </div>
-          
+
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-4 h-4 border border-white rounded-full flex items-center justify-center">
+                <div className="w-2 h-2 bg-white rounded-full"></div>
+              </div>
+              <span className="text-sm text-gray-600 dark:text-gray-300">Throughput</span>
+            </div>
+            <p className="text-lg font-semibold">{hardware.throughput || 'N/A'}</p>
+          </div>
+
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-4 h-4 border border-white rounded-full flex items-center justify-center">
+                <div className="w-2 h-2 bg-white rounded-full"></div>
+              </div>
+              <span className="text-sm text-gray-600 dark:text-gray-300">Requests/sec</span>
+            </div>
+            <p className="text-lg font-semibold">{hardware.requestsPerSec || 'N/A'}</p>
+          </div>
+
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-4 h-4 border border-white rounded-full flex items-center justify-center">
+                <div className="w-2 h-2 bg-white rounded-full"></div>
+              </div>
+              <span className="text-sm text-gray-600 dark:text-gray-300">Time to 1st Token</span>
+            </div>
+            <p className="text-lg font-semibold">{hardware.ttft || 'N/A'}</p>
+          </div>
+
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-4 h-4 border border-white rounded-full flex items-center justify-center">
+                <div className="w-2 h-2 bg-white rounded-full"></div>
+              </div>
+              <span className="text-sm text-gray-600 dark:text-gray-300">Concurrent Users</span>
+            </div>
+            <p className="text-lg font-semibold">{hardware.concurrentUsers || 'N/A'}</p>
+          </div>
+
           <div>
             <div className="flex items-center gap-2 mb-2">
               <span className="text-gray-900 dark:text-white text-lg">$</span>
@@ -323,7 +464,7 @@ const SimulationResults = ({ results, title = "Simulation Results" }) => {
             </div>
             <p className="text-lg font-semibold text-gray-900 dark:text-white">{hardware.costPer1000}</p>
           </div>
-          
+
           <div>
             <div className="flex items-center gap-2 mb-2">
               <div className="w-4 h-4 border border-white rounded flex items-center justify-center">
@@ -333,7 +474,7 @@ const SimulationResults = ({ results, title = "Simulation Results" }) => {
             </div>
             <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">{hardware.memory}</p>
           </div>
-          
+
           <div>
             <div className="flex items-center gap-2 mb-2">
               <div className={`w-4 h-4 border border-white rounded flex items-center justify-center`}>
@@ -518,17 +659,23 @@ const SimulationResults = ({ results, title = "Simulation Results" }) => {
                   <th className="border border-gray-200 dark:border-gray-600 px-4 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-200">
                     Hardware
                   </th>
-                  <th className="border border-gray-200 dark:border-gray-600 px-4 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-200">
-                    Full Name
-                  </th>
                   <th className="border border-gray-200 dark:border-gray-600 px-4 py-3 text-center text-sm font-medium text-gray-700 dark:text-gray-200">
                     Latency<br />(ms)
                   </th>
                   <th className="border border-gray-200 dark:border-gray-600 px-4 py-3 text-center text-sm font-medium text-gray-700 dark:text-gray-200">
-                    Cost per<br />1000
+                    Throughput<br />(tokens/sec)
                   </th>
                   <th className="border border-gray-200 dark:border-gray-600 px-4 py-3 text-center text-sm font-medium text-gray-700 dark:text-gray-200">
-                    Recommended<br />RAM (GB)
+                    Requests<br />/sec
+                  </th>
+                  <th className="border border-gray-200 dark:border-gray-600 px-4 py-3 text-center text-sm font-medium text-gray-700 dark:text-gray-200">
+                    Time to 1st Token<br />(ms)
+                  </th>
+                  <th className="border border-gray-200 dark:border-gray-600 px-4 py-3 text-center text-sm font-medium text-gray-700 dark:text-gray-200">
+                    Concurrent<br />Users
+                  </th>
+                  <th className="border border-gray-200 dark:border-gray-600 px-4 py-3 text-center text-sm font-medium text-gray-700 dark:text-gray-200">
+                    Cost per<br />1000
                   </th>
                   <th className="border border-gray-200 dark:border-gray-600 px-4 py-3 text-center text-sm font-medium text-gray-700 dark:text-gray-200">
                     Status
@@ -537,29 +684,35 @@ const SimulationResults = ({ results, title = "Simulation Results" }) => {
               </thead>
               <tbody>
                 {hardwareComparison.map((hardware, index) => (
-                  <tr 
-                    key={index} 
+                  <tr
+                    key={index}
                     className="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
                     onClick={() => setSelectedHardware(hardware)}
                   >
                     <td className="border border-gray-200 dark:border-gray-600 px-4 py-3 font-medium text-gray-900 dark:text-white">
                       {hardware.name ? hardware.name.replace(/^Config \d+: /, '') : 'Unknown Hardware'}
                     </td>
-                    <td className="border border-gray-200 dark:border-gray-600 px-4 py-3 text-gray-600 dark:text-gray-300">
-                      {hardware.fullName}
-                    </td>
                     <td className="border border-gray-200 dark:border-gray-600 px-4 py-3 text-center text-gray-900 dark:text-white">
                       {hardware.latency}
+                    </td>
+                    <td className="border border-gray-200 dark:border-gray-600 px-4 py-3 text-center text-gray-900 dark:text-white">
+                      {hardware.throughput || 'N/A'}
+                    </td>
+                    <td className="border border-gray-200 dark:border-gray-600 px-4 py-3 text-center text-gray-900 dark:text-white">
+                      {hardware.requestsPerSec || 'N/A'}
+                    </td>
+                    <td className="border border-gray-200 dark:border-gray-600 px-4 py-3 text-center text-gray-900 dark:text-white">
+                      {hardware.ttft || 'N/A'}
+                    </td>
+                    <td className="border border-gray-200 dark:border-gray-600 px-4 py-3 text-center text-gray-900 dark:text-white">
+                      {hardware.concurrentUsers || 'N/A'}
                     </td>
                     <td className="border border-gray-200 dark:border-gray-600 px-4 py-3 text-center text-gray-900 dark:text-white font-medium">
                       {hardware.costPer1000}
                     </td>
-                    <td className="border border-gray-200 dark:border-gray-600 px-4 py-3 text-center text-gray-900 dark:text-white font-medium">
-                      {hardware.memory}
-                    </td>
                     <td className={`border border-gray-200 dark:border-gray-600 px-4 py-3 text-center font-medium ${
-                      hardware.status && hardware.status.includes('wont run') 
-                        ? 'text-gray-700 dark:text-gray-300' 
+                      hardware.status && hardware.status.includes('wont run')
+                        ? 'text-gray-700 dark:text-gray-300'
                         : 'text-gray-900 dark:text-white'
                     }`}>
                       {hardware.status && hardware.status.includes('wont run') ? 'Incompatible' : 'Compatible'}

@@ -272,11 +272,28 @@ const ProcessDetailsPage = () => {
 
   // Set up real-time updates
   useEffect(() => {
+    // Wrap fetchProcessData to check visibility
+    const fetchWithVisibilityCheck = () => {
+      if (document.visibilityState !== 'visible') return;
+      fetchProcessData();
+    };
+
     fetchCostModels();
     fetchProcessData();
-    const interval = setInterval(fetchProcessData, 2000); // Update every 2 seconds
+    const interval = setInterval(fetchWithVisibilityCheck, 5000); // Update every 5 seconds
 
-    return () => clearInterval(interval);
+    // Resume polling when tab becomes visible
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchProcessData();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   // Refetch data when region changes

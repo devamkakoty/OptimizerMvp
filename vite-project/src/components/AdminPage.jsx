@@ -146,6 +146,9 @@ const AdminPage = () => {
   // Fetch data on component mount and set up auto-refresh
   useEffect(() => {
     const loadData = async (dateFilters = {}, isInitialLoad = false) => {
+      // Skip fetch if tab is hidden
+      if (document.visibilityState !== 'visible') return;
+
       const filters = { limit: 1000, ...dateFilters };
       const response = await fetchHostMetrics(filters, isInitialLoad);
       if (response) {
@@ -157,11 +160,22 @@ const AdminPage = () => {
     // Load data immediately (initial load)
     loadData({}, true);
 
-    // Set up auto-refresh every 2 seconds for real-time monitoring
-    const interval = setInterval(loadData, 2000);
+    // Set up auto-refresh every 5 seconds for real-time monitoring
+    const interval = setInterval(loadData, 5000);
 
-    // Cleanup interval on component unmount
-    return () => clearInterval(interval);
+    // Resume polling when tab becomes visible
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadData();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Cleanup interval and event listener on component unmount
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   const [selectedDate, setSelectedDate] = useState('today');

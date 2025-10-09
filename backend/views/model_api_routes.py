@@ -35,20 +35,32 @@ class SimulationRequest(BaseModel):
     Scenario: Optional[str] = None
     Total_Parameters_Millions: float
     Model_Size_MB: float
-    Architecture_type: str
-    Model_Type: str
-    Embedding_Vector_Dimension: int
+    # Architecture_type and Model_Type are now OPTIONAL (removed from PKL inputs)
+    Architecture_type: Optional[str] = None
+    Model_Type: Optional[str] = None
+    # Embedding_Vector_Dimension and FFN_Dimension are OPTIONAL (not needed by preprocessor)
+    Embedding_Vector_Dimension: Optional[int] = None
     Precision: str
     Vocabulary_Size: int
-    FFN_Dimension: int
+    FFN_Dimension: Optional[int] = None
     Activation_Function: str
     Number_of_hidden_Layers: Optional[int] = None
     Number_of_Attention_Layers: Optional[int] = None
     GFLOPs_Billions: Optional[float] = None
-    # Training-specific fields
-    Batch_Size: Optional[int] = None
+    # Inference-specific fields (NEW - required for Inference task type)
     Input_Size: Optional[int] = None
+    Output_Size: Optional[int] = None
+    Batch_Size: Optional[int] = None
+    # Training-specific fields
     Full_Training: Optional[int] = None
+    # User Goals / Constraints (OPTIONAL - for filtering recommendations)
+    Target_Latency: Optional[float] = None  # in ms
+    Target_Throughput: Optional[float] = None  # in tokens/sec
+    Target_Concurrent_Users: Optional[float] = None
+    Target_Requests_Per_Second: Optional[float] = None  # requests/sec
+    Target_Cost: Optional[float] = None  # cost per 1000 inferences
+    Target_TTFT: Optional[float] = None  # in ms
+    Number_Of_GPUs: Optional[int] = None  # user's desired number of GPUs
 
 class PostDeploymentRequest(BaseModel):
     # Model characteristics - exact field names as required by pickle model
@@ -474,7 +486,16 @@ async def simulate_performance(
         'Number of Attention Layers': request.Number_of_Attention_Layers,
         'GFLOPs (Billions)': flops_value
     }
-    
+
+    # Add Inference-specific fields if provided
+    if request.Task_Type == 'Inference':
+        if request.Input_Size is not None:
+            user_input['Input_Size'] = request.Input_Size
+        if request.Output_Size is not None:
+            user_input['Output_Size'] = request.Output_Size
+        if request.Batch_Size is not None:
+            user_input['Batch_Size'] = request.Batch_Size
+
     # Add Training-specific fields if provided
     if request.Task_Type == 'Training':
         if request.Batch_Size is not None:
@@ -498,13 +519,14 @@ async def recommend_hardware(
     db: Session = Depends(get_db)
 ):
     """Get top N hardware recommendations for a model (default: top 3)
-    
-    This is a convenience endpoint that calls simulate-performance with result limiting.
-    Used by the Recommend Hardware tab for pre-deployment recommendations.
+
+    NEW: Now supports user goals/constraints filtering with GPU scaling (1-4 GPUs).
+    If user constraints are provided, returns top 3 configs that meet all constraints.
+    If no constraints provided, returns top 3 by default sorting (cost).
     """
     # Use GFLOPs_Billions value
     flops_value = request.GFLOPs_Billions
-    
+
     # Convert Pydantic model to dict for the controller
     user_input = {
         'Model': request.Model,
@@ -524,7 +546,16 @@ async def recommend_hardware(
         'Number of Attention Layers': request.Number_of_Attention_Layers,
         'GFLOPs (Billions)': flops_value
     }
-    
+
+    # Add Inference-specific fields if provided
+    if request.Task_Type == 'Inference':
+        if request.Input_Size is not None:
+            user_input['Input_Size'] = request.Input_Size
+        if request.Output_Size is not None:
+            user_input['Output_Size'] = request.Output_Size
+        if request.Batch_Size is not None:
+            user_input['Batch_Size'] = request.Batch_Size
+
     # Add Training-specific fields if provided
     if request.Task_Type == 'Training':
         if request.Batch_Size is not None:
@@ -533,14 +564,38 @@ async def recommend_hardware(
             user_input['Input Size'] = request.Input_Size
         if request.Full_Training is not None:
             user_input['Full Training'] = request.Full_Training
-    
-    # Call simulation with result limiting for recommendations
-    result = model_controller.simulate_performance(db, user_input, limit_results=top_n)
-    
+
+    # NEW: Extract user constraints (goals) from request
+    user_constraints = {
+        'Target_Latency': request.Target_Latency,
+        'Target_Throughput': request.Target_Throughput,
+        'Target_Concurrent_Users': request.Target_Concurrent_Users,
+        'Target_Requests_Per_Second': request.Target_Requests_Per_Second,
+        'Target_Cost': request.Target_Cost,
+        'Target_TTFT': request.Target_TTFT,
+        'Number_Of_GPUs': request.Number_Of_GPUs
+    }
+
+    # Call simulation WITHOUT result limiting (get all results first)
+    result = model_controller.simulate_performance(db, user_input, limit_results=None)
+
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
-    
-    return result
+
+    # NEW: Apply user constraints and get top 3 recommendations
+    import pandas as pd
+    performance_results_df = pd.DataFrame(result['performance_results'])
+
+    # Apply constraints and get top 3
+    filtered_result = model_controller.apply_user_constraints_and_get_top_3(
+        performance_results_df,
+        user_constraints
+    )
+
+    if "error" in filtered_result:
+        raise HTTPException(status_code=400, detail=filtered_result["error"])
+
+    return filtered_result
 
 # Model inference endpoints
 @app.post("/api/model/inference", response_model=Dict[str, Any])
@@ -1005,13 +1060,13 @@ async def post_deployment_optimization(
 
 # Host Process Metrics endpoints
 @app.post("/api/host-process-metrics/push")
-def push_host_process_metrics(host_process_metrics: HostProcessMetricsRequest, db: Session = Depends(get_metrics_db)):
-    """Push host process metrics data to database"""
+def push_host_process_metrics(host_process_metrics: HostProcessMetricsRequest, db: Session = Depends(get_timescaledb)):
+    """Push host process metrics data to database (TimescaleDB for time-series optimization)"""
     return host_process_metrics_controller.push_host_process_metrics(db, host_process_metrics.dict())
 
 @app.post("/api/host-process-metrics/push-batch")
-def push_host_process_metrics_batch(host_process_metrics_batch: HostProcessMetricsBatchRequest, db: Session = Depends(get_metrics_db)):
-    """Push a batch of host process metrics data to database"""
+def push_host_process_metrics_batch(host_process_metrics_batch: HostProcessMetricsBatchRequest, db: Session = Depends(get_timescaledb)):
+    """Push a batch of host process metrics data to database (TimescaleDB)"""
     host_process_metrics_list = [metrics.dict() for metrics in host_process_metrics_batch.host_process_metrics]
     return host_process_metrics_controller.push_host_process_metrics_batch(db, host_process_metrics_list)
 
@@ -1027,26 +1082,29 @@ def get_host_process_metrics(
     end_date: Optional[str] = None,
     start_time_str: Optional[str] = None,
     end_time_str: Optional[str] = None,
-    limit: int = 1000,
-    db: Session = Depends(get_metrics_db)
+    limit: int = 100,
+    db: Session = Depends(get_timescaledb)
 ):
     """Get host process metrics data with optional filters, time-based filtering, and date range filtering"""
+    # Enforce maximum limit to prevent database overload
+    limit = min(limit, 500)
+
     # Parse datetime strings
     start_dt = None
     end_dt = None
-    
+
     if start_time:
         try:
             start_dt = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
         except ValueError:
             return {"error": "Invalid start_time format. Use ISO format (YYYY-MM-DDTHH:MM:SS)"}
-    
+
     if end_time:
         try:
             end_dt = datetime.fromisoformat(end_time.replace('Z', '+00:00'))
         except ValueError:
             return {"error": "Invalid end_time format. Use ISO format (YYYY-MM-DDTHH:MM:SS)"}
-    
+
     return host_process_metrics_controller.get_host_process_metrics(
         db, process_name=process_name, process_id=process_id, username=username,
         start_time=start_dt, end_time=end_dt, time_filter=time_filter,
@@ -1064,7 +1122,7 @@ def get_host_process_metrics_summary(
     end_date: Optional[str] = None,
     start_time_str: Optional[str] = None,
     end_time_str: Optional[str] = None,
-    db: Session = Depends(get_metrics_db)
+    db: Session = Depends(get_timescaledb)
 ):
     """Get summary statistics for host process metrics with time-based filtering and date range filtering"""
     # Parse datetime strings
@@ -1092,9 +1150,9 @@ def get_host_process_metrics_summary(
 @app.get("/api/host-process-metrics/available-dates")
 def get_host_process_metrics_available_dates(
     days_back: int = 30,
-    db: Session = Depends(get_metrics_db)
+    db: Session = Depends(get_timescaledb)
 ):
-    """Get dates that have data entries in the host process metrics table"""
+    """Get dates that have data entries in the host process metrics table (TimescaleDB)"""
     return host_process_metrics_controller.get_available_dates(db, days_back=days_back)
 
 # Time-filtered aggregated endpoints
@@ -1202,8 +1260,8 @@ def get_latest_hardware_specs(
 
 # Metrics Snapshot endpoint for collect_all_metrics.py
 @app.post("/api/metrics/snapshot")
-def push_metrics_snapshot(snapshot: MetricsSnapshotRequest, db: Session = Depends(get_metrics_db)):
-    """Push comprehensive metrics snapshot data to appropriate tables"""
+def push_metrics_snapshot(snapshot: MetricsSnapshotRequest, db: Session = Depends(get_timescaledb)):
+    """Push comprehensive metrics snapshot data to TimescaleDB (optimized for time-series)"""
     try:
         # Push overall host metrics to host_overall_metrics table  
         overall_metrics_data = {
@@ -2062,10 +2120,13 @@ def get_host_overall_metrics(
     end_date: Optional[str] = None,
     start_time_str: Optional[str] = None,
     end_time_str: Optional[str] = None,
-    limit: int = 1000,
-    db: Session = Depends(get_metrics_db)
+    limit: int = 100,
+    db: Session = Depends(get_timescaledb)
 ):
     """Get host overall metrics data with optional filters, time-based filtering, and date range filtering"""
+    # Enforce maximum limit to prevent database overload
+    limit = min(limit, 500)
+
     # Parse datetime strings
     start_dt = None
     end_dt = None
@@ -2098,9 +2159,9 @@ async def get_dashboard_top_processes(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     region: Optional[str] = None,
-    db: Session = Depends(get_metrics_db)
+    db: Session = Depends(get_timescaledb)
 ):
-    """Get top N processes by specified metric (cpu, memory, gpu, power)"""
+    """Get top N processes by specified metric from TimescaleDB (cpu, memory, gpu, power)"""
     result = dashboard_controller.get_top_processes(db, metric, limit, start_date, end_date, region)
     
     if not result['success']:

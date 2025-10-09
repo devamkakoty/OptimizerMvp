@@ -178,14 +178,31 @@ const PerformanceTab = () => {
   };
 
   useEffect(() => {
+    // Wrap fetchSystemMetrics to check visibility
+    const fetchWithVisibilityCheck = () => {
+      if (document.visibilityState !== 'visible') return;
+      fetchSystemMetrics();
+    };
+
     // Initial load
     fetchSystemMetrics();
     fetchHardwareSpecs();
 
-    // Update system metrics every 2 seconds for real-time graphs (matches AdminDashboard)
-    const interval = setInterval(fetchSystemMetrics, 2000);
+    // Update system metrics every 5 seconds for real-time graphs (matches AdminDashboard)
+    const interval = setInterval(fetchWithVisibilityCheck, 5000);
 
-    return () => clearInterval(interval);
+    // Resume polling when tab becomes visible
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchSystemMetrics();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   const createChartOptions = (title, color, maxValue = 100) => ({
