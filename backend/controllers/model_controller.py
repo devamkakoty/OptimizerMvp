@@ -82,9 +82,9 @@ class ModelController:
             else:  # training
                 model_data = {
                     'Model': user_input.get('Model'),
-                    'Batch Size': user_input.get('Batch Size'),
-                    'Input Size': user_input.get('Input Size'),
-                    'IsFullTraining': user_input.get('Full Training', 0),
+                    'Batch Size': user_input.get('Batch_Size') or user_input.get('Batch Size'),
+                    'Input Size': user_input.get('Input_Size') or user_input.get('Input Size'),
+                    'Output Size': user_input.get('Output_Size') or user_input.get('Output Size'),  # REQUIRED!
                     'Framework': user_input.get('Framework'),
                     'Task Type': 'Training',
                     'Total Parameters (Millions)': user_input.get('Total Parameters (Millions)'),
@@ -96,14 +96,20 @@ class ModelController:
                     'Activation Function': user_input.get('Activation Function'),
                     'GFLOPs (Billions)': user_input.get('GFLOPs (Billions)') or user_input.get('FLOPs'),
                     'Number of hidden Layers': user_input.get('Number of hidden Layers'),
-                    'Number of Attention Layers': user_input.get('Number of Attention Layers')
+                    'Number of Attention Layers': user_input.get('Number of Attention Layers'),
+                    # CRITICAL: Training-specific fields required by preprocessor
+                    'Trainig Method': user_input.get('Training_Method') or user_input.get('Training Method'),  # Note typo in preprocessor!
+                    'Optimizer': user_input.get('Optimizer'),
+                    'Learning Rate': user_input.get('Learning_Rate') or user_input.get('Learning Rate'),
+                    'Num of Epochs': user_input.get('Num_of_Epochs') or user_input.get('Num of Epochs'),
+                    'Dataset Size': user_input.get('Dataset_Size') or user_input.get('Dataset Size')
                 }
             
             # Use model data - hardware data will be combined in outputtable function
             combined_features = model_data
             
             # Get available hardware configurations first
-            from controllers.simulation_output_formatter import outputtable, get_available_hardware
+            from controllers.simulation_output_formatter import outputtable, outputtable_training, get_available_hardware
             available_HW = get_available_hardware(db)
             
             if available_HW.empty:
@@ -210,27 +216,39 @@ class ModelController:
                         all_intervals_requests.append([[0], [100]])
 
                 else:
-                    # Training: single model
-                    prediction_output = results.get("prediction_output")
-                    intervals = results.get("intervals")
+                    # Training: 2 separate models (latency and throughput)
+                    prediction_output_latency = results.get("prediction_output_latency")
+                    intervals_latency = results.get("intervals_latency")
+                    prediction_output_throughput = results.get("prediction_output_throughput")
+                    intervals_throughput = results.get("intervals_throughput")
 
-                    if not prediction_output:
+                    if not prediction_output_latency or not prediction_output_throughput:
                         return {"error": f"Invalid prediction output for hardware config {index + 1}"}
 
                     # Add to collections
-                    if isinstance(prediction_output, list):
-                        all_predictions.extend(prediction_output)
+                    if isinstance(prediction_output_latency, list):
+                        all_predictions_latency.extend(prediction_output_latency)
+                        all_predictions_throughput.extend(prediction_output_throughput)
                     else:
-                        all_predictions.append(prediction_output)
+                        all_predictions_latency.append(prediction_output_latency)
+                        all_predictions_throughput.append(prediction_output_throughput)
 
-                    if intervals:
-                        if isinstance(intervals, list):
-                            all_intervals.extend(intervals)
+                    # Add intervals
+                    if intervals_latency:
+                        if isinstance(intervals_latency, list) and len(intervals_latency) > 0 and isinstance(intervals_latency[0], list):
+                            all_intervals_latency.extend(intervals_latency)
                         else:
-                            all_intervals.append(intervals)
+                            all_intervals_latency.append(intervals_latency)
                     else:
-                        # Default interval if not available
-                        all_intervals.append([[0], [100]])
+                        all_intervals_latency.append([[0], [100]])
+
+                    if intervals_throughput:
+                        if isinstance(intervals_throughput, list) and len(intervals_throughput) > 0 and isinstance(intervals_throughput[0], list):
+                            all_intervals_throughput.extend(intervals_throughput)
+                        else:
+                            all_intervals_throughput.append(intervals_throughput)
+                    else:
+                        all_intervals_throughput.append([[0], [100]])
 
             # Format the results using the outputtable function
             try:
@@ -248,10 +266,16 @@ class ModelController:
                         db=db
                     )
                 else:
-                    # Training: single model - call outputtable with single prediction
-                    prediction_output = all_predictions
-                    intervals = all_intervals
-                    final_table = outputtable(prediction_output, intervals, model_data, available_HW, db)
+                    # Training: 2 separate models - call outputtable_training with latency and throughput predictions
+                    final_table = outputtable_training(
+                        prediction_output_latency=all_predictions_latency,
+                        prediction_output_throughput=all_predictions_throughput,
+                        intervals_latency=all_intervals_latency,
+                        intervals_throughput=all_intervals_throughput,
+                        user_input=model_data,
+                        available_HW=available_HW,
+                        db=db
+                    )
                 
                 # Convert DataFrame to list of dictionaries for JSON serialization
                 performance_results = final_table.to_dict('records')
@@ -1174,6 +1198,187 @@ class ModelController:
 
         return {
             "error": "No hardware configurations meet all the specified constraints, even when scaling up to 4 GPUs. Please relax your constraints or consider different hardware options.",
+            "filters_applied": ", ".join(filters_applied) if filters_applied else "None",
+            "total_configs_evaluated": len(performance_results_df),
+            "gpu_counts_tried": "1, 2, 3, 4"
+        }
+
+    def apply_user_constraints_and_get_top_3_training(self, performance_results_df, user_constraints: Dict) -> Dict:
+        """
+        Apply user constraints for TRAINING task type to filter hardware recommendations and return top 3.
+        Training uses different filtering fields: Latency, Throughput, Concurrent Jobs, Cost
+
+        Args:
+            performance_results_df: DataFrame with all hardware simulation results
+            user_constraints: Dict with user goals for training
+
+        Returns:
+            Dict with filtered results or error message
+        """
+        import pandas as pd
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.info("="*80)
+        logger.info("APPLYING TRAINING CONSTRAINTS TO GET TOP 3 RECOMMENDATIONS")
+        logger.info(f"Total hardware configs to evaluate: {len(performance_results_df)}")
+        logger.info(f"User constraints provided: {user_constraints}")
+
+        # Extract Training-specific constraints from dictionary
+        target_latency = user_constraints.get('Target_Latency')  # Training time per job in ms
+        target_throughput = user_constraints.get('Target_Throughput')  # tokens/sec
+        target_concurrent_jobs = user_constraints.get('Target_Concurrent_Jobs')  # concurrent training jobs
+        target_cost = user_constraints.get('Target_Cost')  # cost budget
+        num_gpus_constraint = user_constraints.get('Number_Of_GPUs')
+
+        # Check if ANY constraints are provided
+        has_constraints = any([
+            target_latency is not None,
+            target_throughput is not None,
+            target_concurrent_jobs is not None,
+            target_cost is not None,
+            num_gpus_constraint is not None
+        ])
+
+        # If NO constraints provided, return top 3 by default sorting (cost)
+        if not has_constraints:
+            logger.warning("⚠️ No user constraints provided! Returning top 3 by default sorting (lowest cost)")
+
+            # Filter out 'N/A' rows and sort by cost
+            valid_results = performance_results_df[
+                (performance_results_df['Latency (ms)'] != 'N/A') &
+                (performance_results_df['Throughput (Tokens/secs)'] != 'N/A')
+            ].copy()
+
+            # Convert cost to numeric for sorting
+            valid_results['Total Cost'] = pd.to_numeric(valid_results['Total Cost'], errors='coerce')
+            valid_results = valid_results.sort_values('Total Cost', ascending=True)
+
+            top_3 = valid_results.head(3)
+
+            return {
+                "status": "success",
+                "warning": "No user constraints provided. Showing top 3 hardware configurations sorted by lowest cost.",
+                "performance_results": top_3.to_dict('records'),
+                "total_matching_configs": len(valid_results),
+                "filters_applied": "None - default sorting by cost"
+            }
+
+        # Log which constraints are provided
+        logger.info("Training constraints provided:")
+        if target_latency is not None:
+            logger.info(f"  ✓ Target Latency (Training Time): {target_latency} ms")
+        if target_throughput is not None:
+            logger.info(f"  ✓ Target Throughput: {target_throughput} tokens/sec")
+        if target_concurrent_jobs is not None:
+            logger.info(f"  ✓ Target Concurrent Jobs: {target_concurrent_jobs}")
+        if target_cost is not None:
+            logger.info(f"  ✓ Target Cost: {target_cost}")
+        if num_gpus_constraint is not None:
+            logger.info(f"  ✓ Number of GPUs: {num_gpus_constraint}")
+
+        # Make a copy of the base dataframe
+        base_table = performance_results_df.copy()
+        solution_found = False
+        filters_applied = []
+
+        # Try iterating through 1-4 GPUs to find configs that meet constraints
+        for num_gpus in range(1, 5):
+            logger.info(f"\n{'='*60}")
+            logger.info(f"Trying with {num_gpus} GPU(s)")
+            logger.info(f"{'='*60}")
+
+            # Create scaled table for this GPU count
+            if num_gpus == 1:
+                current_table = base_table.copy()
+            else:
+                scaled_table = base_table.copy()
+
+                # Only scale rows that have valid metrics (not 'N/A')
+                valid_mask = (scaled_table['Latency (ms)'] != 'N/A') & (scaled_table['Throughput (Tokens/secs)'] != 'N/A')
+
+                # Convert columns to numeric for scaling
+                scaled_table.loc[valid_mask, 'Latency (ms)'] = pd.to_numeric(scaled_table.loc[valid_mask, 'Latency (ms)'], errors='coerce') / num_gpus
+                scaled_table.loc[valid_mask, 'Throughput (Tokens/secs)'] = pd.to_numeric(scaled_table.loc[valid_mask, 'Throughput (Tokens/secs)'], errors='coerce') * num_gpus
+                scaled_table.loc[valid_mask, 'Concurrent Jobs'] = pd.to_numeric(scaled_table.loc[valid_mask, 'Concurrent Jobs'], errors='coerce') * num_gpus
+                scaled_table.loc[valid_mask, 'Total Cost'] = pd.to_numeric(scaled_table.loc[valid_mask, 'Total Cost'], errors='coerce') * num_gpus
+
+                current_table = scaled_table
+
+            # Ensure all columns are numeric for filtering
+            current_table['Latency (ms)'] = pd.to_numeric(current_table['Latency (ms)'], errors='coerce')
+            current_table['Throughput (Tokens/secs)'] = pd.to_numeric(current_table['Throughput (Tokens/secs)'], errors='coerce')
+            current_table['Concurrent Jobs'] = pd.to_numeric(current_table['Concurrent Jobs'], errors='coerce')
+            current_table['Total Cost'] = pd.to_numeric(current_table['Total Cost'], errors='coerce')
+
+            # Filter out invalid rows first
+            filtered = current_table[
+                (current_table['Latency (ms)'].notna()) &
+                (current_table['Throughput (Tokens/secs)'].notna())
+            ].copy()
+
+            logger.info(f"Configs with valid metrics: {len(filtered)}")
+
+            # Apply constraints dynamically
+            filters_applied = []
+
+            if target_latency is not None:
+                before_count = len(filtered)
+                filtered = filtered[filtered['Latency (ms)'] <= target_latency]
+                logger.info(f"  After Latency filter (<= {target_latency} ms): {len(filtered)} configs (removed {before_count - len(filtered)})")
+                filters_applied.append(f"Latency <= {target_latency} ms")
+
+            if target_throughput is not None:
+                before_count = len(filtered)
+                filtered = filtered[filtered['Throughput (Tokens/secs)'] >= target_throughput]
+                logger.info(f"  After Throughput filter (>= {target_throughput} tokens/sec): {len(filtered)} configs (removed {before_count - len(filtered)})")
+                filters_applied.append(f"Throughput >= {target_throughput} tokens/sec")
+
+            if target_concurrent_jobs is not None:
+                before_count = len(filtered)
+                filtered = filtered[filtered['Concurrent Jobs'] >= target_concurrent_jobs]
+                logger.info(f"  After Concurrent Jobs filter (>= {target_concurrent_jobs}): {len(filtered)} configs (removed {before_count - len(filtered)})")
+                filters_applied.append(f"Concurrent Jobs >= {target_concurrent_jobs}")
+
+            if target_cost is not None:
+                before_count = len(filtered)
+                filtered = filtered[filtered['Total Cost'] <= target_cost]
+                logger.info(f"  After Cost filter (<= {target_cost}): {len(filtered)} configs (removed {before_count - len(filtered)})")
+                filters_applied.append(f"Cost <= {target_cost}")
+
+            # If we found configs that meet all constraints
+            if not filtered.empty:
+                logger.info(f"\n✅ Found {len(filtered)} suitable configuration(s) with {num_gpus} GPU(s)!")
+
+                # Add # of GPUs column
+                filtered['# of GPUs'] = num_gpus
+
+                # Sort by cost and take top 3
+                filtered = filtered.sort_values('Total Cost', ascending=True)
+                top_3 = filtered.head(3)
+
+                logger.info(f"\n📊 Top 3 Recommendations (with {num_gpus} GPU(s)):")
+                for idx, row in top_3.iterrows():
+                    logger.info(f"  {row['Hardware Name']}: Cost=${row['Total Cost']:.2f}, Latency={row['Latency (ms)']:.2f}ms, Throughput={row['Throughput (Tokens/secs)']:.2f}, Concurrent Jobs={row['Concurrent Jobs']}")
+
+                logger.info("="*80)
+
+                return {
+                    "status": "success",
+                    "performance_results": top_3.to_dict('records'),
+                    "total_matching_configs": len(filtered),
+                    "gpu_count_used": num_gpus,
+                    "filters_applied": ", ".join(filters_applied)
+                }
+            else:
+                logger.info(f"❌ No configs meet all constraints with {num_gpus} GPU(s)")
+
+        # If we exhausted all GPU counts (1-4) and found no matches
+        logger.error("No hardware configurations meet the specified constraints even with up to 4 GPUs")
+        logger.info("="*80)
+
+        return {
+            "error": "No hardware configurations meet all the specified Training constraints, even when scaling up to 4 GPUs. Please relax your constraints or consider different hardware options.",
             "filters_applied": ", ".join(filters_applied) if filters_applied else "None",
             "total_configs_evaluated": len(performance_results_df),
             "gpu_counts_tried": "1, 2, 3, 4"

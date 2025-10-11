@@ -67,12 +67,18 @@ class ModelInferenceController:
                     self.loaded_models['inference_simulation_requests'] = pickle.load(f)
                 logger.info("Loaded inference simulation requests model")
             
-            # Load training simulation model (correct path)
-            training_model_path = os.path.join(self.models_path, "Training_simulation.pkl")
-            if os.path.exists(training_model_path):
-                with open(training_model_path, 'rb') as f:
-                    self.loaded_models['training_simulation'] = pickle.load(f)
-                logger.info("Loaded training simulation model")
+            # Load 2 separate training simulation models (NEW APPROACH)
+            training_latency_path = os.path.join(self.models_path, "Training_simulation_latency.pkl")
+            if os.path.exists(training_latency_path):
+                with open(training_latency_path, 'rb') as f:
+                    self.loaded_models['training_simulation_latency'] = pickle.load(f)
+                logger.info("Loaded training simulation latency model")
+
+            training_throughput_path = os.path.join(self.models_path, "Training_simulation_throughput.pkl")
+            if os.path.exists(training_throughput_path):
+                with open(training_throughput_path, 'rb') as f:
+                    self.loaded_models['training_simulation_throughput'] = pickle.load(f)
+                logger.info("Loaded training simulation throughput model")
             
             # Load optimizer model
             optimizer_model_path = os.path.join(self.models_path, "Optimizer_model.pkl")
@@ -356,21 +362,24 @@ class ModelInferenceController:
             return {"error": f"Inference simulation failed: {str(e)}"}
     
     def _run_training_simulation(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Run training simulation using the loaded model - follows the sample workflow"""
+        """Run training simulation using 2 separate PKL models for latency and throughput"""
         try:
-            if 'training_simulation' not in self.loaded_models:
-                return {"error": "Training simulation model not loaded"}
-            
+            # Check if both training models are loaded
+            required_models = ['training_simulation_latency', 'training_simulation_throughput']
+            for model_name in required_models:
+                if model_name not in self.loaded_models:
+                    return {"error": f"{model_name} model not loaded"}
+
             if 'simulation_training_preprocessor' not in self.loaded_models:
                 return {"error": "Simulation training preprocessor not loaded"}
-            
+
             # Convert input_data to DataFrame (it already contains model + hardware data combined)
             df = pd.DataFrame([input_data])
-            
+
             logger.info(f"Training input dataframe shape: {df.shape}")
             logger.info(f"Training input dataframe columns: {list(df.columns)}")
-            
-            # Apply preprocessing pipeline 
+
+            # Apply preprocessing pipeline
             try:
                 preprocessor = self.loaded_models['simulation_training_preprocessor']
                 processed_features = preprocessor.transform(df)
@@ -379,28 +388,37 @@ class ModelInferenceController:
                 logger.error(f"Training simulation preprocessor failed: {prep_error}")
                 logger.error(f"Training input data keys: {list(input_data.keys())}")
                 return {"error": f"Training simulation preprocessor failed: {str(prep_error)}"}
-            
-            # Make prediction with confidence intervals
-            model = self.loaded_models['training_simulation']
+
+            # Make predictions with 2 separate models (NEW APPROACH)
+            # Model 1: Latency prediction
             try:
-                prediction_output, intervals = model.predict(processed_features, alpha=0.20)
-                logger.info(f"Training prediction output: {prediction_output}")
-                logger.info(f"Training confidence intervals available: {intervals is not None}")
+                model_latency = self.loaded_models['training_simulation_latency']
+                prediction_output_latency, intervals_latency = model_latency.predict(processed_features, alpha=0.20)
+                logger.info(f"Training latency prediction output: {prediction_output_latency}")
             except Exception as pred_error:
-                logger.error(f"Training model prediction failed: {pred_error}")
-                return {"error": f"Training model prediction failed: {str(pred_error)}"}
-            
-            # Return raw predictions and intervals for further processing
-            logger.info(f"Training predictions type: {type(prediction_output)}")
-            logger.info(f"Training predictions: {prediction_output}")
-            logger.info(f"Training confidence intervals available: {intervals is not None}")
-            
+                logger.error(f"Training latency model prediction failed: {pred_error}")
+                return {"error": f"Training latency model prediction failed: {str(pred_error)}"}
+
+            # Model 2: Throughput prediction
+            try:
+                model_throughput = self.loaded_models['training_simulation_throughput']
+                prediction_output_throughput, intervals_throughput = model_throughput.predict(processed_features, alpha=0.20)
+                logger.info(f"Training throughput prediction output: {prediction_output_throughput}")
+            except Exception as pred_error:
+                logger.error(f"Training throughput model prediction failed: {pred_error}")
+                return {"error": f"Training throughput model prediction failed: {str(pred_error)}"}
+
+            # Return both predictions and their intervals for further processing
+            logger.info(f"Both training predictions completed successfully")
+
             return {
-                "prediction_output": prediction_output.tolist() if hasattr(prediction_output, 'tolist') else prediction_output,
-                "intervals": intervals.tolist() if intervals is not None and hasattr(intervals, 'tolist') else intervals,
+                "prediction_output_latency": prediction_output_latency.tolist() if hasattr(prediction_output_latency, 'tolist') else prediction_output_latency,
+                "intervals_latency": intervals_latency.tolist() if intervals_latency is not None and hasattr(intervals_latency, 'tolist') else intervals_latency,
+                "prediction_output_throughput": prediction_output_throughput.tolist() if hasattr(prediction_output_throughput, 'tolist') else prediction_output_throughput,
+                "intervals_throughput": intervals_throughput.tolist() if intervals_throughput is not None and hasattr(intervals_throughput, 'tolist') else intervals_throughput,
                 "task_type": "training"
             }
-            
+
         except Exception as e:
             logger.error(f"Error in training simulation: {str(e)}")
             return {"error": f"Training simulation failed: {str(e)}"}

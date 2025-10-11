@@ -51,8 +51,13 @@ class SimulationRequest(BaseModel):
     Input_Size: Optional[int] = None
     Output_Size: Optional[int] = None
     Batch_Size: Optional[int] = None
-    # Training-specific fields
-    Full_Training: Optional[int] = None
+    # Training-specific fields (NEW - required for Training task type)
+    Training_Method: Optional[str] = None  # "LoRA" / "QLoRA" / "Full Fine-tuning"
+    Optimizer: Optional[str] = None  # "AdamW" / "SGD"
+    Learning_Rate: Optional[float] = None
+    Num_of_Epochs: Optional[int] = None
+    Dataset_Size: Optional[int] = None
+    Full_Training: Optional[int] = None  # Legacy field, kept for backwards compatibility
     # User Goals / Constraints (OPTIONAL - for filtering recommendations)
     Target_Latency: Optional[float] = None  # in ms
     Target_Throughput: Optional[float] = None  # in tokens/sec
@@ -499,12 +504,24 @@ async def simulate_performance(
     # Add Training-specific fields if provided
     if request.Task_Type == 'Training':
         if request.Batch_Size is not None:
-            user_input['Batch Size'] = request.Batch_Size
+            user_input['Batch_Size'] = request.Batch_Size
         if request.Input_Size is not None:
-            user_input['Input Size'] = request.Input_Size
+            user_input['Input_Size'] = request.Input_Size
+        if request.Output_Size is not None:
+            user_input['Output_Size'] = request.Output_Size
+        if request.Training_Method is not None:
+            user_input['Training_Method'] = request.Training_Method
+        if request.Optimizer is not None:
+            user_input['Optimizer'] = request.Optimizer
+        if request.Learning_Rate is not None:
+            user_input['Learning_Rate'] = request.Learning_Rate
+        if request.Num_of_Epochs is not None:
+            user_input['Num_of_Epochs'] = request.Num_of_Epochs
+        if request.Dataset_Size is not None:
+            user_input['Dataset_Size'] = request.Dataset_Size
         if request.Full_Training is not None:
-            user_input['Full Training'] = request.Full_Training
-    
+            user_input['Full_Training'] = request.Full_Training  # Legacy
+
     result = model_controller.simulate_performance(db, user_input, limit_results)
     
     if "error" in result:
@@ -559,11 +576,23 @@ async def recommend_hardware(
     # Add Training-specific fields if provided
     if request.Task_Type == 'Training':
         if request.Batch_Size is not None:
-            user_input['Batch Size'] = request.Batch_Size
+            user_input['Batch_Size'] = request.Batch_Size
         if request.Input_Size is not None:
-            user_input['Input Size'] = request.Input_Size
+            user_input['Input_Size'] = request.Input_Size
+        if request.Output_Size is not None:
+            user_input['Output_Size'] = request.Output_Size
+        if request.Training_Method is not None:
+            user_input['Training_Method'] = request.Training_Method
+        if request.Optimizer is not None:
+            user_input['Optimizer'] = request.Optimizer
+        if request.Learning_Rate is not None:
+            user_input['Learning_Rate'] = request.Learning_Rate
+        if request.Num_of_Epochs is not None:
+            user_input['Num_of_Epochs'] = request.Num_of_Epochs
+        if request.Dataset_Size is not None:
+            user_input['Dataset_Size'] = request.Dataset_Size
         if request.Full_Training is not None:
-            user_input['Full Training'] = request.Full_Training
+            user_input['Full_Training'] = request.Full_Training  # Legacy
 
     # NEW: Extract user constraints (goals) from request
     user_constraints = {
@@ -586,11 +615,26 @@ async def recommend_hardware(
     import pandas as pd
     performance_results_df = pd.DataFrame(result['performance_results'])
 
-    # Apply constraints and get top 3
-    filtered_result = model_controller.apply_user_constraints_and_get_top_3(
-        performance_results_df,
-        user_constraints
-    )
+    # Apply constraints and get top 3 (use different function for Training vs Inference)
+    if request.Task_Type == 'Training':
+        # Training-specific filtering (different fields: Latency, Throughput, Concurrent Jobs, Cost)
+        training_constraints = {
+            'Target_Latency': request.Target_Latency,
+            'Target_Throughput': request.Target_Throughput,
+            'Target_Concurrent_Jobs': user_constraints.get('Target_Concurrent_Users'),  # Map from Concurrent Users to Jobs
+            'Target_Cost': request.Target_Cost,
+            'Number_Of_GPUs': request.Number_Of_GPUs
+        }
+        filtered_result = model_controller.apply_user_constraints_and_get_top_3_training(
+            performance_results_df,
+            training_constraints
+        )
+    else:
+        # Inference filtering (original fields: Latency, Throughput, Concurrent Users, Requests/sec, TTFT, Cost)
+        filtered_result = model_controller.apply_user_constraints_and_get_top_3(
+            performance_results_df,
+            user_constraints
+        )
 
     if "error" in filtered_result:
         raise HTTPException(status_code=400, detail=filtered_result["error"])

@@ -78,14 +78,14 @@ export const useModelConfigAutoPopulate = (setters = {}) => {
 
       // Training-specific fields
       isFullTraining: setters.setIsFullTraining,
-      fineTuningMethod: setters.setFineTuningMethod,
+      fineTuningMethod: setters.setTrainingMethod, // Maps to trainingMethod state
       trainingDatasetSize: setters.setDatasetSize,
-      trainingInputSize: setters.setTrainingInputSize,
-      trainingOutputSize: setters.setTrainingOutputSize,
-      trainingBatchSize: setters.setTrainingBatchSize,
+      trainingInputSize: setters.setInputSize, // For Training, uses same input size field
+      trainingOutputSize: setters.setOutputSize, // For Training, uses same output size field
+      trainingBatchSize: setters.setBatchSize, // For Training, uses same batch size field
       optimizer: setters.setOptimizer,
       learningRate: setters.setLearningRate,
-      epochs: setters.setEpochs,
+      epochs: setters.setNumOfEpochs, // Maps to numOfEpochs state
       targetTrainingTime: setters.setTargetTrainingTime,
       trainingThroughput: setters.setTrainingThroughput,
       concurrentTrainingJobs: setters.setConcurrentTrainingJobs,

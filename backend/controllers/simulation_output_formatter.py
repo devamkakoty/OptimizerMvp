@@ -212,6 +212,169 @@ def outputtable(prediction_output_latency, prediction_output_throughput, predict
 
     return final_table
 
+def outputtable_training(prediction_output_latency, prediction_output_throughput,
+                         intervals_latency, intervals_throughput,
+                         user_input, available_HW, db: Session):
+    """
+    Format simulation results for TRAINING task type into a comprehensive table
+    NEW: Training uses 2 predictions (latency, throughput) instead of 3 like inference
+
+    Args:
+        prediction_output_latency: Latency predictions from the model
+        prediction_output_throughput: Throughput predictions from the model
+        intervals_latency: Confidence intervals for latency
+        intervals_throughput: Confidence intervals for throughput (not used in confidence calculation)
+        user_input: User input data as dictionary
+        available_HW: Available hardware dataframe
+        db: Database session
+
+    Returns:
+        DataFrame with formatted results including recommendations for training
+    """
+
+    # Max possible width for latency (calibrated from training data)
+    max_possible_width = 84911.695
+
+    confidence_percent = []
+    for i in range(len(prediction_output_latency)):
+        confidence_score = intervals_latency[i][1][0] - intervals_latency[i][0][0]
+        confidence_percent.append((1 - (confidence_score / max_possible_width)) * 100)
+
+    confidence_percent = np.array(confidence_percent)
+
+    # Build final_table
+    final_table = pd.concat([available_HW.reset_index(drop=True),
+                            pd.DataFrame(prediction_output_latency, columns=['Latency (ms)'])], axis=1)
+    final_table = pd.concat([final_table,
+                            pd.DataFrame(prediction_output_throughput, columns=['Throughput (Tokens/secs)'])], axis=1)
+    final_table = pd.concat([final_table,
+                            pd.DataFrame(confidence_percent, columns=['Confidence Score'])], axis=1)
+
+    # Convert user_input dict to DataFrame for processing
+    user_input_df = pd.DataFrame([user_input])
+
+    # Note: '# of GPU' already exists in final_table from available_HW, no need to set it again
+
+    # Computing RAM, VRAM and Storage for TRAINING:
+    def recommend_hw(size_gb):
+        if size_gb <= 1:
+            return 1
+        exponent = math.ceil(math.log2(size_gb))
+        return 2**exponent
+
+    bytes_per_param_dict = {
+        "FP32": 4, "FLOAT32": 4,
+        "FP16": 2, "FLOAT16": 2,
+        "BF16": 2, "BFLOAT16": 2,
+        "INT8": 1,
+    }
+
+    total_params = user_input_df['Total Parameters (Millions)'].iloc[0] * 1e6
+    bytes_per_param = bytes_per_param_dict.get(user_input_df['Precision'].iloc[0], 4)  # Default FP32
+    batch_size = user_input_df['Batch Size'].iloc[0]
+    seq_len = user_input_df['Input Size'].iloc[0]
+    num_layers = user_input_df['Number of hidden Layers'].iloc[0]
+
+    if 'Hidden Dimension' in user_input_df.columns and pd.notna(user_input_df['Hidden Dimension'].iloc[0]):
+        hidden_dim = user_input_df['Hidden Dimension'].iloc[0]
+    else:
+        if num_layers > 0:
+            hidden_dim = math.sqrt(total_params / (12 * num_layers))
+        else:
+            hidden_dim = 0
+
+    param_mem = total_params * bytes_per_param
+    grad_mem = total_params * bytes_per_param
+    optimizer_mem = total_params * bytes_per_param * 2
+    total_model_mem_gb = (param_mem + grad_mem + optimizer_mem) / 1e9
+
+    activation_mem_gb = (batch_size * seq_len * hidden_dim * num_layers * 10) / 1e9
+    framework_overhead_gb = 1.5
+    estimated_vram_gb = total_model_mem_gb + activation_mem_gb + framework_overhead_gb
+    estimated_ram_gb = estimated_vram_gb * 1.5
+
+    user_input_df['Estimated_VRAM (GB)'] = estimated_vram_gb
+    user_input_df['Estimated_RAM (GB)'] = estimated_ram_gb
+
+    # Add RAM and VRAM for Training to all rows
+    for index, rows in user_input_df.iterrows():
+        final_table['RAM for Training'] = rows['Estimated_RAM (GB)']
+        final_table['VRAM for Training'] = rows['Estimated_VRAM (GB)']
+
+    # Calculate recommended storage and RAM
+    for index, rows in user_input_df.iterrows():
+        user_input_df['Recommended Storage'] = (user_input_df['Model Size (MB)'] / 1024).apply(recommend_hw)
+        user_input_df['Recommended RAM'] = user_input_df['Estimated_RAM (GB)'].apply(recommend_hw)
+        user_input_df['Estimated_VRAM (GB)'] = user_input_df['Estimated_VRAM (GB)'].apply(recommend_hw)
+
+    def cost_compute(power_watts, latency_ms, cost_per_kwh=0.12, num_inferences=1000):
+        total_time_seconds = (latency_ms / 1000) * num_inferences
+        total_time_hours = total_time_seconds / 3600
+        power_kw = power_watts / 1000
+        total_cost = power_kw * total_time_hours * cost_per_kwh
+        return total_cost
+
+    # Calculate total power consumption from hardware columns (already in final_table from available_HW)
+    final_table['Total power consumption'] = final_table['GPUPower Consumption'] + final_table['CPU Power Consumption']
+
+    # Broadcast model-specific values to all hardware rows (don't use merge - it can cause issues)
+    final_table['Recommended Storage'] = user_input_df['Recommended Storage'].iloc[0]
+    final_table['Recommended RAM'] = user_input_df['Recommended RAM'].iloc[0]
+    final_table['Estimated_VRAM (GB)'] = user_input_df['Estimated_VRAM (GB)'].iloc[0]
+    final_table['Status'] = 'This model will run on this GPU'
+
+    for index, rows in final_table.iterrows():
+        final_table.at[index, 'Total Cost'] = cost_compute(rows['Total power consumption'], rows['Latency (ms)'])
+
+    final_table = final_table.sort_values(by=['Total Cost'], ascending=[True])
+
+    for index, row in final_table.iterrows():
+        # Convert GB to MB for comparison (Estimated_VRAM is in GB, GPU Memory is in MB)
+        estimated_vram_mb = row['Estimated_VRAM (GB)'] * 1024
+        gpu_vram_mb = row['GPU Memory Total - VRAM (MB)']
+
+        if estimated_vram_mb > gpu_vram_mb:
+            final_table.at[index, 'Status'] = 'This model wont run on this GPU'
+            final_table.at[index, 'Latency (ms)'] = 'N/A'
+            final_table.at[index, 'Throughput (Tokens/secs)'] = 'N/A'
+            final_table.at[index, 'Recommended Storage'] = 'N/A'
+            final_table.at[index, 'Recommended RAM'] = 'N/A'
+            final_table.at[index, 'Total power consumption'] = 'N/A'
+            final_table.at[index, 'Total Cost'] = '0'
+
+    final_table.reset_index(drop=True, inplace=True)
+    final_table['sorter'] = (final_table == 'N/A').any(axis=1)
+    final_table = final_table.sort_values(by='sorter', ascending=True, kind='mergesort').drop('sorter', axis=1)
+
+    # Calculate concurrent jobs for each hardware configuration
+    for index, row in final_table.iterrows():
+        if row['Status'] == 'This model will run on this GPU':
+            try:
+                available_vram = float(row['GPU Memory Total - VRAM (MB)'])
+                num_gpu = int(row['# of GPU'])
+                vram_needed = float(row['VRAM for Training'])
+                ram_available = float(row['Recommended RAM'])
+                ram_needed = float(row['RAM for Training'])
+
+                if num_gpu > 1:
+                    final_table.at[index, 'Latency (ms)'] = float(row['Latency (ms)']) / num_gpu
+                    final_table.at[index, 'Throughput (Tokens/secs)'] = float(row['Throughput (Tokens/secs)']) * num_gpu
+                    final_table.at[index, 'Total Cost'] = float(row['Total Cost']) * num_gpu
+
+                max_jobs_vram = math.floor((available_vram * num_gpu) / vram_needed)
+                max_jobs_ram = math.floor(ram_available / ram_needed)
+                max_jobs_gpu = num_gpu
+
+                concurrent_jobs = min(max_jobs_vram, max_jobs_ram, max_jobs_gpu)
+                final_table.at[index, 'Concurrent Jobs'] = concurrent_jobs
+
+            except (ValueError, TypeError):
+                final_table.at[index, 'Concurrent Jobs'] = 0
+        else:
+            final_table.at[index, 'Concurrent Jobs'] = 0
+
+    return final_table
+
 def get_available_hardware(db: Session) -> pd.DataFrame:
     """Get ALL available hardware configurations from the Hardware_table"""
     try:

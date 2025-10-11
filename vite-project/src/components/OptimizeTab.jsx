@@ -29,6 +29,13 @@ const OptimizeTab = () => {
   const [outputSize, setOutputSize] = useState('');
   const [isFullTraining, setIsFullTraining] = useState('No');
 
+  // Training-specific fields (NEW)
+  const [trainingMethod, setTrainingMethod] = useState('');
+  const [optimizer, setOptimizer] = useState('');
+  const [learningRate, setLearningRate] = useState('');
+  const [numOfEpochs, setNumOfEpochs] = useState('');
+  const [datasetSize, setDatasetSize] = useState('');
+
   // Additional parameters state
   const [showMoreParams, setShowMoreParams] = useState(false);
   const [showAdvancedParamsBare, setShowAdvancedParamsBare] = useState(false);
@@ -80,6 +87,11 @@ const OptimizeTab = () => {
     setBatchSize, // Maps to inferenceBatchSize
     // Training-specific
     setIsFullTraining,
+    setTrainingMethod, // Maps to fineTuningMethod
+    setOptimizer, // Maps to optimizer
+    setLearningRate, // Maps to learningRate
+    setNumOfEpochs, // Maps to epochs
+    setDatasetSize, // Maps to trainingDatasetSize
   });
 
   // Post-deployment specific state - using the specific fields provided
@@ -756,6 +768,12 @@ const OptimizeTab = () => {
         if (taskType === 'Training') {
           optimizationParams.Batch_Size = parseInt(batchSize);
           optimizationParams.Input_Size = parseInt(inputSize);
+          optimizationParams.Output_Size = parseInt(outputSize); // REQUIRED!
+          optimizationParams.Training_Method = trainingMethod;
+          optimizationParams.Optimizer = optimizer;
+          optimizationParams.Learning_Rate = parseFloat(learningRate);
+          optimizationParams.Num_of_Epochs = parseInt(numOfEpochs);
+          optimizationParams.Dataset_Size = parseInt(datasetSize);
           optimizationParams.Full_Training = isFullTraining === 'Yes' ? 1 : 0;
         }
 
@@ -884,16 +902,13 @@ const OptimizeTab = () => {
             const hardwareComparison = response.data.performance_results.map(result => {
               console.log(`Processing result:`, result);
 
-              return {
+              const formattedResult = {
                 name: result.GPU || result['Hardware Name'] || 'Unknown Hardware',
                 fullName: `${result.CPU || 'Unknown CPU'} + ${result.GPU || 'Unknown GPU'}`,
-                // Core performance metrics (NEW)
+                // Core performance metrics (common to both Inference and Training)
                 latency: result['Latency (ms)'] !== 'N/A' ? `${parseFloat(result['Latency (ms)']).toFixed(2)} ms` : 'N/A',
                 throughput: result['Throughput (Tokens/secs)'] !== 'N/A' ? `${parseFloat(result['Throughput (Tokens/secs)']).toFixed(2)} tokens/sec` : 'N/A',
-                requestsPerSec: result['Requests/secs'] !== 'N/A' ? `${parseFloat(result['Requests/secs']).toFixed(2)} req/sec` : 'N/A',
-                ttft: result['TTFT (ms)'] !== 'N/A' ? `${parseFloat(result['TTFT (ms)']).toFixed(2)} ms` : 'N/A',
-                concurrentUsers: result['Concurrent Users'] !== 'N/A' ? `${parseFloat(result['Concurrent Users']).toFixed(2)}` : 'N/A',
-                // Cost and resources
+                // Cost and resources (common)
                 costPer1000: result['Total Cost'] !== 'N/A' && result['Total Cost'] !== '0' ? `$${parseFloat(result['Total Cost']).toFixed(4)}` : '$0.0000',
                 memory: `${result['Recommended RAM'] || 0} GB`,
                 status: result.Status || 'Unknown',
@@ -903,6 +918,22 @@ const OptimizeTab = () => {
                 estimatedRAM: result['Estimated_RAM (GB)'] || 'N/A',
                 powerConsumption: result['Total power consumption'] || 'N/A'
               };
+
+              // Add Inference-specific fields
+              if (taskType === 'Inference') {
+                formattedResult.requestsPerSec = result['Requests/secs'] !== 'N/A' ? `${parseFloat(result['Requests/secs']).toFixed(2)} req/sec` : 'N/A';
+                formattedResult.ttft = result['TTFT (ms)'] !== 'N/A' ? `${parseFloat(result['TTFT (ms)']).toFixed(2)} ms` : 'N/A';
+                formattedResult.concurrentUsers = result['Concurrent Users'] !== 'N/A' ? `${parseFloat(result['Concurrent Users']).toFixed(2)}` : 'N/A';
+              }
+
+              // Add Training-specific fields
+              if (taskType === 'Training') {
+                formattedResult.concurrentJobs = result['Concurrent Jobs'] !== undefined ? result['Concurrent Jobs'] : 'N/A';
+                formattedResult.ramForTraining = result['RAM for Training'] !== undefined ? `${parseFloat(result['RAM for Training']).toFixed(2)} GB` : 'N/A';
+                formattedResult.vramForTraining = result['VRAM for Training'] !== undefined ? `${parseFloat(result['VRAM for Training']).toFixed(2)} GB` : 'N/A';
+              }
+
+              return formattedResult;
             });
 
             // Calculate minimum VRAM from the formatted results
@@ -2897,6 +2928,145 @@ const OptimizeTab = () => {
                         disabled={isLoadingModelData}
                       />
                     </div>
+                  )}
+
+                  {/* Training-specific fields - Only for Training task type */}
+                  {optimizationMode === 'pre-deployment' && taskType === 'Training' && (
+                    <>
+                      {/* Training Method */}
+                      <div>
+                        <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Training Method
+                          <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          value={trainingMethod}
+                          onChange={(e) => setTrainingMethod(e.target.value)}
+                          className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
+                          disabled={isLoadingModelData}
+                        >
+                          <option value="">Select training method</option>
+                          <option value="LoRA">LoRA</option>
+                          <option value="QLoRA">QLoRA</option>
+                          <option value="Full Fine-tuning">Full Fine-tuning</option>
+                        </select>
+                      </div>
+
+                      {/* Optimizer */}
+                      <div>
+                        <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Optimizer
+                          <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          value={optimizer}
+                          onChange={(e) => setOptimizer(e.target.value)}
+                          className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#01a982] focus:border-[#01a982] transition-all"
+                          disabled={isLoadingModelData}
+                        >
+                          <option value="">Select optimizer</option>
+                          <option value="AdamW">AdamW</option>
+                          <option value="SGD">SGD</option>
+                        </select>
+                      </div>
+
+                      {/* Learning Rate */}
+                      <div>
+                        <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Learning Rate
+                          <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="number"
+                          step="0.0001"
+                          value={learningRate}
+                          onChange={(e) => setLearningRate(e.target.value)}
+                          placeholder="e.g., 0.001"
+                          className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                          disabled={isLoadingModelData}
+                        />
+                      </div>
+
+                      {/* Number of Epochs */}
+                      <div>
+                        <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Number of Epochs
+                          <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="number"
+                          value={numOfEpochs}
+                          onChange={(e) => setNumOfEpochs(e.target.value)}
+                          placeholder="e.g., 50"
+                          className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                          disabled={isLoadingModelData}
+                        />
+                      </div>
+
+                      {/* Dataset Size */}
+                      <div>
+                        <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Dataset Size
+                          <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="number"
+                          value={datasetSize}
+                          onChange={(e) => setDatasetSize(e.target.value)}
+                          placeholder="e.g., 1000"
+                          className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                          disabled={isLoadingModelData}
+                        />
+                      </div>
+
+                      {/* Input Size for Training */}
+                      <div>
+                        <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Input Size
+                          <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="number"
+                          value={inputSize}
+                          onChange={(e) => setInputSize(e.target.value)}
+                          placeholder="e.g., 224"
+                          className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                          disabled={isLoadingModelData}
+                        />
+                      </div>
+
+                      {/* Output Size for Training */}
+                      <div>
+                        <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Output Size
+                          <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="number"
+                          value={outputSize}
+                          onChange={(e) => setOutputSize(e.target.value)}
+                          placeholder="e.g., 10"
+                          className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                          disabled={isLoadingModelData}
+                        />
+                      </div>
+
+                      {/* Batch Size for Training */}
+                      <div>
+                        <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Batch Size
+                          <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="number"
+                          value={batchSize}
+                          onChange={(e) => setBatchSize(e.target.value)}
+                          placeholder="e.g., 16"
+                          className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                          disabled={isLoadingModelData}
+                        />
+                      </div>
+                    </>
                   )}
                 </div>
 
