@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import { useModelConfig } from '../contexts/ModelConfigContext';
 
 /**
@@ -23,25 +23,45 @@ import { useModelConfig } from '../contexts/ModelConfigContext';
  * @returns {Object} The current user goals configuration
  */
 export const useModelConfigAutoPopulate = (setters = {}) => {
-  const { config } = useModelConfig();
+  const { config, isLoading } = useModelConfig();
   const hasPopulated = useRef(false); // Track if we've already populated fields
+  const lastConfigHash = useRef(''); // Track config hash to detect meaningful changes
+
+  // Create a hash of the config to detect meaningful changes (memoized)
+  const configHash = useMemo(() => {
+    return JSON.stringify({
+      modelName: config.modelName,
+      taskType: config.taskType
+    });
+  }, [config.modelName, config.taskType]);
 
   useEffect(() => {
+    // Wait for context to finish loading from localStorage
+    if (isLoading) {
+      console.log('[useModelConfigAutoPopulate] Context is still loading. Waiting...');
+      return;
+    }
+
     // Only auto-populate if User Goals has been configured (at minimum, model name and task type)
     if (!config.modelName || !config.taskType) {
       console.log('[useModelConfigAutoPopulate] No User Goals configuration found. Skipping auto-populate.');
+      hasPopulated.current = false; // Reset so it can populate when config becomes available
+      lastConfigHash.current = '';
       return;
     }
 
-    // Skip if we've already populated fields once (ONLY check this AFTER confirming config is ready)
-    if (hasPopulated.current) {
+    // Skip if we've already populated fields for THIS config
+    if (hasPopulated.current && lastConfigHash.current === configHash) {
+      console.log('[useModelConfigAutoPopulate] Already populated for this config. Skipping.');
       return;
     }
 
-    console.log('[useModelConfigAutoPopulate] Auto-populating fields from User Goals (ONCE):', {
+    console.log('[useModelConfigAutoPopulate] Auto-populating fields from User Goals:', {
       modelName: config.modelName,
       taskType: config.taskType,
-      totalFields: Object.keys(config).filter(key => config[key] !== '').length
+      totalFields: Object.keys(config).filter(key => config[key] !== '').length,
+      isFirstPopulation: !hasPopulated.current,
+      configChanged: lastConfigHash.current !== configHash
     });
 
     // Map User Goals config fields to setter functions
@@ -103,10 +123,11 @@ export const useModelConfigAutoPopulate = (setters = {}) => {
 
     console.log(`[useModelConfigAutoPopulate] Auto-populated ${populatedCount} fields from User Goals`);
 
-    // Mark as populated so this doesn't run again
+    // Mark as populated for this config
     hasPopulated.current = true;
+    lastConfigHash.current = configHash;
 
-  }, [config]); // Watch config, but only populate once
+  }, [configHash, config, isLoading]); // Depend on configHash, config, and isLoading
 
   // Return the config so components can access it if needed
   return config;

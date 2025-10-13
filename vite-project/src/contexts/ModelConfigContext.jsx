@@ -72,6 +72,7 @@ export const ModelConfigProvider = ({ children }) => {
 
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaveError, setLastSaveError] = useState(null);
+  const [isLoading, setIsLoading] = useState(true); // Track if localStorage is being loaded
 
   // Auto-fillable fields from backend (15 fields)
   const AUTO_FILLABLE_FIELDS = [
@@ -92,15 +93,25 @@ export const ModelConfigProvider = ({ children }) => {
 
   // Load from localStorage on mount
   useEffect(() => {
+    setIsLoading(true);
+
     const savedConfig = localStorage.getItem('modelConfig');
     const savedMetadata = localStorage.getItem('modelConfigMetadata');
 
     if (savedConfig) {
       try {
-        setConfig(JSON.parse(savedConfig));
+        const parsedConfig = JSON.parse(savedConfig);
+        setConfig(parsedConfig);
+        console.log('[ModelConfigContext] Loaded config from localStorage:', {
+          modelName: parsedConfig.modelName,
+          taskType: parsedConfig.taskType,
+          totalFields: Object.keys(parsedConfig).filter(key => parsedConfig[key] !== '').length
+        });
       } catch (error) {
         console.error('Error parsing saved config:', error);
       }
+    } else {
+      console.log('[ModelConfigContext] No saved config found in localStorage');
     }
 
     if (savedMetadata) {
@@ -110,6 +121,9 @@ export const ModelConfigProvider = ({ children }) => {
         console.error('Error parsing saved metadata:', error);
       }
     }
+
+    // Mark as loaded
+    setIsLoading(false);
   }, []);
 
   // Debounced auto-save to localStorage
@@ -304,6 +318,7 @@ export const ModelConfigProvider = ({ children }) => {
     loadFromBackend,
     clearConfig,
     isSaving,
+    isLoading,
     lastSaveError
   };
 
