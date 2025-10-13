@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import DatePicker from 'react-datepicker';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../config/axios';
-import { ChevronLeft, ChevronRight, BarChart3, Calendar, DollarSign, Zap, Cpu, HardDrive, Monitor, MemoryStick, Server, Download, Search, Funnel, BatteryCharging, Factory, Lightbulb } from 'lucide-react';
+import { ChevronLeft, ChevronRight, BarChart3, DollarSign, Cpu, HardDrive, Monitor, MemoryStick, Server, Download, Search, Funnel, BatteryCharging, Factory, Lightbulb } from 'lucide-react';
 import SystemInsightsGenerator from './SystemInsightsGenerator';
+import { useWalkthrough } from '../contexts/WalkthroughContext';
 import "../styles/AdminDashboardNew.css"
 import {
   Chart as ChartJS,
@@ -103,19 +104,22 @@ const AdminDashboardNew = ({
   // State for top processes data
   const [topProcesses, setTopProcesses] = useState([]);
 
-  // State for showing and hiding the Walkthrough Modal
-  const [showModal, setShowModal] = useState(false);
+  // Use Walkthrough Context for modal state
+  const { showModal, openWalkthrough, closeWalkthrough } = useWalkthrough();
 
+  // Show modal only on first visit
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setShowModal(true);
-    }, 100);
-    return () => clearTimeout(timer);
-  }, []);
+    const hasSeenWalkthrough = localStorage.getItem('hasSeenDashboardWalkthrough');
 
-  useEffect(() => {
-    console.log('showModal:', showModal);
-  }, [showModal]);
+    if (!hasSeenWalkthrough) {
+      const timer = setTimeout(() => {
+        openWalkthrough();
+        // Mark as seen after showing
+        localStorage.setItem('hasSeenDashboardWalkthrough', 'true');
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [openWalkthrough]);
 
   // Generate AI-powered process-specific recommendations
   const generateProcessRecommendations = (processName, power, cost, process) => {
@@ -1138,7 +1142,7 @@ const AdminDashboardNew = ({
 
   return (
     <>
-      {showModal && <CardModal showModal={showModal} onClose={() => setShowModal(false)} />}
+      {showModal && <CardModal showModal={showModal} onClose={closeWalkthrough} />}
       <div className={`space-y-6 max-w-full overflow-hidden transition-opacity duration-300 ${showModal ? 'pointer-events-none opacity-50' : 'opacity-100'}`}></div>
       <div className="space-y-4 max-w-full overflow-hidden">
         {/* Top Right-Aligned Toolbar */}

@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import logo from '../assets/logo.png';
 import DatePicker from 'react-datepicker';
 import { useDarkMode } from '../contexts/DarkModeContext';
+import { useWalkthrough } from '../contexts/WalkthroughContext';
 import AdminDashboardNew from './AdminDashboardNew';
 import HardwareTab from './HardwareTab';
 import CostManagementTab from './CostManagementTab';
@@ -17,6 +18,7 @@ import '../styles/datepicker.css';
 const AdminPage = () => {
   const [activeAdminTab, setActiveAdminTab] = useState('dashboard');
   const { isDarkMode, toggleDarkMode } = useDarkMode();
+  const { openWalkthrough } = useWalkthrough();
 
   // Navigation state
   const [activeSection, setActiveSection] = useState('administration');
@@ -330,8 +332,9 @@ const AdminPage = () => {
               {isDarkMode ? <Notification size="20" color="#67655eff" /> : <Notification size="20" color="#6b7280" />}
             </button>
             <button
-              onClick={toggleDarkMode}
+              onClick={openWalkthrough}
               className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
+              title="Show Dashboard Walkthrough"
             >
               {isDarkMode ? <HelpOption size="20" color="#67655eff" /> : <HelpOption size="20" color="#6b7280" />}
             </button>
