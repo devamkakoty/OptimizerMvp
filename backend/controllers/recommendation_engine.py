@@ -1115,9 +1115,10 @@ class RecommendationEngine:
             interval_hours = 1 / 60.0
             total_energy_kwh = (result.total_power_watts * interval_hours) / 1000.0
 
-            # Get top processes for the host
+            # Get top processes for the host (include username for filtering)
             top_processes_query = db.query(
                 HostProcessMetric.process_name,
+                HostProcessMetric.username,
                 func.avg(HostProcessMetric.estimated_power_watts).label('avg_power'),
                 func.avg(HostProcessMetric.cpu_usage_percent).label('avg_cpu'),
                 func.avg(HostProcessMetric.memory_usage_mb).label('avg_memory'),
@@ -1129,15 +1130,17 @@ class RecommendationEngine:
                     HostProcessMetric.estimated_power_watts.isnot(None)
                 )
             ).group_by(
-                HostProcessMetric.process_name
+                HostProcessMetric.process_name,
+                HostProcessMetric.username
             ).order_by(
                 desc(func.avg(HostProcessMetric.estimated_power_watts))
-            ).limit(5)
+            ).limit(10)  # Increased limit to get more processes for filtering
 
             top_processes = []
             for proc in top_processes_query.all():
                 top_processes.append({
                     'process_name': proc.process_name,
+                    'username': proc.username or 'unknown',
                     'avg_power_watts': round(float(proc.avg_power), 2),
                     'avg_cpu_percent': round(float(proc.avg_cpu or 0), 2),
                     'avg_memory_mb': round(float(proc.avg_memory or 0), 2),
@@ -1223,8 +1226,10 @@ class RecommendationEngine:
                 peak_hours_query = []
 
             # Process efficiency analysis - optimized to avoid heavy computation
+            # Include username to differentiate system vs user processes
             efficiency_query = db.query(
                 HostProcessMetric.process_name,
+                HostProcessMetric.username,
                 func.avg(HostProcessMetric.cpu_usage_percent).label('avg_cpu'),
                 func.avg(HostProcessMetric.estimated_power_watts).label('avg_power'),
                 func.avg(HostProcessMetric.memory_usage_mb).label('avg_memory'),
@@ -1236,24 +1241,52 @@ class RecommendationEngine:
                     HostProcessMetric.estimated_power_watts > 1.0,  # Only processes using meaningful power
                     HostProcessMetric.estimated_power_watts.isnot(None)
                 )
-            ).group_by(HostProcessMetric.process_name).having(func.count() > 10).limit(20).all()  # Limit to top 20 processes
+            ).group_by(
+                HostProcessMetric.process_name,
+                HostProcessMetric.username
+            ).having(func.count() > 10).limit(50).all()  # Increased limit to get more processes
+
+            # System usernames that indicate non-user-controllable processes
+            system_usernames = {'root', 'daemon', 'sys', 'sync', 'bin', 'man', 'lp', 'mail',
+                               'news', 'uucp', 'proxy', 'www-data', 'backup', 'list', 'irc',
+                               'gnats', 'nobody', 'systemd-network', 'systemd-resolve',
+                               'systemd-timesync', 'messagebus', 'syslog', '_apt', 'uuidd',
+                               'avahi-autoipd', 'usbmux', 'dnsmasq', 'rtkit', 'cups-pk-helper',
+                               'speech-dispatcher', 'whoopsie', 'kernoops', 'saned', 'pulse',
+                               'avahi', 'colord', 'hplip', 'geoclue', 'gnome-initial-setup',
+                               'gdm', 'sssd', 'postfix', 'ntp', 'redis', 'mongodb', 'mysql',
+                               'postgres', 'apache', 'nginx'}
 
             # Convert efficiency results to dict with calculated ratios
+            # Separate system and user processes
             efficiency_data = []
+            system_efficiency_data = []
+            user_efficiency_data = []
+
             for eff in efficiency_query:
                 avg_power = float(eff.avg_power or 1.0)
                 cpu_efficiency = round(float(eff.avg_cpu or 0) / avg_power, 4) if avg_power > 0 else 0
                 memory_efficiency = round(float(eff.avg_memory or 0) / avg_power, 4) if avg_power > 0 else 0
 
-                efficiency_data.append({
+                process_data = {
                     'process_name': eff.process_name,
+                    'username': eff.username or 'unknown',
                     'avg_cpu_percent': round(float(eff.avg_cpu or 0), 2),
                     'avg_power_watts': round(avg_power, 2),
                     'avg_memory_mb': round(float(eff.avg_memory or 0), 2),
                     'cpu_efficiency_per_watt': cpu_efficiency,
                     'memory_efficiency_per_watt': memory_efficiency,
-                    'sample_count': eff.sample_count
-                })
+                    'sample_count': eff.sample_count,
+                    'is_system_process': (eff.username or '').lower() in system_usernames
+                }
+
+                efficiency_data.append(process_data)
+
+                # Separate into system vs user processes
+                if process_data['is_system_process']:
+                    system_efficiency_data.append(process_data)
+                else:
+                    user_efficiency_data.append(process_data)
 
             # Convert peak hours to structured data
             peak_hours_data = {}
@@ -1342,8 +1375,10 @@ class RecommendationEngine:
                 # Time pattern analysis
                 "peak_hours_analysis": peak_hours_data,
 
-                # Process efficiency analysis
-                "process_efficiency_data": efficiency_data
+                # Process efficiency analysis (separated by type)
+                "process_efficiency_data": efficiency_data,  # All processes
+                "system_efficiency_data": system_efficiency_data,  # System processes only
+                "user_efficiency_data": user_efficiency_data  # User processes only
             }
 
             return {
@@ -1544,31 +1579,38 @@ class RecommendationEngine:
                 })
 
             # Process Efficiency Analysis Recommendations
-            efficiency_data = host_analysis.get('process_efficiency_data', [])
-            if efficiency_data:
-                # Find most and least efficient processes
-                most_efficient = sorted(efficiency_data, key=lambda x: x['cpu_efficiency_per_watt'], reverse=True)[:3]
-                least_efficient = sorted(efficiency_data, key=lambda x: x['cpu_efficiency_per_watt'])[:3]
+            # Use separated data: user_efficiency_data for recommendations, all data for insights
+            all_efficiency_data = host_analysis.get('process_efficiency_data', [])
+            user_efficiency_data = host_analysis.get('user_efficiency_data', [])
+            system_efficiency_data = host_analysis.get('system_efficiency_data', [])
 
-                if least_efficient and least_efficient[0]['cpu_efficiency_per_watt'] < 1.0:
+            if user_efficiency_data:
+                # Find most and least efficient USER processes (actionable)
+                most_efficient_user = sorted(user_efficiency_data, key=lambda x: x['cpu_efficiency_per_watt'], reverse=True)[:3]
+                least_efficient_user = sorted(user_efficiency_data, key=lambda x: x['cpu_efficiency_per_watt'])[:3]
+
+                # Only recommend on USER processes (that users can actually optimize)
+                if least_efficient_user and least_efficient_user[0]['cpu_efficiency_per_watt'] < 1.0:
                     recommendations.append({
                         'category': 'optimization',
                         'priority': 'medium',
-                        'title': 'Process Efficiency Optimization Opportunities',
-                        'description': f'Found {len([p for p in efficiency_data if p["cpu_efficiency_per_watt"] < 1.0])} inefficient processes consuming disproportionate power',
+                        'title': 'User Process Efficiency Optimization Opportunities',
+                        'description': f'Found {len([p for p in user_efficiency_data if p["cpu_efficiency_per_watt"] < 1.0])} inefficient user processes consuming disproportionate power',
                         'recommendations': [
-                            f"Optimize '{proc['process_name']}' (efficiency: {proc['cpu_efficiency_per_watt']:.3f} CPU%/W)"
-                            for proc in least_efficient[:3]
+                            f"Optimize '{proc['process_name']}' (user: {proc['username']}, efficiency: {proc['cpu_efficiency_per_watt']:.3f} CPU%/W)"
+                            for proc in least_efficient_user[:3]
                         ] + [
                             'Consider process replacement or configuration optimization',
                             'Benchmark against most efficient processes',
-                            'Implement power-aware process scheduling'
+                            'Implement power-aware process scheduling',
+                            'Profile application code for CPU hotspots'
                         ],
-                        'impact': 'Significant power savings through process optimization',
+                        'impact': 'Significant power savings through user process optimization',
                         'statistics': {
-                            'least_efficient_processes': least_efficient[:3],
-                            'most_efficient_processes': most_efficient[:3],
-                            'total_processes_analyzed': len(efficiency_data)
+                            'least_efficient_user_processes': least_efficient_user[:3],
+                            'most_efficient_user_processes': most_efficient_user[:3],
+                            'total_user_processes_analyzed': len(user_efficiency_data),
+                            'total_system_processes_analyzed': len(system_efficiency_data)
                         }
                     })
 
@@ -1623,21 +1665,32 @@ class RecommendationEngine:
                     'impact': 'Prevent hardware damage and performance throttling'
                 })
 
-            # Process-Specific Recommendations
+            # Process-Specific Recommendations (USER PROCESSES ONLY)
             top_processes = host_analysis.get('top_processes', [])
             if top_processes:
-                high_power_processes = [p for p in top_processes if p['avg_power_watts'] > 25]
-                if high_power_processes:
+                # System usernames to exclude from recommendations
+                system_usernames = {'root', 'daemon', 'sys', 'sync', 'bin', 'man', 'lp', 'mail',
+                                   'news', 'uucp', 'proxy', 'www-data', 'backup', 'list', 'irc',
+                                   'gnats', 'nobody', 'systemd-network', 'systemd-resolve',
+                                   'systemd-timesync', 'messagebus', 'syslog', '_apt', 'uuidd'}
+
+                # Filter for USER processes with high power consumption (exclude system processes)
+                high_power_user_processes = [
+                    p for p in top_processes
+                    if p['avg_power_watts'] > 25 and p.get('username', '').lower() not in system_usernames
+                ]
+
+                if high_power_user_processes:
                     recommendations.append({
                         'category': 'optimization',
                         'priority': 'medium',
-                        'title': 'High Power Consuming Processes Identified',
-                        'description': f'Found {len(high_power_processes)} processes with high power consumption',
+                        'title': 'High Power Consuming User Processes Identified',
+                        'description': f'Found {len(high_power_user_processes)} user processes with high power consumption',
                         'recommendations': [
-                            f"Optimize '{proc['process_name']}' (avg: {proc['avg_power_watts']:.1f}W)"
-                            for proc in high_power_processes[:3]
-                        ] + ['Consider process optimization or scheduling'],
-                        'processes': high_power_processes
+                            f"Optimize '{proc['process_name']}' (user: {proc.get('username', 'unknown')}, avg: {proc['avg_power_watts']:.1f}W)"
+                            for proc in high_power_user_processes[:3]
+                        ] + ['Consider process optimization or scheduling', 'Profile code for performance bottlenecks'],
+                        'processes': high_power_user_processes
                     })
 
             # Cost Estimation and Regional Comparison

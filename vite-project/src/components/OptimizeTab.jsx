@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Info, Loader2, CodeXml } from 'lucide-react';
 import apiClient from '../config/axios';
 import OptimizationResults from './OptimizationResults';
@@ -322,9 +322,21 @@ const OptimizeTab = () => {
     setError('');
   }, [optimizationMode, postDeploymentMode]);
 
+  // Track if post-deployment mode has changed (to prevent clearing on initial load)
+  const postDeploymentMountRef = useRef(false);
+
   // Clear post-deployment specific fields when switching between bare-metal and VM-level
   useEffect(() => {
     if (optimizationMode === 'post-deployment') {
+      // Skip on initial switch to post-deployment mode
+      if (!postDeploymentMountRef.current) {
+        postDeploymentMountRef.current = true;
+        console.log('[OptimizeTab] First time in post-deployment - skipping field clear');
+        return;
+      }
+
+      console.log('[OptimizeTab] User switched post-deployment sub-tabs - clearing mode-specific metrics only');
+
       if (postDeploymentMode === 'bare-metal') {
         // Clear VM-specific metrics when switching to bare-metal
         setVmGpuUtilization('');
@@ -352,16 +364,8 @@ const OptimizeTab = () => {
         setIsOverrideEnabled(false);
       }
 
-      // Clear model parameters when switching between modes for fresh start
-      setModelName('');
-      setFramework('');
-      setParameters('');
-      setModelSize('');
-      setArchitectureType('');
-      setModelType('');
-      setPrecision('');
-      setVocabularySize('');
-      setActivationFunction('');
+      // DO NOT clear model parameters - they should persist across bare-metal and VM-level
+      // These fields are the same "Runtime Parameters" in both sub-tabs
 
       // Reset advanced parameters visibility
       setShowAdvancedParamsBare(false);
@@ -370,8 +374,11 @@ const OptimizeTab = () => {
       // Always clear results when switching post-deployment tabs
       setOptimizationResults(null);
       setError('');
+    } else {
+      // Reset the ref when leaving post-deployment mode
+      postDeploymentMountRef.current = false;
     }
-  }, [postDeploymentMode]);
+  }, [postDeploymentMode, optimizationMode]);
 
   // Auto-fetch metrics when VM is selected
   useEffect(() => {
@@ -470,28 +477,26 @@ const OptimizeTab = () => {
     };
   }, [optimizationMode, postDeploymentMode, isOverrideEnabled]);
 
+  // Track if component has mounted (to prevent clearing fields on initial load)
+  const hasMounted = useRef(false);
+
   // Clear form data when switching between pre/post deployment modes
   useEffect(() => {
-    // Clear all form fields when mode changes
-    setModelName('');
-    setTaskType('');
-    setScenario('Single Stream');
-    setFramework('');
-    setModelSize('');
-    setParameters('');
-    setFlops('');
-    setModelType('');
-    setBatchSize('');
-    setInputSize('');
-    setIsFullTraining('No');
-    setArchitectureType('');
-    setHiddenLayers('');
-    setVocabularySize('');
-    setAttentionLayers('');
-    setActivationFunction('');
-    setPrecision('');
+    // Skip on initial mount to preserve User Goals auto-population
+    if (!hasMounted.current) {
+      hasMounted.current = true;
+      console.log('[OptimizeTab] Initial mount - skipping field clear to preserve User Goals');
+      return;
+    }
 
-    // Clear post-deployment specific fields
+    console.log('[OptimizeTab] User switched tabs - clearing mode-specific fields only');
+
+    // DO NOT clear shared model parameter fields (they're used in both pre and post-deployment)
+    // These fields should persist: modelName, taskType, framework, parameters, modelSize,
+    // architectureType, modelType, precision, vocabularySize, activationFunction, hiddenLayers,
+    // attentionLayers, embeddingDimension, ffnDimension, flops, batchSize, inputSize, outputSize, etc.
+
+    // Clear post-deployment specific fields only
     setGpuMemoryUsage('');
     setCpuMemoryUsage('');
     setCpuUtilization('');
@@ -1109,9 +1114,14 @@ const OptimizeTab = () => {
                 description: vmDescription,
                 recommendedInstance: primaryRecommendation,
                 expectedInferenceTime: `${optimizationSummary.expected_latency_ms || costAnalysis.latency_ms || 'Calculating...'} ms`,
-                costPer1000: `$${optimizationSummary.optimized_cost_per_1000_inferences || costAnalysis.optimized_cost_per_1000 || 'Calculating...'}`
+                costPer1000: `$${optimizationSummary.optimized_cost_per_1000_inferences || costAnalysis.optimized_cost_per_1000 || 'Calculating...'}`,
+                // Add VRAM allocation details
+                currentVRAM: `${vmConfig.current_vram_gb || 0} GB`,
+                requiredVRAM: `${modelReqs.estimated_vram_gb || 0} GB`,
+                recommendedVRAM: `${modelReqs.recommended_vram_gb || modelReqs.estimated_vram_gb || 0} GB`,
+                vramStatus: recommendation.recommendation_type
               },
-              vmMetrics: currentVmMetrics,
+              vmMetrics: currentVmMetrics, // Resource utilization metrics (GPU, CPU, etc.)
               advancedVmStats: vmAdvancedStats,
               hardwareAnalysis: {
                 name: `${vmConfig.vm_name} on ${vmConfig.host_hardware}`,
@@ -1137,12 +1147,28 @@ const OptimizeTab = () => {
                 resourceAnalysis: `Current: ${vmConfig.current_vram_gb}GB, Required: ${modelReqs.estimated_vram_gb}GB`
               }],
               analysisType: 'vm_level',
-              vmMetrics: {
+              // Cost and efficiency metrics (separate from resource metrics)
+              vmCostMetrics: {
                 currentCost: optimizationSummary.current_cost_per_1000_inferences || costAnalysis.current_vm_cost_per_1000,
                 optimizedCost: optimizationSummary.optimized_cost_per_1000_inferences || costAnalysis.optimized_cost_per_1000,
                 efficiencyScore: optimizationSummary.resource_efficiency_score || costAnalysis.efficiency_score,
                 costImpactFactor: optimizationSummary.cost_impact_factor || costAnalysis.cost_increase_factor
-              }
+              },
+              // Add model parameters for the report
+              modelParameters: {
+                modelName: modelName,
+                taskType: taskType,
+                framework: framework,
+                parameters: parameters,
+                modelSize: modelSize,
+                precision: precision,
+                inputSize: inputSize,
+                outputSize: outputSize,
+                batchSize: batchSize,
+                scenario: scenario
+              },
+              // Add post-deployment specific flag
+              isPostDeployment: true
             };
 
             console.log('VM-level optimization results:', vmFormattedResults);
@@ -1246,10 +1272,23 @@ const OptimizeTab = () => {
                 GFLOPs_Billions: parseFloat(flops) || 0
               };
 
+              // Add Inference-specific fields if task type is Inference
+              if (taskType === 'Inference') {
+                simulationParams.Input_Size = parseInt(inputSize) || 256;
+                simulationParams.Output_Size = parseInt(outputSize) || 256;
+                simulationParams.Batch_Size = parseInt(batchSize) || 1;
+              }
+
               // Add Training-specific fields if task type is Training
               if (taskType === 'Training') {
                 simulationParams.Batch_Size = parseInt(batchSize) || 1;
                 simulationParams.Input_Size = parseInt(inputSize) || 256;
+                simulationParams.Output_Size = parseInt(outputSize) || 256; // REQUIRED!
+                simulationParams.Training_Method = trainingMethod || 'Full Fine-tuning';
+                simulationParams.Optimizer = optimizer || 'AdamW';
+                simulationParams.Learning_Rate = parseFloat(learningRate) || 0.001;
+                simulationParams.Num_of_Epochs = parseInt(numOfEpochs) || 3;
+                simulationParams.Dataset_Size = parseInt(datasetSize) || 1000;
                 simulationParams.Full_Training = isFullTraining === 'Yes' ? 1 : 0;
               }
 

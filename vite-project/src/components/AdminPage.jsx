@@ -479,8 +479,8 @@ const AdminPage = () => {
         </div>
       </div>
       {/* Footer */}
-      <footer className="w-full fixed bottom-0 left-0 mt-auto py-4 px-6 text-center z-50 bg-gray-100 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
-        <div className="w-full mx-auto px-6 py-4">
+      <footer className="w-full fixed bottom-0 left-0 mt-auto py-3 px-6 text-center z-50 bg-gray-100 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
+        <div className="w-full mx-auto px-6 py-3">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div className="text-sm text-gray-600 dark:text-gray-300">
               &copy; {new Date().getFullYear()} Hewlett Packard Enterprise D evelopment LP

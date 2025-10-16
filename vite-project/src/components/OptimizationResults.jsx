@@ -288,6 +288,27 @@ const OptimizationResults = ({ results, mode }) => {
         <h2>Recommended Configuration</h2>
         <p>${recommendedConfiguration.description}</p>
 
+        ${recommendedConfiguration.recommendedVRAM ? `
+        <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 15px; margin: 20px 0;">
+            <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; font-size: 0.95em;">
+                <div>
+                    <span style="color: #6b7280;">Current VRAM Allocation:</span>
+                    <strong style="color: #1d4ed8; margin-left: 5px;">${recommendedConfiguration.currentVRAM}</strong>
+                </div>
+                <span style="color: #d1d5db;">|</span>
+                <div>
+                    <span style="color: #6b7280;">Model Required VRAM:</span>
+                    <strong style="color: #d97706; margin-left: 5px;">${recommendedConfiguration.requiredVRAM}</strong>
+                </div>
+                <span style="color: #d1d5db;">|</span>
+                <div>
+                    <span style="color: #6b7280;">Recommended VRAM:</span>
+                    <strong style="color: #059669; margin-left: 5px;">${recommendedConfiguration.recommendedVRAM}</strong>
+                </div>
+            </div>
+        </div>
+        ` : ''}
+
         <div class="recommended-config">
             <div class="config-card">
                 <h3>RECOMMENDED CONFIGURATION</h3>
@@ -303,6 +324,58 @@ const OptimizationResults = ({ results, mode }) => {
             </div>
         </div>
     </div>
+
+    ${mode === 'post-deployment' && results.modelParameters ? `
+    <div class="section">
+        <h2>AI Model Details</h2>
+        <p>Model characteristics and runtime parameters selected for optimization analysis.</p>
+
+        <div class="metrics-grid">
+            <div class="metric-item">
+                <div class="metric-label">Model Name</div>
+                <div class="metric-value">${results.modelParameters.modelName || 'N/A'}</div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-label">Task Type</div>
+                <div class="metric-value">${results.modelParameters.taskType || 'N/A'}</div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-label">Framework</div>
+                <div class="metric-value">${results.modelParameters.framework || 'N/A'}</div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-label">Total Parameters</div>
+                <div class="metric-value">${results.modelParameters.parameters || 'N/A'} Million</div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-label">Model Size</div>
+                <div class="metric-value">${results.modelParameters.modelSize || 'N/A'} MB</div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-label">Precision</div>
+                <div class="metric-value">${results.modelParameters.precision || 'N/A'}</div>
+            </div>
+            ${results.modelParameters.taskType === 'Inference' ? `
+            <div class="metric-item">
+                <div class="metric-label">Input Size</div>
+                <div class="metric-value">${results.modelParameters.inputSize || 'N/A'} tokens</div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-label">Output Size</div>
+                <div class="metric-value">${results.modelParameters.outputSize || 'N/A'} tokens</div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-label">Batch Size</div>
+                <div class="metric-value">${results.modelParameters.batchSize || 'N/A'}</div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-label">Scenario</div>
+                <div class="metric-value">${results.modelParameters.scenario || 'N/A'}</div>
+            </div>
+            ` : ''}
+        </div>
+    </div>
+    ` : ''}
 
     ${mode === 'post-deployment' ? `
     <div class="section">
@@ -659,7 +732,29 @@ const OptimizationResults = ({ results, mode }) => {
         <p className="text-center text-gray-600 dark:text-gray-300 mb-6">
           {recommendedConfiguration.description}
         </p>
-        
+
+        {/* VM-specific VRAM allocation info */}
+        {recommendedConfiguration.recommendedVRAM && (
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
+            <div className="flex flex-wrap items-center justify-center gap-4 text-sm">
+              <div className="flex items-center gap-2">
+                <span className="text-gray-600 dark:text-gray-300">Current VRAM Allocation:</span>
+                <span className="font-bold text-blue-700 dark:text-blue-300">{recommendedConfiguration.currentVRAM}</span>
+              </div>
+              <div className="text-gray-400">|</div>
+              <div className="flex items-center gap-2">
+                <span className="text-gray-600 dark:text-gray-300">Model Required VRAM:</span>
+                <span className="font-bold text-amber-700 dark:text-amber-300">{recommendedConfiguration.requiredVRAM}</span>
+              </div>
+              <div className="text-gray-400">|</div>
+              <div className="flex items-center gap-2">
+                <span className="text-gray-600 dark:text-gray-300">Recommended VRAM:</span>
+                <span className="font-bold text-green-700 dark:text-green-300">{recommendedConfiguration.recommendedVRAM}</span>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {recommendedConfiguration.recommendedMethod ? (
             // Optimization recommendations display

@@ -920,7 +920,21 @@ const ModelTab = () => {
 
             {/* Optimization Results */}
             {optimizationResults && (
-              <ModelOptimizerResults results={optimizationResults} />
+              <ModelOptimizerResults
+                results={optimizationResults}
+                modelParameters={{
+                  modelName,
+                  taskType,
+                  framework,
+                  modelType,
+                  modelSize: `${modelSize} MB`,
+                  parameters: `${parameters} Million`,
+                  batchSize,
+                  inputSize,
+                  precision,
+                  scenario
+                }}
+              />
             )}
           </div>
         </div>

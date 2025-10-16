@@ -3,6 +3,7 @@ import { Hpe, Moon, Sun, Notification, HelpOption, User} from 'grommet-icons';
 import { Link } from 'react-router-dom';
 import logo from '../assets/logo.png';
 import { useDarkMode } from '../contexts/DarkModeContext';
+import { useWalkthrough } from '../contexts/WalkthroughContext';
 import OptimizeTab from './OptimizeTab';
 import ModelTab from './ModelTab';
 import Sidebar from './Sidebar';
@@ -10,6 +11,7 @@ import Sidebar from './Sidebar';
 const AIWorkloadOptimizer = () => {
   const [activeTab, setActiveTab] = useState('optimize');
   const { isDarkMode, toggleDarkMode } = useDarkMode();
+  const { openWalkthrough } = useWalkthrough();
 
   // Navigation state for sidebar
   const [activeSection, setActiveSection] = useState('greenmatrix');
@@ -37,8 +39,9 @@ const AIWorkloadOptimizer = () => {
               {isDarkMode ? <Notification size="20" color="#67655eff" /> : <Notification size="20" color="#6b7280" />}
             </button>
             <button
-              onClick={toggleDarkMode}
+              onClick={openWalkthrough}
               className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
+              title="Show Dashboard Walkthrough"
             >
               {isDarkMode ? <HelpOption size="20" color="#67655eff" /> : <HelpOption size="20" color="#6b7280" />}
             </button>
@@ -130,8 +133,8 @@ const AIWorkloadOptimizer = () => {
         </div>
       </div>
       {/* Footer */}
-      <footer className="w-full fixed bottom-0 left-0 mt-auto py-4 px-6 text-center z-50 bg-gray-100 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
-        <div className="w-full mx-auto px-6 py-4">
+      <footer className="w-full fixed bottom-0 left-0 mt-auto py-3 px-6 text-center z-50 bg-gray-100 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
+        <div className="w-full mx-auto px-6 py-3">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div className="text-sm text-gray-600 dark:text-gray-300">
               &copy; {new Date().getFullYear()} Hewlett Packard Enterprise D evelopment LP

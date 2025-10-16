@@ -9,7 +9,9 @@ const SimulationResults = ({ results, title = "Simulation Results" }) => {
     return null;
   }
 
-  const { hardwareComparison, minimumVRAM } = results;
+  const { hardwareComparison, minimumVRAM, taskType } = results;
+  const isTraining = taskType === 'Training';
+  const isInference = taskType === 'Inference';
 
   const exportData = (format) => {
     if (format === 'json') {
@@ -26,11 +28,26 @@ const SimulationResults = ({ results, title = "Simulation Results" }) => {
       URL.revokeObjectURL(url);
       
     } else if (format === 'csv') {
-      // Export as CSV with new metrics
-      const headers = ['Hardware', 'Full Name', 'Latency (ms)', 'Throughput (tokens/sec)', 'Requests/sec', 'Time to 1st Token (ms)', 'Concurrent Users', 'Cost per 1000', 'Memory (GB)', 'Status'];
-      const csvContent = [
-        headers.join(','),
-        ...hardwareComparison.map(hw => [
+      // Export as CSV with conditional metrics based on task type
+      let headers, csvRows;
+
+      if (isTraining) {
+        // Training-specific CSV headers
+        headers = ['Hardware', 'Full Name', 'Latency (ms)', 'Throughput (tokens/sec)', 'Concurrent Jobs', 'Cost per 1000', 'Memory (GB)', 'Status'];
+        csvRows = hardwareComparison.map(hw => [
+          hw.name,
+          hw.fullName || 'N/A',
+          hw.latency.replace(' ms', ''),
+          (hw.throughput || 'N/A').replace(' tokens/sec', ''),
+          hw.concurrentJobs !== undefined ? hw.concurrentJobs : 'N/A',
+          hw.costPer1000,
+          hw.memory.replace(' GB', ''),
+          hw.status && hw.status.includes('wont run') ? 'Incompatible' : 'Compatible'
+        ].join(','));
+      } else {
+        // Inference-specific CSV headers (default)
+        headers = ['Hardware', 'Full Name', 'Latency (ms)', 'Throughput (tokens/sec)', 'Requests/sec', 'Time to 1st Token (ms)', 'Concurrent Users', 'Cost per 1000', 'Memory (GB)', 'Status'];
+        csvRows = hardwareComparison.map(hw => [
           hw.name,
           hw.fullName || 'N/A',
           hw.latency.replace(' ms', ''),
@@ -41,8 +58,10 @@ const SimulationResults = ({ results, title = "Simulation Results" }) => {
           hw.costPer1000,
           hw.memory.replace(' GB', ''),
           hw.status && hw.status.includes('wont run') ? 'Incompatible' : 'Compatible'
-        ].join(','))
-      ].join('\n');
+        ].join(','));
+      }
+
+      const csvContent = [headers.join(','), ...csvRows].join('\n');
       
       const blob = new Blob([csvContent], { type: 'text/csv' });
       const url = URL.createObjectURL(blob);
@@ -73,44 +92,69 @@ const SimulationResults = ({ results, title = "Simulation Results" }) => {
             margin: 0 auto;
             padding: 40px 20px;
             line-height: 1.6;
-            color: #1f2937;
-            background: #f3f4f6;
+            color: #333;
+            background: #f8f9fa;
         }
         .header {
             text-align: center;
             margin-bottom: 40px;
             padding: 30px;
-            background: linear-gradient(135deg, #4b5563 0%, #374151 100%);
+            background: linear-gradient(135deg, #01a982 0%, #059669 100%);
             color: white;
-            border-radius: 8px;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(1, 169, 130, 0.2);
         }
         .header h1 {
             margin: 0 0 10px 0;
             font-size: 2.5em;
-            font-weight: 600;
+            font-weight: 700;
         }
         .header p {
             margin: 5px 0;
             opacity: 0.9;
-            font-size: 1.05em;
+            font-size: 1.1em;
         }
         .section {
             background: white;
-            border-radius: 8px;
+            border-radius: 12px;
             padding: 30px;
-            margin-bottom: 25px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-            border: 1px solid #e5e7eb;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            border: 1px solid #e1e5e9;
         }
         .section h2 {
-            color: #374151;
+            color: #01a982;
             margin-top: 0;
-            margin-bottom: 20px;
-            font-size: 1.6em;
-            border-bottom: 2px solid #9ca3af;
+            margin-bottom: 25px;
+            font-size: 1.8em;
+            border-bottom: 3px solid #01a982;
             padding-bottom: 10px;
-            font-weight: 600;
+            font-weight: 700;
+        }
+        .recommended-config {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .config-card {
+            background: linear-gradient(135deg, #01a982 0%, #059669 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(1, 169, 130, 0.15);
+        }
+        .config-card h3 {
+            margin: 0 0 10px 0;
+            font-size: 0.9em;
+            opacity: 0.8;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .config-card .value {
+            font-size: 1.5em;
+            font-weight: 700;
         }
         .input-grid {
             display: grid;
@@ -298,6 +342,7 @@ const SimulationResults = ({ results, title = "Simulation Results" }) => {
                             <div class="metric-label">Throughput</div>
                             <div class="metric-value">${hw.throughput || 'N/A'}</div>
                         </div>
+                        ${taskType === 'Inference' ? `
                         <div class="metric">
                             <div class="metric-label">Requests/sec</div>
                             <div class="metric-value">${hw.requestsPerSec || 'N/A'}</div>
@@ -310,6 +355,13 @@ const SimulationResults = ({ results, title = "Simulation Results" }) => {
                             <div class="metric-label">Concurrent Users</div>
                             <div class="metric-value">${hw.concurrentUsers || 'N/A'}</div>
                         </div>
+                        ` : ''}
+                        ${taskType === 'Training' ? `
+                        <div class="metric">
+                            <div class="metric-label">Concurrent Jobs</div>
+                            <div class="metric-value">${hw.concurrentJobs !== undefined ? hw.concurrentJobs : 'N/A'}</div>
+                        </div>
+                        ` : ''}
                         <div class="metric">
                             <div class="metric-label">Cost per 1000</div>
                             <div class="metric-value" style="color: #10b981;">${hw.costPer1000}</div>
@@ -347,9 +399,14 @@ const SimulationResults = ({ results, title = "Simulation Results" }) => {
                     <th>Full Name</th>
                     <th>Latency (ms)</th>
                     <th>Throughput (tokens/sec)</th>
+                    ${taskType === 'Inference' ? `
                     <th>Requests/sec</th>
                     <th>Time to 1st Token (ms)</th>
                     <th>Concurrent Users</th>
+                    ` : ''}
+                    ${taskType === 'Training' ? `
+                    <th>Concurrent Jobs</th>
+                    ` : ''}
                     <th>Cost per 1000</th>
                     <th>Status</th>
                 </tr>
@@ -361,9 +418,14 @@ const SimulationResults = ({ results, title = "Simulation Results" }) => {
                         <td>${hw.fullName || 'N/A'}</td>
                         <td>${hw.latency}</td>
                         <td>${hw.throughput || 'N/A'}</td>
+                        ${taskType === 'Inference' ? `
                         <td>${hw.requestsPerSec || 'N/A'}</td>
                         <td>${hw.ttft || 'N/A'}</td>
                         <td>${hw.concurrentUsers || 'N/A'}</td>
+                        ` : ''}
+                        ${taskType === 'Training' ? `
+                        <td>${hw.concurrentJobs !== undefined ? hw.concurrentJobs : 'N/A'}</td>
+                        ` : ''}
                         <td style="color: #10b981; font-weight: 600;">${hw.costPer1000}</td>
                         <td style="color: ${hw.status && hw.status.includes('wont run') ? '#ef4444' : '#10b981'}; font-weight: 600;">${hw.status && hw.status.includes('wont run') ? 'Incompatible' : 'Compatible'}</td>
                     </tr>
@@ -427,35 +489,53 @@ const SimulationResults = ({ results, title = "Simulation Results" }) => {
             <p className="text-lg font-semibold">{hardware.throughput || 'N/A'}</p>
           </div>
 
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-4 h-4 border border-white rounded-full flex items-center justify-center">
-                <div className="w-2 h-2 bg-white rounded-full"></div>
+          {/* Inference-specific fields */}
+          {isInference && (
+            <>
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-4 h-4 border border-white rounded-full flex items-center justify-center">
+                    <div className="w-2 h-2 bg-white rounded-full"></div>
+                  </div>
+                  <span className="text-sm text-gray-600 dark:text-gray-300">Requests/sec</span>
+                </div>
+                <p className="text-lg font-semibold">{hardware.requestsPerSec || 'N/A'}</p>
               </div>
-              <span className="text-sm text-gray-600 dark:text-gray-300">Requests/sec</span>
-            </div>
-            <p className="text-lg font-semibold">{hardware.requestsPerSec || 'N/A'}</p>
-          </div>
 
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-4 h-4 border border-white rounded-full flex items-center justify-center">
-                <div className="w-2 h-2 bg-white rounded-full"></div>
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-4 h-4 border border-white rounded-full flex items-center justify-center">
+                    <div className="w-2 h-2 bg-white rounded-full"></div>
+                  </div>
+                  <span className="text-sm text-gray-600 dark:text-gray-300">Time to 1st Token</span>
+                </div>
+                <p className="text-lg font-semibold">{hardware.ttft || 'N/A'}</p>
               </div>
-              <span className="text-sm text-gray-600 dark:text-gray-300">Time to 1st Token</span>
-            </div>
-            <p className="text-lg font-semibold">{hardware.ttft || 'N/A'}</p>
-          </div>
 
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-4 h-4 border border-white rounded-full flex items-center justify-center">
-                <div className="w-2 h-2 bg-white rounded-full"></div>
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-4 h-4 border border-white rounded-full flex items-center justify-center">
+                    <div className="w-2 h-2 bg-white rounded-full"></div>
+                  </div>
+                  <span className="text-sm text-gray-600 dark:text-gray-300">Concurrent Users</span>
+                </div>
+                <p className="text-lg font-semibold">{hardware.concurrentUsers || 'N/A'}</p>
               </div>
-              <span className="text-sm text-gray-600 dark:text-gray-300">Concurrent Users</span>
+            </>
+          )}
+
+          {/* Training-specific fields */}
+          {isTraining && (
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-4 h-4 border border-white rounded-full flex items-center justify-center">
+                  <div className="w-2 h-2 bg-white rounded-full"></div>
+                </div>
+                <span className="text-sm text-gray-600 dark:text-gray-300">Concurrent Jobs</span>
+              </div>
+              <p className="text-lg font-semibold">{hardware.concurrentJobs !== undefined ? hardware.concurrentJobs : 'N/A'}</p>
             </div>
-            <p className="text-lg font-semibold">{hardware.concurrentUsers || 'N/A'}</p>
-          </div>
+          )}
 
           <div>
             <div className="flex items-center gap-2 mb-2">
@@ -665,15 +745,24 @@ const SimulationResults = ({ results, title = "Simulation Results" }) => {
                   <th className="border border-gray-200 dark:border-gray-600 px-4 py-3 text-center text-sm font-medium text-gray-700 dark:text-gray-200">
                     Throughput<br />(tokens/sec)
                   </th>
-                  <th className="border border-gray-200 dark:border-gray-600 px-4 py-3 text-center text-sm font-medium text-gray-700 dark:text-gray-200">
-                    Requests<br />/sec
-                  </th>
-                  <th className="border border-gray-200 dark:border-gray-600 px-4 py-3 text-center text-sm font-medium text-gray-700 dark:text-gray-200">
-                    Time to 1st Token<br />(ms)
-                  </th>
-                  <th className="border border-gray-200 dark:border-gray-600 px-4 py-3 text-center text-sm font-medium text-gray-700 dark:text-gray-200">
-                    Concurrent<br />Users
-                  </th>
+                  {isInference && (
+                    <>
+                      <th className="border border-gray-200 dark:border-gray-600 px-4 py-3 text-center text-sm font-medium text-gray-700 dark:text-gray-200">
+                        Requests<br />/sec
+                      </th>
+                      <th className="border border-gray-200 dark:border-gray-600 px-4 py-3 text-center text-sm font-medium text-gray-700 dark:text-gray-200">
+                        Time to 1st Token<br />(ms)
+                      </th>
+                      <th className="border border-gray-200 dark:border-gray-600 px-4 py-3 text-center text-sm font-medium text-gray-700 dark:text-gray-200">
+                        Concurrent<br />Users
+                      </th>
+                    </>
+                  )}
+                  {isTraining && (
+                    <th className="border border-gray-200 dark:border-gray-600 px-4 py-3 text-center text-sm font-medium text-gray-700 dark:text-gray-200">
+                      Concurrent<br />Jobs
+                    </th>
+                  )}
                   <th className="border border-gray-200 dark:border-gray-600 px-4 py-3 text-center text-sm font-medium text-gray-700 dark:text-gray-200">
                     Cost per<br />1000
                   </th>
@@ -698,15 +787,24 @@ const SimulationResults = ({ results, title = "Simulation Results" }) => {
                     <td className="border border-gray-200 dark:border-gray-600 px-4 py-3 text-center text-gray-900 dark:text-white">
                       {hardware.throughput || 'N/A'}
                     </td>
-                    <td className="border border-gray-200 dark:border-gray-600 px-4 py-3 text-center text-gray-900 dark:text-white">
-                      {hardware.requestsPerSec || 'N/A'}
-                    </td>
-                    <td className="border border-gray-200 dark:border-gray-600 px-4 py-3 text-center text-gray-900 dark:text-white">
-                      {hardware.ttft || 'N/A'}
-                    </td>
-                    <td className="border border-gray-200 dark:border-gray-600 px-4 py-3 text-center text-gray-900 dark:text-white">
-                      {hardware.concurrentUsers || 'N/A'}
-                    </td>
+                    {isInference && (
+                      <>
+                        <td className="border border-gray-200 dark:border-gray-600 px-4 py-3 text-center text-gray-900 dark:text-white">
+                          {hardware.requestsPerSec || 'N/A'}
+                        </td>
+                        <td className="border border-gray-200 dark:border-gray-600 px-4 py-3 text-center text-gray-900 dark:text-white">
+                          {hardware.ttft || 'N/A'}
+                        </td>
+                        <td className="border border-gray-200 dark:border-gray-600 px-4 py-3 text-center text-gray-900 dark:text-white">
+                          {hardware.concurrentUsers || 'N/A'}
+                        </td>
+                      </>
+                    )}
+                    {isTraining && (
+                      <td className="border border-gray-200 dark:border-gray-600 px-4 py-3 text-center text-gray-900 dark:text-white">
+                        {hardware.concurrentJobs !== undefined ? hardware.concurrentJobs : 'N/A'}
+                      </td>
+                    )}
                     <td className="border border-gray-200 dark:border-gray-600 px-4 py-3 text-center text-gray-900 dark:text-white font-medium">
                       {hardware.costPer1000}
                     </td>
