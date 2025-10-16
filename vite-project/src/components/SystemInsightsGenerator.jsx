@@ -951,7 +951,13 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode, 
   // Generate HTML report for backend recommendations
   const generateBackendHTMLReport = (backendData) => {
     const hostAnalysis = backendData.host_analysis || {};
-    const recommendations = backendData.recommendations || [];
+    // Filter out regional/location-based cost optimization recommendations
+    const recommendations = (backendData.recommendations || []).filter(r =>
+      !(r.category === 'cost_optimization' &&
+        (r.title?.toLowerCase().includes('region') ||
+         r.title?.toLowerCase().includes('migration') ||
+         r.description?.toLowerCase().includes('migrate to')))
+    );
     const analysisDate = backendData.analysis_period || `Last ${timeRangeDays} days`;
 
     // Calculate combined system power
@@ -1198,7 +1204,27 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode, 
                   <h5 style="margin: 0 0 8px 0; color: #92400e; font-size: 14px;">Key Metrics</h5>
                   ${Object.entries(rec.statistics).map(([key, value]) => {
                     const formattedKey = key.replace(/_/g, ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-                    return `<p style="margin: 4px 0; color: #78350f; font-size: 13px;"><strong>${formattedKey}:</strong> ${typeof value === 'number' ? value.toFixed(1) : value}</p>`;
+
+                    // Format value based on type
+                    let formattedValue;
+                    if (typeof value === 'number') {
+                      formattedValue = value.toFixed(1);
+                    } else if (Array.isArray(value)) {
+                      // Handle arrays of process objects
+                      if (value.length > 0 && typeof value[0] === 'object' && value[0].process_name) {
+                        formattedValue = value.map(proc =>
+                          `${proc.process_name} (efficiency: ${proc.cpu_efficiency_per_watt?.toFixed(3) || 'N/A'} CPU%/W)`
+                        ).join(', ');
+                      } else {
+                        formattedValue = value.join(', ');
+                      }
+                    } else if (typeof value === 'object' && value !== null) {
+                      formattedValue = JSON.stringify(value);
+                    } else {
+                      formattedValue = value;
+                    }
+
+                    return `<p style="margin: 4px 0; color: #78350f; font-size: 13px;"><strong>${formattedKey}:</strong> ${formattedValue}</p>`;
                   }).join('')}
                 </div>
               ` : ''}
@@ -1309,7 +1335,13 @@ const SystemInsightsGenerator = ({ processData, vmData, selectedDate, viewMode, 
     if (isBackendAvailable && backendRecommendations) {
       const backendRecs = backendRecommendations.recommendations || [];
       // Transform backend recommendations to match client-side format for display
-      const cost = backendRecs.filter(r => r.category === 'cost_optimization');
+      // Filter out regional/location-based cost optimization recommendations
+      const cost = backendRecs.filter(r =>
+        r.category === 'cost_optimization' &&
+        !r.title?.toLowerCase().includes('region') &&
+        !r.title?.toLowerCase().includes('migration') &&
+        !r.description?.toLowerCase().includes('migrate to')
+      );
       const scaling = backendRecs.filter(r => r.category === 'performance');
       const performance = backendRecs.filter(r => r.category === 'optimization');
       const security = backendRecs.filter(r => r.category === 'maintenance');
