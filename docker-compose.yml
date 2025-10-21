@@ -117,6 +117,7 @@ services:
     volumes:
       - timescaledb_data:/var/lib/postgresql/data
       - ./backend/vm_metrics_init.sql:/docker-entrypoint-initdb.d/01-vm-metrics-init.sql:ro
+      - ./backend/host_metrics_init.sql:/docker-entrypoint-initdb.d/02-host-metrics-init.sql:ro
     ports:
       - "${TIMESCALEDB_PORT:-5433}:5432"
     healthcheck:

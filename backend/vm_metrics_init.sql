@@ -99,23 +99,39 @@ CREATE INDEX IF NOT EXISTS idx_vm_process_metrics_high_memory
     ON vm_process_metrics (timestamp DESC) 
     WHERE memory_usage_percent > 75;
 
-CREATE INDEX IF NOT EXISTS idx_vm_process_metrics_high_gpu 
-    ON vm_process_metrics (timestamp DESC) 
+CREATE INDEX IF NOT EXISTS idx_vm_process_metrics_high_gpu
+    ON vm_process_metrics (timestamp DESC)
     WHERE gpu_utilization_percent > 50;
 
 -- NEW: Indexes for VM-level memory fields
-CREATE INDEX IF NOT EXISTS idx_vm_process_metrics_vm_ram 
+CREATE INDEX IF NOT EXISTS idx_vm_process_metrics_vm_ram
     ON vm_process_metrics (vm_name, vm_ram_usage_percent DESC, timestamp DESC);
 
-CREATE INDEX IF NOT EXISTS idx_vm_process_metrics_vm_vram 
+CREATE INDEX IF NOT EXISTS idx_vm_process_metrics_vm_vram
     ON vm_process_metrics (vm_name, vm_vram_usage_percent DESC, timestamp DESC);
 
-CREATE INDEX IF NOT EXISTS idx_vm_process_metrics_high_vm_ram 
-    ON vm_process_metrics (timestamp DESC) 
+CREATE INDEX IF NOT EXISTS idx_vm_process_metrics_high_vm_ram
+    ON vm_process_metrics (timestamp DESC)
     WHERE vm_ram_usage_percent > 80;
 
-CREATE INDEX IF NOT EXISTS idx_vm_process_metrics_high_vm_vram 
-    ON vm_process_metrics (timestamp DESC) 
+CREATE INDEX IF NOT EXISTS idx_vm_process_metrics_high_vm_vram
+    ON vm_process_metrics (timestamp DESC)
+    WHERE vm_vram_usage_percent > 80;
+
+-- =====================================================================
+-- ADDITIONAL INDEXES (from Migration 001 - integrated for fresh deploys)
+-- =====================================================================
+
+-- High VM RAM usage partial index (from Migration 001)
+-- Speeds up queries for VMs with high RAM usage (>80%)
+CREATE INDEX IF NOT EXISTS idx_vm_process_high_ram_usage
+    ON vm_process_metrics (timestamp DESC, vm_ram_usage_percent)
+    WHERE vm_ram_usage_percent > 80;
+
+-- High VM VRAM usage partial index (from Migration 001)
+-- Speeds up queries for VMs with high VRAM usage (>80%)
+CREATE INDEX IF NOT EXISTS idx_vm_process_high_vram_usage
+    ON vm_process_metrics (timestamp DESC, vm_vram_usage_percent)
     WHERE vm_vram_usage_percent > 80;
 
 -- Create a view for latest metrics per VM
@@ -333,11 +349,29 @@ CREATE TRIGGER trigger_high_resource_usage
 -- Print setup completion message
 DO $$
 BEGIN
-    RAISE NOTICE 'VM Metrics TimescaleDB setup completed successfully!';
+    RAISE NOTICE '';
+    RAISE NOTICE '===================================================================';
+    RAISE NOTICE '✅ VM Metrics TimescaleDB Initialization Completed Successfully!';
+    RAISE NOTICE '===================================================================';
+    RAISE NOTICE '';
     RAISE NOTICE 'Created hypertable: vm_process_metrics';
     RAISE NOTICE 'Created views: vm_process_metrics_latest, vm_metrics_summary';
     RAISE NOTICE 'Created materialized view: vm_metrics_daily';
-    RAISE NOTICE 'Set up retention policy: 90 days';
+    RAISE NOTICE '';
+    RAISE NOTICE 'Added 10+ performance indexes including:';
+    RAISE NOTICE '  - VM name + timestamp indexes';
+    RAISE NOTICE '  - Process name + timestamp indexes';
+    RAISE NOTICE '  - High CPU, memory, GPU partial indexes';
+    RAISE NOTICE '  - VM RAM/VRAM usage indexes (from Migration 001)';
+    RAISE NOTICE '';
+    RAISE NOTICE 'Configured policies:';
+    RAISE NOTICE '  - Data retention: 90 days';
+    RAISE NOTICE '  - Daily aggregation policy';
+    RAISE NOTICE '';
     RAISE NOTICE 'Created function: get_vm_health_status()';
+    RAISE NOTICE '';
     RAISE NOTICE 'Ready to accept VM monitoring data!';
+    RAISE NOTICE '';
+    RAISE NOTICE '===================================================================';
+    RAISE NOTICE '';
 END $$;
