@@ -1,0 +1,105 @@
+# GreenMatrix Git Attributes Configuration
+# This file ensures consistent line endings across Windows, Mac, and Linux
+
+# Auto detect text files and normalize to LF on checkin
+* text=auto
+
+# ===================================================================
+# Shell Scripts - CRITICAL: Must use LF (Unix) line endings
+# These scripts run inside Docker Linux containers and will fail with CRLF
+# ===================================================================
+*.sh text eol=lf
+
+# ===================================================================
+# Windows Batch Files - Use CRLF (Windows) line endings
+# ===================================================================
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# ===================================================================
+# SQL Files - Use LF for consistency with Docker PostgreSQL/TimescaleDB
+# ===================================================================
+*.sql text eol=lf
+
+# ===================================================================
+# Python Files - Use LF (PEP 8 standard)
+# ===================================================================
+*.py text eol=lf
+
+# ===================================================================
+# Configuration Files
+# ===================================================================
+*.ini text eol=lf
+*.conf text eol=lf
+*.config text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.toml text eol=lf
+
+# ===================================================================
+# Web Files
+# ===================================================================
+*.html text eol=lf
+*.css text eol=lf
+*.js text eol=lf
+*.jsx text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.md text eol=lf
+
+# ===================================================================
+# Docker Files
+# ===================================================================
+Dockerfile text eol=lf
+*.dockerfile text eol=lf
+.dockerignore text eol=lf
+docker-compose.yml text eol=lf
+
+# ===================================================================
+# Environment Files
+# ===================================================================
+.env text eol=lf
+.env.* text eol=lf
+.gitignore text eol=lf
+.gitattributes text eol=lf
+
+# ===================================================================
+# Binary Files - Never modify these
+# ===================================================================
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.tar binary
+*.gz binary
+*.7z binary
+*.pkl binary
+*.pickle binary
+*.h5 binary
+*.hdf5 binary
+*.pt binary
+*.pth binary
+*.onnx binary
+*.db binary
+*.sqlite binary
+*.whl binary
+
+# ===================================================================
+# Font Files
+# ===================================================================
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.otf binary
+
+# ===================================================================
+# Archive Files
+# ===================================================================
+*.tar.gz binary
+*.tgz binary

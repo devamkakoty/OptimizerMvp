@@ -1157,10 +1157,284 @@ lxc start vm-instance-1
 
 ## Docker-based Deployment
 
-### Docker Compose Configuration
+### Automated Quick Start Deployment (Recommended)
+
+GreenMatrix provides automated deployment scripts for both Windows and Linux that handle the entire setup process. This is the **recommended method** for new deployments.
+
+---
+
+### 🪟 Windows Automated Deployment
+
+#### Prerequisites
+1. **Docker Desktop for Windows** (version 4.0+)
+   - Download from: https://docs.docker.com/desktop/install/windows/
+   - Ensure WSL2 backend is enabled
+   - Allocate at least 8GB RAM in Docker Desktop settings
+2. **Git for Windows**
+   - Download from: https://git-scm.com/download/win
+
+#### Step-by-Step Deployment
+
+1. **Verify Prerequisites**
+```cmd
+REM Check Docker is installed
+docker --version
+
+REM Check Docker is running
+docker info
+
+REM Check Docker Compose available
+docker-compose --version
+```
+
+2. **Clone Repository**
+```cmd
+git clone https://github.com/YOUR_ORG/GreenMatrix.git
+cd GreenMatrix
+```
+
+3. **Run Automated Setup**
+```cmd
+REM Run the automated setup script
+setup-greenmatrix.bat
+```
+
+The script will automatically:
+- ✅ Verify Docker is installed and running
+- ✅ Create `.env` configuration from template (with secure defaults)
+- ✅ Create required directories (airflow/logs, data/, etc.)
+- ✅ Start PostgreSQL database (port 5432)
+- ✅ Start TimescaleDB database (port 5433) with optimized hypertables and indexes
+- ✅ Start Redis cache (port 6379)
+- ✅ Initialize Airflow monitoring system (port 8080)
+- ✅ Start Backend API service (port 8000)
+- ✅ Start Frontend Dashboard (port 3000)
+- ✅ Initialize all databases with proper schemas
+- ✅ Create 18+ performance indexes for time-series data
+- ✅ Load sample cost models and hardware configurations
+
+**Deployment Time:** 5-10 minutes (including Docker image downloads)
+
+4. **Verify Deployment**
+```cmd
+REM Check all containers are running
+docker-compose ps
+
+REM View service logs
+docker-compose logs backend
+docker-compose logs timescaledb
+
+REM Test API endpoint
+curl http://localhost:8000/health
+```
+
+5. **Access the Application**
+Open your browser to:
+- **Frontend Dashboard:** http://localhost:3000
+- **Backend API:** http://localhost:8000
+- **API Documentation:** http://localhost:8000/docs
+- **Airflow Monitoring:** http://localhost:8080 (credentials: airflow / airflow)
+
+#### Windows Troubleshooting
+
+**Issue: Docker not running**
+```cmd
+REM Start Docker Desktop from Start Menu
+REM Wait for Docker icon in system tray to show "Docker Desktop is running"
+```
+
+**Issue: Port conflicts (3000, 8000, 8080 already in use)**
+```cmd
+REM Find process using the port
+netstat -ano | findstr :3000
+
+REM Kill the process (replace <PID> with actual process ID)
+taskkill /PID <PID> /F
+```
+
+**Issue: PostgreSQL fails to start**
+```cmd
+REM Check .env file has POSTGRES_PASSWORD set
+type .env | findstr POSTGRES_PASSWORD
+
+REM If empty, edit .env and set:
+REM POSTGRES_PASSWORD=password
+
+REM Restart services
+docker-compose restart postgres
+```
+
+---
+
+### 🐧 Linux Automated Deployment
+
+#### Prerequisites
+```bash
+# Ubuntu/Debian
+sudo apt update
+sudo apt install -y docker.io docker-compose git
+
+# RHEL/CentOS/Fedora
+sudo yum install -y docker docker-compose git
+
+# Start and enable Docker
+sudo systemctl start docker
+sudo systemctl enable docker
+
+# Add user to docker group (avoid sudo for docker commands)
+sudo usermod -aG docker $USER
+newgrp docker
+
+# Verify installation
+docker --version
+docker-compose --version
+```
+
+#### Step-by-Step Deployment
+
+1. **Clone Repository**
+```bash
+git clone https://github.com/YOUR_ORG/GreenMatrix.git
+cd GreenMatrix
+```
+
+2. **Run Automated Setup**
+```bash
+# Make script executable
+chmod +x setup-greenmatrix.sh
+
+# Run automated setup
+./setup-greenmatrix.sh
+```
+
+The script will automatically:
+- ✅ Check all prerequisites (Docker, Docker Compose)
+- ✅ Create `.env` configuration from template
+- ✅ Set appropriate AIRFLOW_UID for current user
+- ✅ Create required directories with proper permissions
+- ✅ Build and start all Docker services
+- ✅ Initialize PostgreSQL and TimescaleDB with optimized schemas
+- ✅ Set up systemd service for host metrics collection
+- ✅ Configure VM monitoring agent deployment
+- ✅ Initialize Airflow monitoring and alerting
+- ✅ Perform comprehensive health checks
+- ✅ Display access URLs and credentials
+
+**Deployment Time:** 5-10 minutes
+
+3. **Verify Deployment**
+```bash
+# Check container status
+docker-compose ps
+
+# View comprehensive logs
+docker-compose logs -f
+
+# Check database indexes created
+docker-compose exec timescaledb psql -U postgres -d vm_metrics_ts -c "\d+ vm_process_metrics"
+
+# Verify hypertables
+docker-compose exec timescaledb psql -U postgres -d vm_metrics_ts -c "SELECT * FROM timescaledb_information.hypertables;"
+```
+
+4. **Access the Application**
+- **Frontend Dashboard:** http://localhost:3000
+- **Backend API:** http://localhost:8000/docs
+- **Airflow UI:** http://localhost:8080 (airflow/airflow)
+
+#### Linux-Specific Features
+
+**Host Metrics Collection (Systemd Service)**
+```bash
+# Check systemd service status
+systemctl status greenmatrix-host-metrics
+
+# View real-time logs
+journalctl -u greenmatrix-host-metrics -f
+
+# Restart service
+sudo systemctl restart greenmatrix-host-metrics
+```
+
+**Deploy VM Monitoring to Other Machines**
+```bash
+# Deploy agent to remote VM
+sudo ./deploy-vm-agent.sh
+
+# The script will auto-discover backend URL or prompt for it
+```
+
+#### Linux Troubleshooting
+
+**Issue: Permission denied accessing Docker socket**
+```bash
+# Add user to docker group
+sudo usermod -aG docker $USER
+
+# Log out and back in, or run:
+newgrp docker
+```
+
+**Issue: Containers fail due to resource limits**
+```bash
+# Check Docker resources
+docker system df
+docker system prune -a  # Free space
+
+# Increase Docker limits (edit /etc/docker/daemon.json)
+{
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "10m",
+    "max-file": "3"
+  }
+}
+
+sudo systemctl restart docker
+```
+
+---
+
+### Environment Configuration (.env File)
+
+Both automated scripts create a `.env` file from `.env.example` with secure defaults. Key configurations:
+
+```ini
+# Database Configuration
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=password           # Change in production!
+POSTGRES_DB=greenmatrix
+POSTGRES_PORT=5432
+
+# TimescaleDB Configuration
+TIMESCALEDB_PORT=5433               # Time-series database
+
+# Application Ports
+BACKEND_PORT=8000
+FRONTEND_PORT=3000
+
+# Airflow Configuration
+AIRFLOW_UID=50000                   # Auto-set by Linux script
+AIRFLOW_FERNET_KEY=<auto-generated>
+
+# Security
+SECRET_KEY=<change-in-production>
+```
+
+**Important:** After initial deployment, review and update:
+- `POSTGRES_PASSWORD` - Use strong password for production
+- `SECRET_KEY` - Generate unique key for JWT tokens
+- Alert email addresses
+- SMTP settings for email notifications
+
+---
+
+### Manual Docker Compose Configuration
+
+For advanced users who need custom configurations or want to understand the deployment details:
 
 #### Docker Compose File Creation
-Create comprehensive Docker Compose configuration:
+The repository includes a production-ready `docker-compose.yml`. To create a custom configuration:
 
 ```bash
 # Create Docker Compose file
