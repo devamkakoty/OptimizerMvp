@@ -109,14 +109,19 @@ start_services() {
     
     # Start core services first
     print_status "Starting database and core services..."
-    docker-compose up -d postgres redis
-    
-    # Wait for database to be ready
-    print_status "Waiting for database to be ready..."
+    docker-compose up -d postgres timescaledb redis
+
+    # Wait for databases to be ready
+    print_status "Waiting for PostgreSQL to be ready..."
     while ! docker-compose exec -T postgres pg_isready -U postgres; do
         sleep 2
     done
-    
+
+    print_status "Waiting for TimescaleDB to be ready..."
+    while ! docker-compose exec -T timescaledb pg_isready -U postgres; do
+        sleep 2
+    done
+
     # Start Airflow database
     print_status "Starting Airflow database..."
     docker-compose up -d airflow-postgres

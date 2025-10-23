@@ -1788,22 +1788,155 @@ docker logs greenmatrix-backend -f
 
 ## System Verification and Testing
 
+### Automated Deployment Verification Script
+
+GreenMatrix includes a comprehensive verification script (`backend/verify_indexes.sql`) that validates the complete database setup including all indexes, hypertables, compression policies, and data retention policies.
+
+#### Running the Verification Script
+
+**For Docker Deployments:**
+```bash
+# Copy verification script to TimescaleDB container
+docker cp backend/verify_indexes.sql greenmatrix-timescaledb:/tmp/
+
+# Run comprehensive verification
+docker exec -it greenmatrix-timescaledb psql -U postgres -f /tmp/verify_indexes.sql
+```
+
+**For Manual Installations:**
+```bash
+# Run verification script directly
+psql -U postgres -p 5433 -f backend/verify_indexes.sql
+```
+
+The verification script comprehensively checks:
+- ✅ TimescaleDB extension installation and version
+- ✅ 3 hypertables created (vm_process_metrics, host_process_metrics, host_overall_metrics)
+- ✅ 18+ performance indexes across all time-series tables
+- ✅ Compression policies configured (compresses data older than 7 days for 90% space savings)
+- ✅ Retention policies configured (auto-deletes data older than 90 days)
+- ✅ Host metrics tables properly migrated to TimescaleDB (not in Metrics_db)
+- ✅ Hardware_specs indexes in greenmatrix database (region, OS)
+
+**Expected Verification Output:**
+```
+=====================================================================
+GreenMatrix Performance Index Verification
+=====================================================================
+
+PART 1: TimescaleDB (vm_metrics_ts) - Port 5433
+---------------------------------------------------------------------
+✅ TimescaleDB extension is installed
+
+Checking hypertables...
+ hypertable_name        | num_dimensions | num_chunks | compression_enabled
+-----------------------+----------------+------------+---------------------
+ host_overall_metrics  |              1 |          1 | t
+ host_process_metrics  |              1 |          1 | t
+ vm_process_metrics    |              1 |          2 | t
+(3 rows)
+
+Indexes on host_process_metrics (Expected: 6)
+ indexname                                  | index_size | description
+-------------------------------------------+------------+---------------------------
+ idx_host_process_high_cpu_usage           | 8192 bytes | ✅ High CPU partial index
+ idx_host_process_high_memory_usage        | 8192 bytes | ✅ High memory partial index
+ idx_host_process_name_time                | 16 kB      | ✅ Process name + time index
+ idx_host_process_process_id               | 16 kB      | ✅ Process ID index
+ idx_host_process_timestamp_desc           | 16 kB      | ✅ Timestamp index
+ idx_host_process_user_time                | 16 kB      | ✅ Username + time index
+
+Indexes on host_overall_metrics (Expected: 2)
+ indexname                                  | index_size | description
+-------------------------------------------+------------+---------------------------
+ idx_host_overall_high_gpu_usage           | 8192 bytes | ✅ High GPU partial index
+ idx_host_overall_timestamp_desc           | 16 kB      | ✅ Timestamp index
+
+Indexes on vm_process_metrics (Expected: 10+)
+ indexname                                  | index_size | description
+-------------------------------------------+------------+---------------------------
+ idx_vm_process_high_cpu_usage             | 8192 bytes | ✅ High CPU partial index
+ idx_vm_process_high_gpu_usage             | 8192 bytes | ✅ High GPU partial index
+ idx_vm_process_high_memory_usage          | 8192 bytes | ✅ High memory partial index
+ idx_vm_process_high_ram_usage             | 8192 bytes | ✅ High VM RAM partial index (Migration 001)
+ idx_vm_process_high_vram_usage            | 8192 bytes | ✅ High VM VRAM partial index (Migration 001)
+ idx_vm_process_name_time                  | 24 kB      | ✅ Process name + time index
+ idx_vm_process_username                   | 24 kB      | ✅ Username index
+ idx_vm_process_vm_name_time               | 24 kB      | ✅ VM name + time index
+ idx_vm_process_vm_ram_usage               | 24 kB      | ✅ VM RAM index
+ idx_vm_process_vm_vram_usage              | 24 kB      | ✅ VM VRAM index
+
+TimescaleDB Summary
+---------------------------------------------------------------------
+ host_process_indexes | host_overall_indexes | vm_process_indexes | total_indexes
+----------------------+----------------------+--------------------+---------------
+                    6 |                    2 |                 10 |            18
+
+Expected performance improvements:
+  - Dashboard load: 5-10 seconds (vs 5-10 min without indexes)
+  - Timestamp queries: 100-1000x faster
+  - Process filtering: 50-100x faster
+  - Database size: 90% smaller (with compression after 7 days)
+
+PART 2: PostgreSQL (Metrics_db) - Port 5432
+---------------------------------------------------------------------
+✅ CORRECT: host_process_metrics NOT in Metrics_db (should be in TimescaleDB)
+✅ CORRECT: host_overall_metrics NOT in Metrics_db (should be in TimescaleDB)
+
+FINAL VERIFICATION SUMMARY
+=====================================================================
+✅ ALL VALIDATIONS PASSED!
+If you see this far, your database initialization is mostly correct!
+=====================================================================
+```
+
 ### Component Testing
 
 #### Database Connectivity Testing
 Verify database connections and schema:
 
+**For Docker Deployments:**
 ```bash
-# Test PostgreSQL connectivity
-psql -h localhost -U greenmatrix -d Model_Recommendation_DB -c "SELECT version();"
-psql -h localhost -U greenmatrix -d Metrics_db -c "SELECT version();"
-psql -h localhost -U greenmatrix -d vm_metrics_ts -c "SELECT version();"
+# Test PostgreSQL connectivity (Port 5432)
+docker-compose exec postgres psql -U postgres -d greenmatrix -c "SELECT version();"
+docker-compose exec postgres psql -U postgres -d Model_Recommendation_DB -c "SELECT version();"
+docker-compose exec postgres psql -U postgres -d Metrics_db -c "SELECT version();"
+
+# Test TimescaleDB connectivity (Port 5433)
+docker-compose exec timescaledb psql -U postgres -d vm_metrics_ts -c "SELECT version();"
 
 # Test TimescaleDB extension
-psql -h localhost -U greenmatrix -d vm_metrics_ts -c "SELECT * FROM pg_extension WHERE extname = 'timescaledb';"
+docker-compose exec timescaledb psql -U postgres -d vm_metrics_ts -c "SELECT * FROM pg_extension WHERE extname = 'timescaledb';"
+
+# Verify hypertables created
+docker-compose exec timescaledb psql -U postgres -d vm_metrics_ts -c "SELECT hypertable_name, num_dimensions, num_chunks, compression_enabled FROM timescaledb_information.hypertables;"
+
+# Count indexes (should be 18+)
+docker-compose exec timescaledb psql -U postgres -d vm_metrics_ts -c "SELECT COUNT(*) as total_indexes FROM pg_indexes WHERE schemaname = 'public' AND indexname LIKE 'idx_%';"
+
+# Check compression policies
+docker-compose exec timescaledb psql -U postgres -d vm_metrics_ts -c "SELECT hypertable_name, older_than FROM timescaledb_information.jobs WHERE proc_name = 'policy_compression';"
+
+# Check retention policies
+docker-compose exec timescaledb psql -U postgres -d vm_metrics_ts -c "SELECT hypertable_name, older_than FROM timescaledb_information.jobs WHERE proc_name = 'policy_retention';"
+
+# Verify table creation in Metrics_db
+docker-compose exec postgres psql -U postgres -d Metrics_db -c "\dt"
+```
+
+**For Manual Installations:**
+```bash
+# Test PostgreSQL connectivity
+psql -h localhost -U postgres -p 5432 -d Model_Recommendation_DB -c "SELECT version();"
+psql -h localhost -U postgres -p 5432 -d Metrics_db -c "SELECT version();"
+
+# Test TimescaleDB connectivity
+psql -h localhost -U postgres -p 5433 -d vm_metrics_ts -c "SELECT version();"
+psql -h localhost -U postgres -p 5433 -d vm_metrics_ts -c "SELECT * FROM pg_extension WHERE extname = 'timescaledb';"
 
 # Verify table creation
-psql -h localhost -U greenmatrix -d Metrics_db -c "\dt"
+psql -h localhost -U postgres -p 5432 -d Metrics_db -c "\dt"
+psql -h localhost -U postgres -p 5433 -d vm_metrics_ts -c "\dt"
 ```
 
 #### Backend Service Testing

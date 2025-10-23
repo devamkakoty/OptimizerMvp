@@ -95,15 +95,23 @@ call :print_step "Building and starting GreenMatrix services..."
 
 REM Start core services first
 call :print_status "Starting database and core services..."
-docker-compose up -d postgres redis
+docker-compose up -d postgres timescaledb redis
 
-REM Wait for database to be ready
-call :print_status "Waiting for database to be ready..."
+REM Wait for databases to be ready
+call :print_status "Waiting for PostgreSQL to be ready..."
 :wait_db
 docker-compose exec -T postgres pg_isready -U postgres >nul 2>&1
 if errorlevel 1 (
     timeout /t 2 /nobreak >nul
     goto wait_db
+)
+
+call :print_status "Waiting for TimescaleDB to be ready..."
+:wait_timescaledb
+docker-compose exec -T timescaledb pg_isready -U postgres >nul 2>&1
+if errorlevel 1 (
+    timeout /t 2 /nobreak >nul
+    goto wait_timescaledb
 )
 
 REM Start Airflow database
