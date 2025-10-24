@@ -157,80 +157,26 @@ setup_databases() {
 # Setup host metrics collection
 setup_host_metrics_collection() {
     print_step "Setting up host metrics collection service..."
-    
+
     # Check if running as root (needed for systemd service)
     if [ "$EUID" -ne 0 ]; then
         print_warning "Host metrics collection requires root access for systemd service setup"
         print_status "You can set this up later by running: sudo ./setup-host-metrics.sh"
         return 0
     fi
-    
-    # Install Python dependencies for host metrics collection
-    print_status "Installing Python dependencies for host metrics..."
-    if command -v apt >/dev/null 2>&1; then
-        apt update && apt install -y python3 python3-pip
-        pip3 install psutil requests python-dateutil configparser
-        # Install NVIDIA monitoring if GPU present
-        if lspci | grep -i nvidia >/dev/null 2>&1; then
-            print_status "NVIDIA GPU detected, installing pynvml..."
-            pip3 install pynvml
-        fi
-    elif command -v yum >/dev/null 2>&1; then
-        yum install -y python3 python3-pip
-        pip3 install psutil requests python-dateutil configparser
-        if lspci | grep -i nvidia >/dev/null 2>&1; then
-            print_status "NVIDIA GPU detected, installing pynvml..."
-            pip3 install pynvml
-        fi
-    fi
-    
-    # Create GreenMatrix directory for host services
-    mkdir -p /opt/greenmatrix
-    
-    # Copy metrics collection script to system location
-    cp collect_all_metrics.py /opt/greenmatrix/
-    cp config.ini /opt/greenmatrix/
-    
-    # Update config.ini with correct backend URL
-    HOST_IP=$(docker network inspect $(docker-compose ps -q backend | head -1 | xargs docker inspect --format='{{range .NetworkSettings.Networks}}{{.NetworkID}}{{end}}') 2>/dev/null | grep -o '"Gateway": "[^"]*"' | cut -d'"' -f4 | head -1)
-    if [ -z "$HOST_IP" ]; then
-        HOST_IP="localhost"
-    fi
-    
-    # Update backend URL in config
-    sed -i "s|backend_api_url = .*|backend_api_url = http://${HOST_IP}:8000|g" /opt/greenmatrix/config.ini
-    
-    # Create systemd service for host metrics collection
-    cat > /etc/systemd/system/greenmatrix-host-metrics.service << EOF
-[Unit]
-Description=GreenMatrix Host Metrics Collection Service
-After=network.target
-Wants=network-online.target
-StartLimitIntervalSec=0
 
-[Service]
-Type=simple
-User=root
-WorkingDirectory=/opt/greenmatrix
-Environment=PYTHONUNBUFFERED=1
-ExecStart=/usr/bin/python3 /opt/greenmatrix/collect_all_metrics.py
-Restart=always
-RestartSec=10
-StandardOutput=journal
-StandardError=journal
-
-[Install]
-WantedBy=multi-user.target
-EOF
-    
-    # Enable and start the service
-    systemctl daemon-reload
-    systemctl enable greenmatrix-host-metrics
-    systemctl start greenmatrix-host-metrics
-    
-    print_status "✅ Host metrics collection service installed and started"
-    print_status "📊 View logs with: journalctl -u greenmatrix-host-metrics -f"
-    print_status "🔧 Service status: systemctl status greenmatrix-host-metrics"
+    # Call the dedicated setup-host-metrics.sh script
+    if [ -f "./setup-host-metrics.sh" ]; then
+        print_status "Running setup-host-metrics.sh..."
+        bash ./setup-host-metrics.sh
+        if [ $? -eq 0 ]; then
+            print_status "✅ Host metrics collection setup completed successfully!"
+        else
+            print_warning "Host metrics setup encountered issues. You can retry later with: sudo ./setup-host-metrics.sh"
+        fi
+    else
+        print_warning "setup-host-metrics.sh not found. Skipping host metrics setup."
+    fi
 }
 
 # Auto-configure VM agents

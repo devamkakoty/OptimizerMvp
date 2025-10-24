@@ -155,7 +155,18 @@ if errorlevel 1 (
     call :print_warning "Host metrics collection requires administrator access for service setup"
     call :print_status "You can set this up later by running: setup-host-metrics.bat as Administrator"
 ) else (
-    call :setup_host_metrics
+    REM Call the dedicated setup-host-metrics.bat script
+    call :print_status "Running setup-host-metrics.bat..."
+    if exist "setup-host-metrics.bat" (
+        call setup-host-metrics.bat
+        if errorlevel 1 (
+            call :print_warning "Host metrics setup encountered issues. You can retry later with: setup-host-metrics.bat"
+        ) else (
+            call :print_status "✅ Host metrics collection setup completed successfully!"
+        )
+    ) else (
+        call :print_warning "setup-host-metrics.bat not found. Skipping host metrics setup."
+    )
 )
 
 REM Final verification
@@ -181,6 +192,13 @@ echo.
 echo Default Credentials:
 echo   Airflow UI:           airflow / airflow
 echo.
+echo Host Metrics Collection:
+echo   If running with admin rights, host metrics collection is automatically set up
+echo   Both collect_all_metrics.py and collect_hardware_specs.py services are installed
+echo   Manual setup:         Run setup-host-metrics.bat as Administrator
+echo   Service management:   sc query "GreenMatrix-Host-Metrics"
+echo                        sc query "GreenMatrix-Hardware-Specs"
+echo.
 echo Management Commands:
 echo   View logs:            docker-compose logs -f [service]
 echo   Stop services:        docker-compose down
@@ -193,35 +211,6 @@ call :print_status "Setup completed successfully!"
 echo.
 pause
 exit /b 0
-
-:setup_host_metrics
-REM Install Python dependencies for host metrics collection
-call :print_status "Installing Python dependencies for host metrics..."
-python -m pip install psutil requests python-dateutil configparser
-
-REM Install NVIDIA monitoring if GPU present
-wmic path win32_VideoController get name | findstr /i nvidia >nul 2>&1
-if not errorlevel 1 (
-    call :print_status "NVIDIA GPU detected, installing pynvml..."
-    python -m pip install pynvml
-)
-
-REM Create GreenMatrix directory for host services
-if not exist "C:\opt\greenmatrix" mkdir "C:\opt\greenmatrix"
-
-REM Copy metrics collection script to system location
-copy "collect_all_metrics.py" "C:\opt\greenmatrix\"
-copy "config.ini" "C:\opt\greenmatrix\"
-
-REM Update config.ini with correct backend URL
-powershell -Command "(Get-Content 'C:\opt\greenmatrix\config.ini') -replace 'backend_api_url = .*', 'backend_api_url = http://localhost:8000' | Set-Content 'C:\opt\greenmatrix\config.ini'"
-
-REM Create Windows service for host metrics collection
-sc create "GreenMatrix-Host-Metrics" binPath= "C:\opt\greenmatrix\collect_all_metrics.py" start= auto
-sc description "GreenMatrix-Host-Metrics" "GreenMatrix Host Metrics Collection Service"
-
-call :print_status "Host metrics collection service created"
-goto :eof
 
 :print_status
 echo %GREEN%[INFO]%NC% %~1

@@ -32,7 +32,9 @@ GreenMatrix is a comprehensive platform for optimizing AI workload hardware conf
 
 ### 2. Clone and Deploy
 ```cmd
-# Open Command Prompt or PowerShell
+# Open Command Prompt AS ADMINISTRATOR (required for Windows services)
+# Right-click Command Prompt → "Run as Administrator"
+
 git clone https://github.com/YOUR_USERNAME/GreenMatrix.git
 cd GreenMatrix
 
@@ -47,9 +49,15 @@ The script will:
 - ✅ Start all Docker services (PostgreSQL, TimescaleDB, Redis, Backend, Frontend, Airflow)
 - ✅ Initialize databases with optimized indexes
 - ✅ Load sample data
+- ✅ **Set up host metrics collection** (process and hardware monitoring)
+  - Installs Python dependencies (`psutil`, `requests`, `py-cpuinfo`, `wmi`)
+  - Creates two Windows services: `GreenMatrix-Host-Metrics` & `GreenMatrix-Hardware-Specs`
+  - Auto-starts services on boot
 - ✅ Display access URLs and credentials
 
 **⏱️ Total Time:** ~5-10 minutes (includes Docker image downloads)
+
+> **Note:** Administrator rights are required to create Windows services for host metrics collection. If not running as admin, host metrics setup will be skipped (you can run `setup-host-metrics.bat` as Administrator later).
 
 ### 3. Access the Application
 - **Frontend Dashboard**: http://localhost:3000
@@ -58,6 +66,16 @@ The script will:
 - **Airflow Monitoring**: http://localhost:8080 (airflow/airflow)
 - **PostgreSQL**: localhost:5432
 - **TimescaleDB**: localhost:5433
+
+### 4. Verify Host Metrics Collection
+```cmd
+# Check Windows services are running
+sc query "GreenMatrix-Host-Metrics"
+sc query "GreenMatrix-Hardware-Specs"
+
+# View service logs in Event Viewer
+# Windows Logs → Application → Filter by source "Python"
+```
 
 ### Troubleshooting Windows Deployment
 ```cmd
@@ -105,8 +123,8 @@ cd GreenMatrix
 # Make setup script executable
 chmod +x setup-greenmatrix.sh
 
-# Run automated setup
-./setup-greenmatrix.sh
+# Run automated setup with sudo (required for systemd services)
+sudo ./setup-greenmatrix.sh
 ```
 
 The script will:
@@ -114,23 +132,40 @@ The script will:
 - ✅ Create environment configuration
 - ✅ Build and start all services
 - ✅ Initialize databases with TimescaleDB hypertables and indexes
-- ✅ Set up host metrics collection (systemd service)
+- ✅ **Set up host metrics collection** (process and hardware monitoring)
+  - Installs Python dependencies (`psutil`, `requests`, `py-cpuinfo`, `pynvml`)
+  - Creates two systemd services: `greenmatrix-host-metrics` & `greenmatrix-hardware-specs`
+  - Auto-starts services and enables on boot
 - ✅ Configure VM monitoring agents
 - ✅ Set up Airflow monitoring and alerting
 - ✅ Perform health checks
 
 **⏱️ Total Time:** ~5-10 minutes
 
+> **Note:** Root access (sudo) is required to create systemd services for host metrics collection. If not running as root, host metrics setup will be skipped (you can run `sudo ./setup-host-metrics.sh` later).
+
 ### 3. Access the Application
 Same URLs as Windows deployment above.
 
+### 4. Verify Host Metrics Collection
+```bash
+# Check systemd services are running
+systemctl status greenmatrix-host-metrics
+systemctl status greenmatrix-hardware-specs
+
+# View real-time logs
+journalctl -u greenmatrix-host-metrics -f
+journalctl -u greenmatrix-hardware-specs -f
+
+# Check process metrics are being collected
+docker-compose exec timescaledb psql -U postgres -d vm_metrics_ts -c "SELECT COUNT(*) FROM host_process_metrics;"
+```
+
 ### Linux-Specific Features
 ```bash
-# View host metrics collection logs
-journalctl -u greenmatrix-host-metrics -f
-
-# Check service status
-systemctl status greenmatrix-host-metrics
+# Manage host metrics services
+sudo systemctl restart greenmatrix-host-metrics greenmatrix-hardware-specs
+sudo systemctl stop greenmatrix-host-metrics greenmatrix-hardware-specs
 
 # Deploy VM monitoring agents to other machines
 sudo ./deploy-vm-agent.sh

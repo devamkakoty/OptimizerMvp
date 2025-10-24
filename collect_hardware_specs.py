@@ -15,18 +15,35 @@ else:
         pass
 
 # --- PID File Management ---
-PID_FILE = '/opt/greenmatrix/hardware_collector.pid'
+# Cross-platform PID file path
+if platform.system() == 'Windows':
+    PID_DIR = os.path.join(os.environ.get('PROGRAMDATA', 'C:\\ProgramData'), 'GreenMatrix')
+    PID_FILE = os.path.join(PID_DIR, 'hardware_collector.pid')
+else:
+    PID_DIR = '/opt/greenmatrix'
+    PID_FILE = os.path.join(PID_DIR, 'hardware_collector.pid')
+
+# Ensure PID directory exists
+os.makedirs(PID_DIR, exist_ok=True)
 
 
 def create_pid_file():
     if os.path.exists(PID_FILE):
         print("Hardware collector is already running.")
         exit()
-    with open(PID_FILE, 'w') as f: f.write(str(os.getpid()))
+    try:
+        with open(PID_FILE, 'w') as f:
+            f.write(str(os.getpid()))
+    except Exception as e:
+        print(f"Warning: Could not create PID file: {e}")
 
 
 def remove_pid_file():
-    if os.path.exists(PID_FILE): os.remove(PID_FILE)
+    try:
+        if os.path.exists(PID_FILE):
+            os.remove(PID_FILE)
+    except Exception as e:
+        print(f"Warning: Could not remove PID file: {e}")
 
 
 # --- Configuration Loading ---

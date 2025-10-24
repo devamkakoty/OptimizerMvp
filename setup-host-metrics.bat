@@ -51,7 +51,11 @@ if errorlevel 1 (
 REM Install Python dependencies for host metrics collection
 call :print_step "Installing Python dependencies for host metrics..."
 python -m pip install --upgrade pip
-python -m pip install psutil requests python-dateutil configparser
+python -m pip install psutil requests python-dateutil py-cpuinfo
+
+REM Install Windows-specific dependencies
+call :print_status "Installing Windows-specific dependencies (WMI)..."
+python -m pip install wmi
 
 REM Install NVIDIA monitoring if GPU present
 wmic path win32_VideoController get name | findstr /i nvidia >nul 2>&1
@@ -61,19 +65,23 @@ if not errorlevel 1 (
 )
 
 REM Create GreenMatrix directory for host services
-if not exist "C:\opt\greenmatrix" mkdir "C:\opt\greenmatrix"
+REM Use %PROGRAMDATA% for better Windows compatibility
+set GREENMATRIX_DIR=%PROGRAMDATA%\GreenMatrix
+if not exist "%GREENMATRIX_DIR%" mkdir "%GREENMATRIX_DIR%"
+call :print_status "Created directory: %GREENMATRIX_DIR%"
 
 REM Copy metrics collection scripts to system location
-copy "collect_all_metrics.py" "C:\opt\greenmatrix\"
-copy "collect_hardware_specs.py" "C:\opt\greenmatrix\"
-copy "config.ini" "C:\opt\greenmatrix\"
+call :print_status "Copying metrics collection scripts..."
+copy "collect_all_metrics.py" "%GREENMATRIX_DIR%\"
+copy "collect_hardware_specs.py" "%GREENMATRIX_DIR%\"
+copy "config.ini" "%GREENMATRIX_DIR%\"
 
 REM Get backend URL from docker-compose
 for /f "tokens=*" %%i in ('docker-compose port backend 8000') do set BACKEND_PORT=%%i
 set BACKEND_URL=http://localhost:8000
 
 REM Update config.ini with correct backend URL
-powershell -Command "(Get-Content 'C:\opt\greenmatrix\config.ini') -replace 'backend_api_url = .*', 'backend_api_url = %BACKEND_URL%' | Set-Content 'C:\opt\greenmatrix\config.ini'"
+powershell -Command "(Get-Content '%GREENMATRIX_DIR%\config.ini') -replace 'backend_api_url = .*', 'backend_api_url = %BACKEND_URL%' | Set-Content '%GREENMATRIX_DIR%\config.ini'"
 
 call :print_status "Configuration updated with backend URL: %BACKEND_URL%"
 
@@ -98,9 +106,12 @@ if not errorlevel 1 (
     timeout /t 3 /nobreak >nul
 )
 
+REM Get Python executable path
+for /f "tokens=*" %%i in ('where python') do set PYTHON_PATH=%%i
+
 REM Create the host metrics service
 call :print_status "Creating host metrics service..."
-sc create "GreenMatrix-Host-Metrics" binPath= "python C:\opt\greenmatrix\collect_all_metrics.py" start= auto
+sc create "GreenMatrix-Host-Metrics" binPath= "\"%PYTHON_PATH%\" \"%GREENMATRIX_DIR%\collect_all_metrics.py\"" start= auto
 if errorlevel 1 (
     call :print_error "Failed to create host metrics Windows service"
     pause
@@ -109,7 +120,7 @@ if errorlevel 1 (
 
 REM Create the hardware specs service
 call :print_status "Creating hardware specs service..."
-sc create "GreenMatrix-Hardware-Specs" binPath= "python C:\opt\greenmatrix\collect_hardware_specs.py" start= auto
+sc create "GreenMatrix-Hardware-Specs" binPath= "\"%PYTHON_PATH%\" \"%GREENMATRIX_DIR%\collect_hardware_specs.py\"" start= auto
 if errorlevel 1 (
     call :print_error "Failed to create hardware specs Windows service"
     pause
@@ -155,8 +166,8 @@ if not errorlevel 1 (
 
 REM Create scheduled tasks for automatic restart (alternative to Windows service)
 call :print_step "Creating scheduled tasks for automatic restart..."
-schtasks /create /tn "GreenMatrix-Host-Metrics" /tr "python C:\opt\greenmatrix\collect_all_metrics.py" /sc onstart /ru "SYSTEM" /f >nul 2>&1
-schtasks /create /tn "GreenMatrix-Hardware-Specs" /tr "python C:\opt\greenmatrix\collect_hardware_specs.py" /sc onstart /ru "SYSTEM" /f >nul 2>&1
+schtasks /create /tn "GreenMatrix-Host-Metrics" /tr "\"%PYTHON_PATH%\" \"%GREENMATRIX_DIR%\collect_all_metrics.py\"" /sc onstart /ru "SYSTEM" /f >nul 2>&1
+schtasks /create /tn "GreenMatrix-Hardware-Specs" /tr "\"%PYTHON_PATH%\" \"%GREENMATRIX_DIR%\collect_hardware_specs.py\"" /sc onstart /ru "SYSTEM" /f >nul 2>&1
 
 echo.
 echo ================================================
@@ -166,10 +177,11 @@ echo.
 echo Service Information:
 echo   Host Metrics Service:    GreenMatrix-Host-Metrics (Running)
 echo   Hardware Specs Service:  GreenMatrix-Hardware-Specs (Running)
-echo   Scripts Location:        C:\opt\greenmatrix\collect_all_metrics.py
-echo                           C:\opt\greenmatrix\collect_hardware_specs.py
-echo   Configuration:           C:\opt\greenmatrix\config.ini
+echo   Scripts Location:        %GREENMATRIX_DIR%\collect_all_metrics.py
+echo                           %GREENMATRIX_DIR%\collect_hardware_specs.py
+echo   Configuration:           %GREENMATRIX_DIR%\config.ini
 echo   Backend URL:             %BACKEND_URL%
+echo   Python Path:             %PYTHON_PATH%
 echo.
 echo Management Commands:
 echo   Start Services:      sc start "GreenMatrix-Host-Metrics" ^&^& sc start "GreenMatrix-Hardware-Specs"

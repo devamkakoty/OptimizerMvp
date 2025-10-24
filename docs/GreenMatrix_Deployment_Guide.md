@@ -1193,11 +1193,17 @@ git clone https://github.com/YOUR_ORG/GreenMatrix.git
 cd GreenMatrix
 ```
 
-3. **Run Automated Setup**
+3. **Run Automated Setup (As Administrator)**
 ```cmd
+REM Right-click Command Prompt → "Run as Administrator"
+REM Navigate to GreenMatrix directory
+cd C:\path\to\GreenMatrix
+
 REM Run the automated setup script
 setup-greenmatrix.bat
 ```
+
+**Why Administrator Rights?** Required for creating Windows services for host metrics collection.
 
 The script will automatically:
 - ✅ Verify Docker is installed and running
@@ -1212,6 +1218,11 @@ The script will automatically:
 - ✅ Initialize all databases with proper schemas
 - ✅ Create 18+ performance indexes for time-series data
 - ✅ Load sample cost models and hardware configurations
+- ✅ **Install host metrics collection services** (collects process and hardware metrics)
+  - Installs Python dependencies: `psutil`, `requests`, `py-cpuinfo`, `wmi`
+  - Copies scripts to `C:\ProgramData\GreenMatrix\`
+  - Creates Windows Services: `GreenMatrix-Host-Metrics` & `GreenMatrix-Hardware-Specs`
+  - Auto-starts services on boot
 
 **Deployment Time:** 5-10 minutes (including Docker image downloads)
 
@@ -1219,6 +1230,10 @@ The script will automatically:
 ```cmd
 REM Check all containers are running
 docker-compose ps
+
+REM Check host metrics services
+sc query "GreenMatrix-Host-Metrics"
+sc query "GreenMatrix-Hardware-Specs"
 
 REM View service logs
 docker-compose logs backend
@@ -1234,6 +1249,11 @@ Open your browser to:
 - **Backend API:** http://localhost:8000
 - **API Documentation:** http://localhost:8000/docs
 - **Airflow Monitoring:** http://localhost:8080 (credentials: airflow / airflow)
+
+**Host Metrics Services:**
+- `GreenMatrix-Host-Metrics` - Collects process metrics every ~1 second
+- `GreenMatrix-Hardware-Specs` - Collects hardware specifications every 6 hours
+- View logs in Event Viewer → Windows Logs → Application
 
 #### Windows Troubleshooting
 
@@ -1298,14 +1318,16 @@ git clone https://github.com/YOUR_ORG/GreenMatrix.git
 cd GreenMatrix
 ```
 
-2. **Run Automated Setup**
+2. **Run Automated Setup (With Root Access)**
 ```bash
 # Make script executable
 chmod +x setup-greenmatrix.sh
 
-# Run automated setup
-./setup-greenmatrix.sh
+# Run automated setup with sudo (required for systemd services)
+sudo ./setup-greenmatrix.sh
 ```
+
+**Why Root Access?** Required for creating systemd services for host metrics collection.
 
 The script will automatically:
 - ✅ Check all prerequisites (Docker, Docker Compose)
@@ -1314,7 +1336,11 @@ The script will automatically:
 - ✅ Create required directories with proper permissions
 - ✅ Build and start all Docker services
 - ✅ Initialize PostgreSQL and TimescaleDB with optimized schemas
-- ✅ Set up systemd service for host metrics collection
+- ✅ **Install host metrics collection services** (collects process and hardware metrics)
+  - Installs Python dependencies: `psutil`, `requests`, `py-cpuinfo`, `pynvml` (if GPU)
+  - Copies scripts to `/opt/greenmatrix/`
+  - Creates systemd services: `greenmatrix-host-metrics` & `greenmatrix-hardware-specs`
+  - Auto-starts services and enables on boot
 - ✅ Configure VM monitoring agent deployment
 - ✅ Initialize Airflow monitoring and alerting
 - ✅ Perform comprehensive health checks
@@ -1326,6 +1352,10 @@ The script will automatically:
 ```bash
 # Check container status
 docker-compose ps
+
+# Check host metrics services
+systemctl status greenmatrix-host-metrics
+systemctl status greenmatrix-hardware-specs
 
 # View comprehensive logs
 docker-compose logs -f
@@ -1342,18 +1372,29 @@ docker-compose exec timescaledb psql -U postgres -d vm_metrics_ts -c "SELECT * F
 - **Backend API:** http://localhost:8000/docs
 - **Airflow UI:** http://localhost:8080 (airflow/airflow)
 
+**Host Metrics Services:**
+- `greenmatrix-host-metrics` - Collects process metrics every ~1 second
+- `greenmatrix-hardware-specs` - Collects hardware specifications every 6 hours
+- View logs: `journalctl -u greenmatrix-host-metrics -f`
+
 #### Linux-Specific Features
 
-**Host Metrics Collection (Systemd Service)**
+**Manage Host Metrics Collection**
 ```bash
-# Check systemd service status
+# Check service status
 systemctl status greenmatrix-host-metrics
+systemctl status greenmatrix-hardware-specs
 
 # View real-time logs
 journalctl -u greenmatrix-host-metrics -f
+journalctl -u greenmatrix-hardware-specs -f
 
-# Restart service
+# Restart services
 sudo systemctl restart greenmatrix-host-metrics
+sudo systemctl restart greenmatrix-hardware-specs
+
+# Stop services
+sudo systemctl stop greenmatrix-host-metrics greenmatrix-hardware-specs
 ```
 
 **Deploy VM Monitoring to Other Machines**

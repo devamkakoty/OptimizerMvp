@@ -52,8 +52,9 @@ print_step "Installing Python dependencies..."
 if command -v apt >/dev/null 2>&1; then
     print_status "Using apt package manager..."
     apt update && apt install -y python3 python3-pip pciutils
-    pip3 install psutil requests python-dateutil configparser
-    
+    pip3 install --upgrade pip
+    pip3 install psutil requests python-dateutil py-cpuinfo
+
     # Install NVIDIA monitoring if GPU present
     if lspci | grep -i nvidia >/dev/null 2>&1; then
         print_status "NVIDIA GPU detected, installing pynvml..."
@@ -64,8 +65,21 @@ if command -v apt >/dev/null 2>&1; then
 elif command -v yum >/dev/null 2>&1; then
     print_status "Using yum package manager..."
     yum install -y python3 python3-pip pciutils
-    pip3 install psutil requests python-dateutil configparser
-    
+    pip3 install --upgrade pip
+    pip3 install psutil requests python-dateutil py-cpuinfo
+
+    if lspci | grep -i nvidia >/dev/null 2>&1; then
+        print_status "NVIDIA GPU detected, installing pynvml..."
+        pip3 install pynvml
+    else
+        print_status "No NVIDIA GPU detected, skipping GPU monitoring setup"
+    fi
+elif command -v apk >/dev/null 2>&1; then
+    print_status "Using apk package manager (Alpine)..."
+    apk add --no-cache python3 py3-pip pciutils gcc musl-dev python3-dev
+    pip3 install --upgrade pip
+    pip3 install psutil requests python-dateutil py-cpuinfo
+
     if lspci | grep -i nvidia >/dev/null 2>&1; then
         print_status "NVIDIA GPU detected, installing pynvml..."
         pip3 install pynvml
@@ -73,7 +87,7 @@ elif command -v yum >/dev/null 2>&1; then
         print_status "No NVIDIA GPU detected, skipping GPU monitoring setup"
     fi
 else
-    print_error "Unsupported package manager. Please install python3, pip3, and lspci manually."
+    print_error "Unsupported package manager. Please install python3, pip3, and pciutils manually."
     exit 1
 fi
 
@@ -103,11 +117,14 @@ if [ ! -f "config.ini" ]; then
 fi
 
 # Copy metrics collection files
+print_status "Copying metrics collection scripts..."
 cp collect_all_metrics.py /opt/greenmatrix/
 cp collect_hardware_specs.py /opt/greenmatrix/
 cp config.ini /opt/greenmatrix/
 chmod +x /opt/greenmatrix/collect_all_metrics.py
 chmod +x /opt/greenmatrix/collect_hardware_specs.py
+
+print_status "✅ Scripts copied to /opt/greenmatrix/"
 
 # Detect backend URL
 print_step "Configuring backend connection..."

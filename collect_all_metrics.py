@@ -3,13 +3,35 @@ if platform.system() == 'Windows':
     from pynvml import *
 
 # --- PID File Management ---
-PID_FILE = 'metrics_collector.pid'
+# Cross-platform PID file path
+if platform.system() == 'Windows':
+    PID_DIR = os.path.join(os.environ.get('PROGRAMDATA', 'C:\\ProgramData'), 'GreenMatrix')
+    PID_FILE = os.path.join(PID_DIR, 'metrics_collector.pid')
+else:
+    PID_DIR = '/opt/greenmatrix'
+    PID_FILE = os.path.join(PID_DIR, 'metrics_collector.pid')
+
+# Ensure PID directory exists
+os.makedirs(PID_DIR, exist_ok=True)
+
+
 def create_pid_file():
-    if os.path.exists(PID_FILE): exit()
-    with open(PID_FILE, 'w') as f: f.write(str(os.getpid()))
+    if os.path.exists(PID_FILE):
+        print("Metrics collector is already running.")
+        exit()
+    try:
+        with open(PID_FILE, 'w') as f:
+            f.write(str(os.getpid()))
+    except Exception as e:
+        print(f"Warning: Could not create PID file: {e}")
+
 
 def remove_pid_file():
-    if os.path.exists(PID_FILE): os.remove(PID_FILE)
+    try:
+        if os.path.exists(PID_FILE):
+            os.remove(PID_FILE)
+    except Exception as e:
+        print(f"Warning: Could not remove PID file: {e}")
 
 # --- Configuration & Helper Functions (These are the final, stable versions) ---
 config = configparser.ConfigParser()
