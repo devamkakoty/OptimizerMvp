@@ -21,19 +21,20 @@ set "NC=%ESC%[0m"
 REM Function to print colored output
 call :print_status "Checking prerequisites..."
 
-REM Fix Git line endings for cross-platform compatibility
-call :print_status "Configuring Git for cross-platform compatibility..."
-git config core.autocrlf input >nul 2>&1
+REM Fix line endings for shell scripts (critical for Docker containers)
+call :print_status "Ensuring shell scripts have correct line endings for Docker..."
+
+REM Use PowerShell to convert CRLF to LF for shell scripts
+powershell -Command "$files = Get-ChildItem -Path 'scripts\*.sh' -File; foreach ($file in $files) { try { $content = [System.IO.File]::ReadAllText($file.FullName); $content = $content -replace \"`r`n\", \"`n\"; [System.IO.File]::WriteAllText($file.FullName, $content, [System.Text.UTF8Encoding]::new($false)); Write-Host \"Fixed: $($file.Name)\" } catch { Write-Host \"Warning: Could not process $($file.Name)\" } }" 2>nul
+
 if errorlevel 1 (
-    call :print_warning "Could not configure Git line endings (not in a Git repository or Git not installed)"
+    call :print_warning "Could not automatically fix line endings. If deployment fails, run: dos2unix scripts/*.sh"
 ) else (
-    call :print_status "Git line endings configured successfully"
-    REM Refresh files to ensure correct line endings
-    git reset --hard HEAD >nul 2>&1
-    if not errorlevel 1 (
-        call :print_status "Repository files refreshed with correct line endings"
-    )
+    call :print_status "Shell script line endings fixed successfully"
 )
+
+REM Also configure Git for future operations (optional, won't break if Git not available)
+git config core.autocrlf input >nul 2>&1
 
 REM Check Docker
 docker --version >nul 2>&1

@@ -79,6 +79,25 @@ sc query "GreenMatrix-Hardware-Specs"
 ```
 
 ### Troubleshooting Windows Deployment
+
+#### Line Ending Issues (if shell scripts fail to execute)
+The setup script automatically fixes line endings, but if you encounter errors like:
+```
+/docker-entrypoint.sh: cannot execute: required file not found
+```
+
+Run the line ending fix utility:
+```cmd
+fix-line-endings.bat
+```
+
+Then retry deployment:
+```cmd
+docker-compose down -v
+setup-greenmatrix.bat
+```
+
+#### Other Common Issues
 ```cmd
 # If services fail to start, check logs
 docker-compose logs backend
@@ -88,9 +107,8 @@ docker-compose logs timescaledb
 # Restart all services
 docker-compose restart
 
-# Complete reset
-docker-compose down
-docker volume prune
+# Complete reset (removes all data)
+docker-compose down -v
 setup-greenmatrix.bat
 ```
 
@@ -161,6 +179,40 @@ journalctl -u greenmatrix-hardware-specs -f
 
 # Check process metrics are being collected
 docker-compose exec timescaledb psql -U postgres -d vm_metrics_ts -c "SELECT COUNT(*) FROM host_process_metrics;"
+```
+
+### Troubleshooting Linux Deployment
+
+#### Line Ending Issues (rare, but possible if cloned on Windows first)
+If you encounter errors like:
+```
+/docker-entrypoint.sh: cannot execute: required file not found
+```
+
+Run the line ending fix utility:
+```bash
+chmod +x fix-line-endings.sh
+./fix-line-endings.sh
+```
+
+Then retry deployment:
+```bash
+docker-compose down -v
+sudo ./setup-greenmatrix.sh
+```
+
+#### Other Common Issues
+```bash
+# Check Docker service status
+sudo systemctl status docker
+
+# View container logs
+docker-compose logs backend
+docker-compose logs postgres
+
+# Complete reset (removes all data)
+docker-compose down -v
+sudo ./setup-greenmatrix.sh
 ```
 
 ### Linux-Specific Features
