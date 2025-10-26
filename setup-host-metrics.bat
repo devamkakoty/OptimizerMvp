@@ -22,66 +22,143 @@ REM Function to print colored output
 call :print_status "Setting up host metrics collection service..."
 
 REM Check if running as administrator (needed for service setup)
+call :print_status "Checking administrator privileges..."
 net session >nul 2>&1
 if errorlevel 1 (
+    echo.
     call :print_error "This script requires administrator privileges to create Windows services."
-    echo Please run this script as Administrator (Right-click and select "Run as Administrator")
+    echo.
+    echo Please do one of the following:
+    echo   1. Close this window
+    echo   2. Right-click on setup-host-metrics.bat
+    echo   3. Select "Run as Administrator"
+    echo.
     pause
     exit /b 1
 )
+call :print_status "Running with administrator privileges - OK"
 
 REM Check if Python is installed
+call :print_status "Checking for Python installation..."
 python --version >nul 2>&1
 if errorlevel 1 (
+    echo.
     call :print_error "Python is not installed. Please install Python 3.8 or higher first."
     echo Visit: https://www.python.org/downloads/
+    echo.
     pause
     exit /b 1
 )
+python --version
+call :print_status "Python is installed - OK"
 
-REM Check if GreenMatrix is running
-docker-compose ps | findstr "greenmatrix-backend" >nul 2>&1
+REM Check if GreenMatrix is running (optional - continue even if not detected)
+call :print_status "Checking for GreenMatrix backend service..."
+docker-compose ps 2>nul | findstr "greenmatrix-backend" >nul 2>&1
 if errorlevel 1 (
-    call :print_warning "GreenMatrix backend service is not running."
-    echo Please start GreenMatrix first using setup-greenmatrix.bat or docker-compose up -d
-    pause
-    exit /b 1
+    echo.
+    call :print_warning "GreenMatrix backend service is not detected locally."
+    echo This is OK if GreenMatrix is running on another machine.
+    echo.
+    echo If running on THIS machine, please start GreenMatrix first:
+    echo   setup-greenmatrix.bat  OR  docker-compose up -d
+    echo.
+    choice /C YN /M "Continue with host metrics setup anyway"
+    if errorlevel 2 (
+        echo.
+        echo Setup cancelled by user.
+        pause
+        exit /b 1
+    )
+    echo.
+) else (
+    call :print_status "GreenMatrix backend detected - OK"
 )
 
 REM Install Python dependencies for host metrics collection
+echo.
 call :print_step "Installing Python dependencies for host metrics..."
-python -m pip install --upgrade pip
-python -m pip install psutil requests python-dateutil py-cpuinfo
+echo Installing: pip (upgrade)
+python -m pip install --upgrade pip --quiet
+echo Installing: psutil, requests, python-dateutil, py-cpuinfo
+python -m pip install psutil requests python-dateutil py-cpuinfo --quiet
+call :print_status "Core dependencies installed"
 
 REM Install Windows-specific dependencies
 call :print_status "Installing Windows-specific dependencies (WMI)..."
-python -m pip install wmi
+python -m pip install wmi --quiet
+call :print_status "WMI installed"
 
 REM Install NVIDIA monitoring if GPU present
-wmic path win32_VideoController get name | findstr /i nvidia >nul 2>&1
+wmic path win32_VideoController get name 2>nul | findstr /i nvidia >nul 2>&1
 if not errorlevel 1 (
     call :print_status "NVIDIA GPU detected, installing pynvml..."
-    python -m pip install pynvml
+    python -m pip install pynvml --quiet
+    call :print_status "pynvml installed"
+) else (
+    call :print_status "No NVIDIA GPU detected (skipping pynvml)"
 )
 
 REM Create GreenMatrix directory for host services
 REM Use %PROGRAMDATA% for better Windows compatibility
+echo.
+call :print_step "Setting up GreenMatrix directory..."
 set GREENMATRIX_DIR=%PROGRAMDATA%\GreenMatrix
-if not exist "%GREENMATRIX_DIR%" mkdir "%GREENMATRIX_DIR%"
-call :print_status "Created directory: %GREENMATRIX_DIR%"
+if not exist "%GREENMATRIX_DIR%" (
+    mkdir "%GREENMATRIX_DIR%"
+    call :print_status "Created directory: %GREENMATRIX_DIR%"
+) else (
+    call :print_status "Directory already exists: %GREENMATRIX_DIR%"
+)
 
 REM Copy metrics collection scripts to system location
-call :print_status "Copying metrics collection scripts..."
-copy "collect_all_metrics.py" "%GREENMATRIX_DIR%\"
-copy "collect_hardware_specs.py" "%GREENMATRIX_DIR%\"
-copy "config.ini" "%GREENMATRIX_DIR%\"
+echo.
+call :print_step "Copying metrics collection scripts..."
+if not exist "collect_all_metrics.py" (
+    call :print_error "collect_all_metrics.py not found in current directory!"
+    echo Please run this script from the GreenMatrix root directory.
+    pause
+    exit /b 1
+)
+copy "collect_all_metrics.py" "%GREENMATRIX_DIR%\" >nul
+call :print_status "Copied: collect_all_metrics.py"
 
-REM Get backend URL from docker-compose
-for /f "tokens=*" %%i in ('docker-compose port backend 8000') do set BACKEND_PORT=%%i
+copy "collect_hardware_specs.py" "%GREENMATRIX_DIR%\" >nul
+call :print_status "Copied: collect_hardware_specs.py"
+
+if exist "config.ini" (
+    copy "config.ini" "%GREENMATRIX_DIR%\" >nul
+    call :print_status "Copied: config.ini"
+) else (
+    call :print_warning "config.ini not found (will use default settings)"
+)
+
+REM Get backend URL
 set BACKEND_URL=http://localhost:8000
 
+REM Try to detect actual backend port from docker-compose
+docker-compose port backend 8000 >nul 2>&1
+if not errorlevel 1 (
+    for /f "tokens=*" %%i in ('docker-compose port backend 8000 2^>nul') do set BACKEND_PORT=%%i
+    if defined BACKEND_PORT (
+        set BACKEND_URL=http://localhost:8000
+    )
+)
+
+echo.
+echo Backend URL Configuration:
+echo Current setting: %BACKEND_URL%
+echo.
+echo If GreenMatrix is running on a different machine, enter its URL now.
+echo Otherwise, press Enter to use: %BACKEND_URL%
+echo.
+set /p CUSTOM_URL="Backend URL (or press Enter for default): "
+if not "%CUSTOM_URL%"=="" set BACKEND_URL=%CUSTOM_URL%
+
 REM Update config.ini with correct backend URL
-powershell -Command "(Get-Content '%GREENMATRIX_DIR%\config.ini') -replace 'backend_api_url = .*', 'backend_api_url = %BACKEND_URL%' | Set-Content '%GREENMATRIX_DIR%\config.ini'"
+if exist "%GREENMATRIX_DIR%\config.ini" (
+    powershell -Command "(Get-Content '%GREENMATRIX_DIR%\config.ini') -replace 'backend_api_url = .*', 'backend_api_url = %BACKEND_URL%' | Set-Content '%GREENMATRIX_DIR%\config.ini'"
+)
 
 call :print_status "Configuration updated with backend URL: %BACKEND_URL%"
 
