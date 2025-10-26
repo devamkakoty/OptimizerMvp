@@ -32,10 +32,31 @@ print_step() {
     echo -e "${BLUE}[STEP]${NC} $1"
 }
 
+# Fix Git line endings for cross-platform compatibility
+fix_git_line_endings() {
+    print_step "Configuring Git for cross-platform compatibility..."
+
+    if command -v git &> /dev/null && [ -d .git ]; then
+        git config core.autocrlf input 2>/dev/null
+        if [ $? -eq 0 ]; then
+            print_status "Git line endings configured successfully"
+            # Refresh files to ensure correct line endings
+            git reset --hard HEAD >/dev/null 2>&1
+            if [ $? -eq 0 ]; then
+                print_status "Repository files refreshed with correct line endings"
+            fi
+        else
+            print_warning "Could not configure Git line endings (not in a Git repository or Git not installed)"
+        fi
+    else
+        print_warning "Git not available or not in a Git repository"
+    fi
+}
+
 # Check prerequisites
 check_prerequisites() {
     print_step "Checking prerequisites..."
-    
+
     # Check Docker
     if ! command -v docker &> /dev/null; then
         print_error "Docker is not installed. Please install Docker first."
@@ -592,7 +613,8 @@ trap cleanup EXIT
 main() {
     echo "Starting GreenMatrix setup process..."
     echo ""
-    
+
+    fix_git_line_endings
     check_prerequisites
     setup_environment
     create_directories

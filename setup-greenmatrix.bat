@@ -21,6 +21,20 @@ set "NC=%ESC%[0m"
 REM Function to print colored output
 call :print_status "Checking prerequisites..."
 
+REM Fix Git line endings for cross-platform compatibility
+call :print_status "Configuring Git for cross-platform compatibility..."
+git config core.autocrlf input >nul 2>&1
+if errorlevel 1 (
+    call :print_warning "Could not configure Git line endings (not in a Git repository or Git not installed)"
+) else (
+    call :print_status "Git line endings configured successfully"
+    REM Refresh files to ensure correct line endings
+    git reset --hard HEAD >nul 2>&1
+    if not errorlevel 1 (
+        call :print_status "Repository files refreshed with correct line endings"
+    )
+)
+
 REM Check Docker
 docker --version >nul 2>&1
 if errorlevel 1 (

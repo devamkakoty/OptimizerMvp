@@ -42,7 +42,8 @@ cd GreenMatrix
 setup-greenmatrix.bat
 ```
 
-The script will:
+The script will **automatically**:
+- ✅ Configure Git line endings for cross-platform compatibility
 - ✅ Check Docker is installed and running
 - ✅ Create `.env` from `.env.example` with default settings
 - ✅ Create necessary directories
@@ -127,7 +128,8 @@ chmod +x setup-greenmatrix.sh
 sudo ./setup-greenmatrix.sh
 ```
 
-The script will:
+The script will **automatically**:
+- ✅ Configure Git line endings for cross-platform compatibility
 - ✅ Check prerequisites (Docker, Docker Compose)
 - ✅ Create environment configuration
 - ✅ Build and start all services
