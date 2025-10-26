@@ -349,129 +349,78 @@ for /f "tokens=2" %%i in ('tasklist /fi "imagename eq python.exe" /fo list ^| fi
     )
 )
 
-REM Create Windows services for host metrics and hardware specs collection
-call :print_step "Creating Windows services for host metrics and hardware specs collection..."
-
-REM Check if host metrics service already exists
+REM Clean up any old Windows services (they don't work with Python scripts)
+call :print_step "Cleaning up old Windows services (if any)..."
 sc query "GreenMatrix-Host-Metrics" >nul 2>&1
 if not errorlevel 1 (
-    call :print_warning "Host metrics service already exists. Stopping and removing existing service..."
+    call :print_status "Removing old Windows service: GreenMatrix-Host-Metrics"
     sc stop "GreenMatrix-Host-Metrics" >nul 2>&1
     sc delete "GreenMatrix-Host-Metrics" >nul 2>&1
-    timeout /t 3 /nobreak >nul
 )
 
-REM Check if hardware specs service already exists
 sc query "GreenMatrix-Hardware-Specs" >nul 2>&1
 if not errorlevel 1 (
-    call :print_warning "Hardware specs service already exists. Stopping and removing existing service..."
+    call :print_status "Removing old Windows service: GreenMatrix-Hardware-Specs"
     sc stop "GreenMatrix-Hardware-Specs" >nul 2>&1
     sc delete "GreenMatrix-Hardware-Specs" >nul 2>&1
-    timeout /t 3 /nobreak >nul
 )
 
-REM Python path already set from detection above
+REM Windows services don't work with Python scripts - use scheduled tasks instead
+call :print_step "Creating scheduled tasks to run metrics collectors..."
 
-REM Create the host metrics service
-call :print_status "Creating host metrics service..."
-sc create "GreenMatrix-Host-Metrics" binPath= "\"%PYTHON_PATH%\" \"%GREENMATRIX_DIR%\collect_all_metrics.py\"" start= auto
-if errorlevel 1 (
-    call :print_error "Failed to create host metrics Windows service"
-    echo Python path: %PYTHON_PATH%
-    echo Service path would be: "%PYTHON_PATH%" "%GREENMATRIX_DIR%\collect_all_metrics.py"
-    pause
-    exit /b 1
-)
+REM Create scheduled tasks that run at startup
+schtasks /create /tn "GreenMatrix-Host-Metrics" /tr "\"%PYTHON_PATH%\" \"%GREENMATRIX_DIR%\collect_all_metrics.py\"" /sc onstart /ru "SYSTEM" /rl HIGHEST /f >nul 2>&1
+schtasks /create /tn "GreenMatrix-Hardware-Specs" /tr "\"%PYTHON_PATH%\" \"%GREENMATRIX_DIR%\collect_hardware_specs.py\"" /sc onstart /ru "SYSTEM" /rl HIGHEST /f >nul 2>&1
 
-REM Create the hardware specs service
-call :print_status "Creating hardware specs service..."
-sc create "GreenMatrix-Hardware-Specs" binPath= "\"%PYTHON_PATH%\" \"%GREENMATRIX_DIR%\collect_hardware_specs.py\"" start= auto
-if errorlevel 1 (
-    call :print_error "Failed to create hardware specs Windows service"
-    pause
-    exit /b 1
-)
+REM Start the scheduled tasks immediately (don't wait for reboot)
+call :print_status "Starting metrics collection tasks..."
+schtasks /run /tn "GreenMatrix-Host-Metrics" >nul 2>&1
+schtasks /run /tn "GreenMatrix-Hardware-Specs" >nul 2>&1
 
-REM Set service descriptions
-sc description "GreenMatrix-Host-Metrics" "GreenMatrix Host Metrics Collection Service"
-sc description "GreenMatrix-Hardware-Specs" "GreenMatrix Hardware Specifications Collection Service"
+REM Wait for tasks to start
+timeout /t 3 /nobreak >nul
 
-REM Start both services
-call :print_status "Starting host metrics collection service..."
-sc start "GreenMatrix-Host-Metrics"
-if errorlevel 1 (
-    call :print_warning "Failed to start host metrics service automatically."
-    echo.
-    echo Troubleshooting:
-    echo 1. Check Event Viewer: eventvwr.msc → Windows Logs → Application
-    echo 2. Try running Python script manually:
-    echo    "%PYTHON_PATH%" "%GREENMATRIX_DIR%\collect_all_metrics.py"
-    echo 3. Check if backend is accessible: curl http://localhost:8000/health
-    echo.
-) else (
-    call :print_status "Host metrics service started successfully"
-)
-
-call :print_status "Starting hardware specs collection service..."
-sc start "GreenMatrix-Hardware-Specs"
-if errorlevel 1 (
-    call :print_warning "Failed to start hardware specs service automatically."
-    echo.
-    echo Troubleshooting:
-    echo 1. Check Event Viewer: eventvwr.msc → Windows Logs → Application
-    echo 2. Try running Python script manually:
-    echo    "%PYTHON_PATH%" "%GREENMATRIX_DIR%\collect_hardware_specs.py"
-    echo.
-) else (
-    call :print_status "Hardware specs service started successfully"
-)
-
-REM Verify services are running
-timeout /t 5 /nobreak >nul
-sc query "GreenMatrix-Host-Metrics" | findstr "RUNNING" >nul 2>&1
+REM Verify tasks are running
+tasklist /fi "imagename eq python.exe" | findstr /i "collect_all_metrics.py" >nul 2>&1
 if not errorlevel 1 (
-    call :print_status "Host metrics collection service is running successfully"
+    call :print_status "Host metrics collector is running"
 ) else (
-    call :print_warning "Host metrics service may not be running. Check service status manually."
+    call :print_warning "Host metrics collector may not be running"
 )
 
-sc query "GreenMatrix-Hardware-Specs" | findstr "RUNNING" >nul 2>&1
+tasklist /fi "imagename eq python.exe" | findstr /i "collect_hardware_specs.py" >nul 2>&1
 if not errorlevel 1 (
-    call :print_status "Hardware specs collection service is running successfully"
+    call :print_status "Hardware specs collector is running"
 ) else (
-    call :print_warning "Hardware specs service may not be running. Check service status manually."
+    call :print_warning "Hardware specs collector may not be running"
 )
-
-REM Create scheduled tasks for automatic restart (alternative to Windows service)
-call :print_step "Creating scheduled tasks for automatic restart..."
-schtasks /create /tn "GreenMatrix-Host-Metrics" /tr "\"%PYTHON_PATH%\" \"%GREENMATRIX_DIR%\collect_all_metrics.py\"" /sc onstart /ru "SYSTEM" /f >nul 2>&1
-schtasks /create /tn "GreenMatrix-Hardware-Specs" /tr "\"%PYTHON_PATH%\" \"%GREENMATRIX_DIR%\collect_hardware_specs.py\"" /sc onstart /ru "SYSTEM" /f >nul 2>&1
 
 echo.
 echo ================================================
 echo Host Metrics and Hardware Specs Setup Complete
 echo ================================================
 echo.
-echo Service Information:
-echo   Host Metrics Service:    GreenMatrix-Host-Metrics (Running)
-echo   Hardware Specs Service:  GreenMatrix-Hardware-Specs (Running)
-echo   Scripts Location:        %GREENMATRIX_DIR%\collect_all_metrics.py
+echo Task Information:
+echo   Host Metrics Task:      GreenMatrix-Host-Metrics (Scheduled)
+echo   Hardware Specs Task:    GreenMatrix-Hardware-Specs (Scheduled)
+echo   Scripts Location:       %GREENMATRIX_DIR%\collect_all_metrics.py
 echo                           %GREENMATRIX_DIR%\collect_hardware_specs.py
-echo   Configuration:           %GREENMATRIX_DIR%\config.ini
-echo   Backend URL:             %BACKEND_URL%
-echo   Python Path:             %PYTHON_PATH%
+echo   Configuration:          %GREENMATRIX_DIR%\config.ini
+echo   Backend URL:            %BACKEND_URL%
+echo   Python Path:            %PYTHON_PATH%
 echo.
 echo Management Commands:
-echo   Start Services:      sc start "GreenMatrix-Host-Metrics" ^&^& sc start "GreenMatrix-Hardware-Specs"
-echo   Stop Services:       sc stop "GreenMatrix-Host-Metrics" ^&^& sc stop "GreenMatrix-Hardware-Specs"
-echo   View Service Status: sc query "GreenMatrix-Host-Metrics" ^&^& sc query "GreenMatrix-Hardware-Specs"
-echo   View Service Logs:   Get-EventLog -LogName Application -Source "GreenMatrix-Host-Metrics"
-echo                       Get-EventLog -LogName Application -Source "GreenMatrix-Hardware-Specs"
+echo   Start Tasks:        schtasks /run /tn "GreenMatrix-Host-Metrics"
+echo                       schtasks /run /tn "GreenMatrix-Hardware-Specs"
+echo   View Task Status:   schtasks /query /tn "GreenMatrix-Host-Metrics" /fo LIST
+echo                       schtasks /query /tn "GreenMatrix-Hardware-Specs" /fo LIST
+echo   View Running:       tasklist /fi "imagename eq python.exe" /v
+echo   Stop Tasks:         Stop via Task Scheduler (taskschd.msc)
 echo.
 echo Troubleshooting:
-echo   If the service fails to start, check the Windows Event Viewer
-echo   Ensure Python is in the system PATH
-echo   Verify the backend URL is accessible
+echo   Run manually to test: "%PYTHON_PATH%" "%GREENMATRIX_DIR%\collect_all_metrics.py"
+echo   Check backend: curl %BACKEND_URL%/health
+echo   View task history: Task Scheduler (taskschd.msc) -^> GreenMatrix tasks
 echo.
 call :print_status "Host metrics setup completed successfully!"
 echo.
