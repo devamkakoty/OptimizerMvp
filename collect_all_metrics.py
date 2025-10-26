@@ -205,9 +205,23 @@ def get_hyperv_vm_metrics():
     if platform.system() != 'Windows': return []
     command = "Get-VM | Where-Object {$_.State -eq 'Running'} | Measure-VM | Select-Object VMName, CPUUsage, AverageMemoryUsage | ConvertTo-Json"
     try:
-        result = subprocess.run(["powershell.exe", "-Command", command], capture_output=True, text=True, check=True, timeout=5)
-        return json.loads(result.stdout) if result.stdout else []
+        # Use Popen with communicate(timeout) for better timeout handling
+        process = subprocess.Popen(
+            ["powershell.exe", "-Command", command],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        stdout, stderr = process.communicate(timeout=3)
+
+        if process.returncode == 0 and stdout:
+            return json.loads(stdout)
+        else:
+            return []
     except subprocess.TimeoutExpired:
+        # Kill the hung process
+        process.kill()
+        process.communicate()  # Clean up
         print("Warning: Hyper-V VM metrics query timed out (no VMs or access denied)")
         return []
     except Exception as e:
