@@ -2217,9 +2217,9 @@ async def get_dashboard_top_processes(
 async def get_dashboard_performance_summary(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
-    db: Session = Depends(get_metrics_db)
+    db: Session = Depends(get_timescaledb)
 ):
-    """Get performance metrics summary with aggregated statistics"""
+    """Get performance metrics summary with aggregated statistics from TimescaleDB"""
     result = dashboard_controller.get_performance_summary(db, start_date, end_date)
     
     if not result['success']:
@@ -2231,10 +2231,10 @@ async def get_dashboard_performance_summary(
 async def get_dashboard_system_overview(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
-    metrics_db: Session = Depends(get_metrics_db),
+    metrics_db: Session = Depends(get_timescaledb),
     greenmatrix_db: Session = Depends(get_db)
 ):
-    """Get complete system overview with hardware specs and metrics"""
+    """Get complete system overview with hardware specs from main DB and metrics from TimescaleDB"""
     result = dashboard_controller.get_system_overview(metrics_db, greenmatrix_db, start_date, end_date)
     
     if not result['success']:
@@ -2249,7 +2249,7 @@ async def get_dashboard_chart_data(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     region: Optional[str] = None,
-    db: Session = Depends(get_metrics_db)
+    db: Session = Depends(get_timescaledb)
 ):
     """Get pre-processed chart data for frontend visualization"""
     result = dashboard_controller.get_chart_data(db, metric, limit, start_date, end_date, region)
