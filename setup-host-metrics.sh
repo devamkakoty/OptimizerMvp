@@ -31,23 +31,46 @@ print_step() {
 echo "🔧 GreenMatrix Host Metrics Collection Setup"
 echo "============================================="
 
-# Check if running as root
+# Auto-elevate to root if not already running as root
 if [ "$EUID" -ne 0 ]; then
-    print_error "Please run as root: sudo $0"
-    exit 1
+    print_warning "This script requires root privileges for systemd service installation."
+    print_status "Requesting sudo access..."
+    exec sudo "$0" "$@"
+    exit $?
 fi
 
-# Check if GreenMatrix is running
+print_status "Running with root privileges - OK"
+
+# Check if GreenMatrix is running (optional - allow continuation)
 print_step "Checking if GreenMatrix is running..."
-if ! docker ps | grep -q greenmatrix-backend; then
-    print_error "GreenMatrix backend container is not running!"
-    print_error "Please start GreenMatrix first with: docker-compose up -d"
-    exit 1
+if ! docker ps 2>/dev/null | grep -q greenmatrix-backend; then
+    print_warning "GreenMatrix backend container is not detected locally."
+    echo "This is OK if GreenMatrix is running on another machine."
+    echo ""
+    echo "If running on THIS machine, please start GreenMatrix first:"
+    echo "  sudo ./setup-greenmatrix.sh  OR  docker-compose up -d"
+    echo ""
+    read -p "Continue with host metrics setup anyway? (y/n) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        print_status "Setup cancelled by user."
+        exit 0
+    fi
+else
+    print_status "✅ GreenMatrix containers are running"
 fi
 
-print_status "✅ GreenMatrix containers are running"
+# Check if Python 3 is installed
+print_step "Checking Python installation..."
+if command -v python3 >/dev/null 2>&1; then
+    PYTHON_VERSION=$(python3 --version 2>&1)
+    print_status "Python found: $PYTHON_VERSION"
+    PYTHON_CMD="python3"
+else
+    print_warning "Python 3 not found. Installing Python 3..."
+fi
 
-# Install Python dependencies
+# Install Python and dependencies
 print_step "Installing Python dependencies..."
 if command -v apt >/dev/null 2>&1; then
     print_status "Using apt package manager..."
@@ -97,30 +120,41 @@ print_status "✅ Python dependencies installed"
 print_step "Setting up GreenMatrix host services..."
 mkdir -p /opt/greenmatrix
 
-# Check if files exist
-if [ ! -f "collect_all_metrics.py" ]; then
-    print_error "collect_all_metrics.py not found in current directory!"
-    print_error "Please run this script from the GreenMatrix project directory."
+# Determine script directory (works even when called from other locations)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+print_status "Script directory: $SCRIPT_DIR"
+
+# Check if files exist in script directory
+print_step "Locating metrics collection scripts..."
+if [ ! -f "$SCRIPT_DIR/collect_all_metrics.py" ]; then
+    print_error "collect_all_metrics.py not found in $SCRIPT_DIR"
+    echo ""
+    echo "Current directory: $(pwd)"
+    echo "Script directory: $SCRIPT_DIR"
+    echo ""
+    echo "This script must be in the GreenMatrix repository root directory"
+    echo "containing collect_all_metrics.py and collect_hardware_specs.py"
     exit 1
 fi
 
-if [ ! -f "collect_hardware_specs.py" ]; then
-    print_error "collect_hardware_specs.py not found in current directory!"
-    print_error "Please run this script from the GreenMatrix project directory."
+if [ ! -f "$SCRIPT_DIR/collect_hardware_specs.py" ]; then
+    print_error "collect_hardware_specs.py not found in $SCRIPT_DIR"
     exit 1
 fi
 
-if [ ! -f "config.ini" ]; then
-    print_error "config.ini not found in current directory!"
-    print_error "Please run this script from the GreenMatrix project directory."
-    exit 1
+if [ ! -f "$SCRIPT_DIR/config.ini" ]; then
+    print_warning "config.ini not found in $SCRIPT_DIR (will use default settings)"
 fi
+
+print_status "Found scripts in: $SCRIPT_DIR"
 
 # Copy metrics collection files
 print_status "Copying metrics collection scripts..."
-cp collect_all_metrics.py /opt/greenmatrix/
-cp collect_hardware_specs.py /opt/greenmatrix/
-cp config.ini /opt/greenmatrix/
+cp "$SCRIPT_DIR/collect_all_metrics.py" /opt/greenmatrix/
+cp "$SCRIPT_DIR/collect_hardware_specs.py" /opt/greenmatrix/
+if [ -f "$SCRIPT_DIR/config.ini" ]; then
+    cp "$SCRIPT_DIR/config.ini" /opt/greenmatrix/
+fi
 chmod +x /opt/greenmatrix/collect_all_metrics.py
 chmod +x /opt/greenmatrix/collect_hardware_specs.py
 
