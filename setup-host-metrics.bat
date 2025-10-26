@@ -368,31 +368,35 @@ if not errorlevel 1 (
 REM Windows services don't work with Python scripts - use scheduled tasks instead
 call :print_step "Creating scheduled tasks to run metrics collectors..."
 
-REM Create scheduled tasks that run at startup
-schtasks /create /tn "GreenMatrix-Host-Metrics" /tr "\"%PYTHON_PATH%\" \"%GREENMATRIX_DIR%\collect_all_metrics.py\"" /sc onstart /ru "SYSTEM" /rl HIGHEST /f >nul 2>&1
-schtasks /create /tn "GreenMatrix-Hardware-Specs" /tr "\"%PYTHON_PATH%\" \"%GREENMATRIX_DIR%\collect_hardware_specs.py\"" /sc onstart /ru "SYSTEM" /rl HIGHEST /f >nul 2>&1
+REM Create batch wrappers that can be run as background tasks
+echo @echo off > "%GREENMATRIX_DIR%\run_metrics.bat"
+echo start /B "GreenMatrix-Metrics" "%PYTHON_PATH%" "%GREENMATRIX_DIR%\collect_all_metrics.py" >> "%GREENMATRIX_DIR%\run_metrics.bat"
 
-REM Start the scheduled tasks immediately (don't wait for reboot)
-call :print_status "Starting metrics collection tasks..."
-schtasks /run /tn "GreenMatrix-Host-Metrics" >nul 2>&1
-schtasks /run /tn "GreenMatrix-Hardware-Specs" >nul 2>&1
+echo @echo off > "%GREENMATRIX_DIR%\run_hardware.bat"
+echo start /B "GreenMatrix-Hardware" "%PYTHON_PATH%" "%GREENMATRIX_DIR%\collect_hardware_specs.py" >> "%GREENMATRIX_DIR%\run_hardware.bat"
 
-REM Wait for tasks to start
+REM Create scheduled tasks that run at startup using batch wrappers
+schtasks /create /tn "GreenMatrix-Host-Metrics" /tr "\"%GREENMATRIX_DIR%\run_metrics.bat\"" /sc onstart /ru "SYSTEM" /rl HIGHEST /f >nul 2>&1
+schtasks /create /tn "GreenMatrix-Hardware-Specs" /tr "\"%GREENMATRIX_DIR%\run_hardware.bat\"" /sc onstart /ru "SYSTEM" /rl HIGHEST /f >nul 2>&1
+
+call :print_status "Scheduled tasks created successfully"
+
+REM Start the collectors immediately using the batch wrappers
+call :print_status "Starting metrics collectors now..."
+call "%GREENMATRIX_DIR%\run_metrics.bat"
+call "%GREENMATRIX_DIR%\run_hardware.bat"
+
+REM Wait for processes to start
 timeout /t 3 /nobreak >nul
 
-REM Verify tasks are running
-tasklist /fi "imagename eq python.exe" | findstr /i "collect_all_metrics.py" >nul 2>&1
+REM Verify Python processes are running
+call :print_status "Verifying collectors are running..."
+tasklist /fi "imagename eq python.exe" | findstr /i "python.exe" >nul 2>&1
 if not errorlevel 1 (
-    call :print_status "Host metrics collector is running"
+    call :print_status "Metrics collectors started successfully"
 ) else (
-    call :print_warning "Host metrics collector may not be running"
-)
-
-tasklist /fi "imagename eq python.exe" | findstr /i "collect_hardware_specs.py" >nul 2>&1
-if not errorlevel 1 (
-    call :print_status "Hardware specs collector is running"
-) else (
-    call :print_warning "Hardware specs collector may not be running"
+    call :print_warning "Collectors may take a few seconds to start"
+    call :print_status "You can verify by running: tasklist /fi \"imagename eq python.exe\""
 )
 
 echo.
