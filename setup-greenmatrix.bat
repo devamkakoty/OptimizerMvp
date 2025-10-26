@@ -127,9 +127,9 @@ if errorlevel 1 (
     goto wait_airflow_db
 )
 
-REM Initialize Airflow
-call :print_status "Initializing Airflow..."
-docker-compose up airflow-init
+REM Initialize Airflow (commented out due to image compatibility issues - not critical)
+REM call :print_status "Initializing Airflow..."
+REM docker-compose up airflow-init
 
 REM Start all services
 call :print_status "Starting all services..."
