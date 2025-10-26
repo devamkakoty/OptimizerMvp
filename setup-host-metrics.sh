@@ -186,6 +186,24 @@ sed -i "s|backend_api_url = .*|backend_api_url = $BACKEND_URL|g" /opt/greenmatri
 
 print_status "✅ Backend URL configured: $BACKEND_URL"
 
+# Clean up stale PID files before creating services
+print_step "Cleaning up any stale PID files..."
+if [ -f "/opt/greenmatrix/metrics_collector.pid" ]; then
+    print_status "Removing stale PID file: metrics_collector.pid"
+    rm -f /opt/greenmatrix/metrics_collector.pid
+fi
+if [ -f "/opt/greenmatrix/hardware_collector.pid" ]; then
+    print_status "Removing stale PID file: hardware_collector.pid"
+    rm -f /opt/greenmatrix/hardware_collector.pid
+fi
+
+# Stop any orphaned Python processes running the collector scripts
+print_status "Checking for orphaned collector processes..."
+for pid in $(pgrep -f "python.*collect_all_metrics.py|python.*collect_hardware_specs.py"); do
+    print_status "Terminating orphaned collector process: $pid"
+    kill -9 "$pid" 2>/dev/null || true
+done
+
 # Create systemd service
 print_step "Creating systemd service..."
 cat > /etc/systemd/system/greenmatrix-host-metrics.service << EOF

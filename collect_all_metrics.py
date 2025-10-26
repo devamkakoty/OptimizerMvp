@@ -26,8 +26,33 @@ os.makedirs(PID_DIR, exist_ok=True)
 
 def create_pid_file():
     if os.path.exists(PID_FILE):
-        print("Metrics collector is already running.")
-        exit()
+        # Check if the process is actually running
+        try:
+            with open(PID_FILE, 'r') as f:
+                old_pid = int(f.read().strip())
+
+            # Check if process with old_pid is still running
+            if psutil.pid_exists(old_pid):
+                try:
+                    proc = psutil.Process(old_pid)
+                    # Verify it's actually our script
+                    if 'collect_all_metrics.py' in ' '.join(proc.cmdline()):
+                        print("Metrics collector is already running.")
+                        exit()
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    pass
+
+            # Stale PID file - remove it
+            print(f"Removing stale PID file (process {old_pid} not running)")
+            os.remove(PID_FILE)
+        except Exception as e:
+            print(f"Warning: Could not validate PID file: {e}")
+            # Try to remove potentially corrupted PID file
+            try:
+                os.remove(PID_FILE)
+            except:
+                pass
+
     try:
         with open(PID_FILE, 'w') as f:
             f.write(str(os.getpid()))

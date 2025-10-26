@@ -318,6 +318,28 @@ if exist "%GREENMATRIX_DIR%\config.ini" (
 
 call :print_status "Configuration updated with backend URL: %BACKEND_URL%"
 
+REM Clean up stale PID files before creating services
+call :print_step "Cleaning up any stale PID files..."
+if exist "%GREENMATRIX_DIR%\metrics_collector.pid" (
+    call :print_status "Removing stale PID file: metrics_collector.pid"
+    del /f /q "%GREENMATRIX_DIR%\metrics_collector.pid" >nul 2>&1
+)
+if exist "%GREENMATRIX_DIR%\hardware_collector.pid" (
+    call :print_status "Removing stale PID file: hardware_collector.pid"
+    del /f /q "%GREENMATRIX_DIR%\hardware_collector.pid" >nul 2>&1
+)
+
+REM Stop any orphaned Python processes running the collector scripts
+call :print_status "Checking for orphaned collector processes..."
+for /f "tokens=2" %%i in ('tasklist /fi "imagename eq python.exe" /fo list ^| findstr "PID:"') do (
+    set PID=%%i
+    wmic process where "ProcessId=!PID!" get CommandLine 2>nul | findstr /i "collect_all_metrics.py collect_hardware_specs.py" >nul 2>&1
+    if not errorlevel 1 (
+        call :print_status "Terminating orphaned collector process: !PID!"
+        taskkill /f /pid !PID! >nul 2>&1
+    )
+)
+
 REM Create Windows services for host metrics and hardware specs collection
 call :print_step "Creating Windows services for host metrics and hardware specs collection..."
 
