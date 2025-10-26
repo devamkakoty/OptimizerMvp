@@ -2220,6 +2220,65 @@ Complete list of supported environment variables:
 
 #### Common Issues and Solutions
 
+**Issue: Shell script execution fails in Docker with "cannot execute: required file not found"**
+
+**Symptoms:**
+```
+/docker-entrypoint.sh: line 203: /docker-entrypoint-initdb.d/02-create-multiple-databases.sh: cannot execute: required file not found
+greenmatrix-postgres exited with code 127
+```
+
+**Root Cause:** Shell scripts have Windows line endings (CRLF) instead of Unix line endings (LF). Linux Docker containers cannot execute scripts with CRLF endings.
+
+**Solution:**
+
+*Windows:*
+```cmd
+# Run the automated line ending fix utility
+fix-line-endings.bat
+
+# Clean up Docker volumes and restart
+docker-compose down -v
+setup-greenmatrix.bat
+```
+
+*Linux/macOS:*
+```bash
+# Run the automated line ending fix utility
+chmod +x fix-line-endings.sh
+./fix-line-endings.sh
+
+# Clean up Docker volumes and restart
+docker-compose down -v
+sudo ./setup-greenmatrix.sh
+```
+
+**Prevention:** The setup scripts (`setup-greenmatrix.bat` and `setup-greenmatrix.sh`) automatically fix line endings, but if you encounter this error:
+1. Your Git configuration may have `core.autocrlf=true` (Windows default)
+2. Set `git config --global core.autocrlf input` to prevent future issues
+3. Use the `fix-line-endings` utility before deployment
+
+**Technical Details:**
+- Windows uses CRLF (`\r\n`) line endings
+- Linux uses LF (`\n`) line endings
+- Git with `core.autocrlf=true` converts LF → CRLF on Windows checkouts
+- This can override `.gitattributes` settings in some Git versions
+- Docker Linux containers cannot parse `#!/bin/bash\r` (with carriage return)
+
+**Verification:**
+```bash
+# Check if file has correct line endings (Linux/Git Bash)
+file scripts/create-multiple-postgresql-databases.sh
+# Should output: "Bourne-Again shell script, ASCII text executable"
+# If it says "with CRLF line terminators", run fix utility
+
+# Check with Git
+git ls-files --eol scripts/*.sh
+# Should show: i/lf w/lf attr/text eol=lf
+```
+
+---
+
 **Issue: Database connection failed**
 - Check PostgreSQL service status: `sudo systemctl status postgresql`
 - Verify connection parameters in `.env` file
