@@ -52,20 +52,40 @@ call :print_status "Searching for Python installation..."
 set PYTHON_PATH=
 set PYTHON_CMD=
 
-REM Try standard python command first
+REM Try standard python command first (but exclude Microsoft Store wrapper)
 python --version >nul 2>&1
 if not errorlevel 1 (
-    set PYTHON_CMD=python
-    for /f "tokens=*" %%i in ('where python 2^>nul') do set PYTHON_PATH=%%i
-    goto :python_found
+    for /f "tokens=*" %%i in ('where python 2^>nul') do (
+        REM Skip Microsoft Store Python wrapper (doesn't work with Windows services)
+        echo %%i | findstr /i "WindowsApps" >nul
+        if errorlevel 1 (
+            set PYTHON_CMD=python
+            set PYTHON_PATH=%%i
+            goto :python_found
+        )
+    )
 )
 
-REM Try py launcher
+REM Try py launcher (and get actual Python path, not just py.exe)
 py --version >nul 2>&1
 if not errorlevel 1 (
-    set PYTHON_CMD=py
-    for /f "tokens=*" %%i in ('where py 2^>nul') do set PYTHON_PATH=%%i
-    goto :python_found
+    REM Get the actual Python executable path from py launcher
+    for /f "tokens=*" %%i in ('py -c "import sys; print(sys.executable)" 2^>nul') do (
+        set PYTHON_PATH=%%i
+        set PYTHON_CMD=%%i
+        REM Verify it's not WindowsApps
+        echo %%i | findstr /i "WindowsApps" >nul
+        if errorlevel 1 (
+            goto :python_found
+        )
+    )
+)
+
+REM Check if we only found WindowsApps Python
+where python 2>nul | findstr /i "WindowsApps" >nul
+if not errorlevel 1 (
+    call :print_warning "Found Microsoft Store Python, which cannot be used for Windows services."
+    call :print_warning "Searching for regular Python installation..."
 )
 
 REM Search common Python installation locations
