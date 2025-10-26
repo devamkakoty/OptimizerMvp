@@ -25,6 +25,10 @@ if '%errorlevel%' NEQ '0' (
 
 setlocal enabledelayedexpansion
 
+REM Store script's directory for later use (must be done before any other CD commands)
+set "SCRIPT_DIR=%~dp0"
+if "%SCRIPT_DIR:~-1%"=="\" set "SCRIPT_DIR=%SCRIPT_DIR:~0,-1%"
+
 echo.
 echo ================================================
 echo GreenMatrix Host Metrics Setup
@@ -82,15 +86,71 @@ for %%d in (
     )
 )
 
-REM Python not found anywhere
+REM Python not found anywhere - try to install automatically
 echo.
-call :print_error "Python is not installed or could not be found."
+call :print_warning "Python not found. Attempting automatic installation..."
 echo.
-echo Please install Python 3.8 or higher from: https://www.python.org/downloads/
-echo IMPORTANT: During installation, check the box "Add Python to PATH"
+
+REM Check if winget is available (Windows 10 1809+ / Windows 11)
+winget --version >nul 2>&1
+if not errorlevel 1 (
+    call :print_status "Installing Python 3.11 using winget..."
+    echo This may take a few minutes...
+    winget install -e --id Python.Python.3.11 --silent --accept-package-agreements --accept-source-agreements
+
+    if not errorlevel 1 (
+        call :print_status "Python installed successfully!"
+        echo.
+        call :print_status "Searching for newly installed Python..."
+
+        REM Wait a moment for installation to complete
+        timeout /t 3 /nobreak >nul
+
+        REM Search again for Python
+        for %%d in (
+            "%LOCALAPPDATA%\Programs\Python\Python311"
+            "%LOCALAPPDATA%\Programs\Python\Python*"
+            "C:\Program Files\Python311"
+            "C:\Program Files\Python*"
+        ) do (
+            for /d %%p in (%%d) do (
+                if exist "%%p\python.exe" (
+                    set "PYTHON_PATH=%%p\python.exe"
+                    set "PYTHON_CMD=%%p\python.exe"
+                    call :print_status "Found installed Python: %%p\python.exe"
+                    goto :python_found
+                )
+            )
+        )
+
+        call :print_warning "Python was installed but couldn't be found immediately."
+        echo Please close this window and run the script again.
+        pause
+        exit /b 1
+    ) else (
+        call :print_error "Automatic Python installation failed."
+        goto :python_manual_install
+    )
+) else (
+    call :print_warning "winget not available. Cannot auto-install Python."
+    goto :python_manual_install
+)
+
+:python_manual_install
 echo.
-call :print_warning "Alternative: Run this command to install Python via winget:"
+call :print_error "Please install Python manually:"
+echo.
+echo Option 1: Download from https://www.python.org/downloads/
+echo   - Download Python 3.8 or higher
+echo   - During installation, CHECK "Add Python to PATH"
+echo.
+echo Option 2: Use winget (if available):
 echo   winget install Python.Python.3.11
+echo.
+echo Option 3: Use Chocolatey:
+echo   choco install python
+echo.
+echo After installing Python, run this script again.
 echo.
 pause
 exit /b 1
@@ -162,15 +222,20 @@ REM Find and copy metrics collection scripts
 echo.
 call :print_step "Locating metrics collection scripts..."
 
-REM Script is running from its own directory due to CD /D "%~dp0" at line 24
-set SCRIPT_DIR=%~dp0
-set SOURCE_DIR=%SCRIPT_DIR%
+REM Use SCRIPT_DIR that was set at the beginning (line 29)
+set "SOURCE_DIR=%SCRIPT_DIR%"
+
+call :print_status "Script directory: %SCRIPT_DIR%"
+call :print_status "Searching for: %SOURCE_DIR%\collect_all_metrics.py"
 
 REM Verify files exist in script directory
-if not exist "%SOURCE_DIR%collect_all_metrics.py" (
+if not exist "%SOURCE_DIR%\collect_all_metrics.py" (
     call :print_error "collect_all_metrics.py not found in %SOURCE_DIR%"
     echo.
-    echo This script must be run from the GreenMatrix repository root directory
+    echo Current directory: %CD%
+    echo Script directory: %SCRIPT_DIR%
+    echo.
+    echo This script must be in the GreenMatrix repository root directory
     echo containing collect_all_metrics.py and collect_hardware_specs.py
     echo.
     pause
@@ -181,14 +246,24 @@ call :print_status "Found scripts in: %SOURCE_DIR%"
 
 REM Copy scripts to system location
 call :print_step "Copying metrics collection scripts..."
-copy "%SOURCE_DIR%collect_all_metrics.py" "%GREENMATRIX_DIR%\" >nul
+copy "%SOURCE_DIR%\collect_all_metrics.py" "%GREENMATRIX_DIR%\" >nul
+if errorlevel 1 (
+    call :print_error "Failed to copy collect_all_metrics.py"
+    pause
+    exit /b 1
+)
 call :print_status "Copied: collect_all_metrics.py"
 
-copy "%SOURCE_DIR%collect_hardware_specs.py" "%GREENMATRIX_DIR%\" >nul
+copy "%SOURCE_DIR%\collect_hardware_specs.py" "%GREENMATRIX_DIR%\" >nul
+if errorlevel 1 (
+    call :print_error "Failed to copy collect_hardware_specs.py"
+    pause
+    exit /b 1
+)
 call :print_status "Copied: collect_hardware_specs.py"
 
-if exist "%SOURCE_DIR%config.ini" (
-    copy "%SOURCE_DIR%config.ini" "%GREENMATRIX_DIR%\" >nul
+if exist "%SOURCE_DIR%\config.ini" (
+    copy "%SOURCE_DIR%\config.ini" "%GREENMATRIX_DIR%\" >nul
     call :print_status "Copied: config.ini"
 ) else (
     call :print_warning "config.ini not found (will use default settings)"
