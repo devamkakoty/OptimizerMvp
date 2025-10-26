@@ -238,6 +238,15 @@ if not exist "%GREENMATRIX_DIR%" (
     call :print_status "Directory already exists: %GREENMATRIX_DIR%"
 )
 
+REM Grant SYSTEM account full permissions to GreenMatrix directory (required for Windows services)
+call :print_status "Setting directory permissions for Windows service (SYSTEM account)..."
+icacls "%GREENMATRIX_DIR%" /grant "SYSTEM:(OI)(CI)F" /T >nul 2>&1
+if not errorlevel 1 (
+    call :print_status "Permissions granted to SYSTEM account"
+) else (
+    call :print_warning "Could not set permissions (may cause PID file issues)"
+)
+
 REM Find and copy metrics collection scripts
 echo.
 call :print_step "Locating metrics collection scripts..."

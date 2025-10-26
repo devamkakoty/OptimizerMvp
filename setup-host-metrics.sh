@@ -158,6 +158,12 @@ fi
 chmod +x /opt/greenmatrix/collect_all_metrics.py
 chmod +x /opt/greenmatrix/collect_hardware_specs.py
 
+# Ensure correct permissions for PID files (root user needs write access)
+print_status "Setting directory permissions for systemd service..."
+chmod 755 /opt/greenmatrix
+chown -R root:root /opt/greenmatrix
+print_status "Permissions configured for root service account"
+
 print_status "✅ Scripts copied to /opt/greenmatrix/"
 
 # Detect backend URL

@@ -205,9 +205,14 @@ def get_hyperv_vm_metrics():
     if platform.system() != 'Windows': return []
     command = "Get-VM | Where-Object {$_.State -eq 'Running'} | Measure-VM | Select-Object VMName, CPUUsage, AverageMemoryUsage | ConvertTo-Json"
     try:
-        result = subprocess.run(["powershell.exe", "-Command", command], capture_output=True, text=True, check=True)
+        result = subprocess.run(["powershell.exe", "-Command", command], capture_output=True, text=True, check=True, timeout=5)
         return json.loads(result.stdout) if result.stdout else []
-    except Exception: return []
+    except subprocess.TimeoutExpired:
+        print("Warning: Hyper-V VM metrics query timed out (no VMs or access denied)")
+        return []
+    except Exception as e:
+        # Silently ignore if Hyper-V is not available or no permission
+        return []
 
 def get_overall_host_metrics():
     # Get system-wide CPU and memory usage (matches Task Manager)
