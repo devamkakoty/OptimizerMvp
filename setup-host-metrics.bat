@@ -79,8 +79,8 @@ for %%d in (
 ) do (
     for /d %%p in (%%d) do (
         if exist "%%p\python.exe" (
-            set "PYTHON_PATH=%%p\python.exe"
-            set "PYTHON_CMD=%%p\python.exe"
+            set PYTHON_PATH=%%p\python.exe
+            set PYTHON_CMD=%%p\python.exe
             goto :python_found
         )
     )
@@ -115,8 +115,8 @@ if not errorlevel 1 (
         ) do (
             for /d %%p in (%%d) do (
                 if exist "%%p\python.exe" (
-                    set "PYTHON_PATH=%%p\python.exe"
-                    set "PYTHON_CMD=%%p\python.exe"
+                    set PYTHON_PATH=%%p\python.exe
+                    set PYTHON_CMD=%%p\python.exe
                     call :print_status "Found installed Python: %%p\python.exe"
                     goto :python_found
                 )
@@ -326,6 +326,8 @@ call :print_status "Creating host metrics service..."
 sc create "GreenMatrix-Host-Metrics" binPath= "\"%PYTHON_PATH%\" \"%GREENMATRIX_DIR%\collect_all_metrics.py\"" start= auto
 if errorlevel 1 (
     call :print_error "Failed to create host metrics Windows service"
+    echo Python path: %PYTHON_PATH%
+    echo Service path would be: "%PYTHON_PATH%" "%GREENMATRIX_DIR%\collect_all_metrics.py"
     pause
     exit /b 1
 )
@@ -347,7 +349,14 @@ REM Start both services
 call :print_status "Starting host metrics collection service..."
 sc start "GreenMatrix-Host-Metrics"
 if errorlevel 1 (
-    call :print_warning "Failed to start host metrics service automatically. You may need to start it manually."
+    call :print_warning "Failed to start host metrics service automatically."
+    echo.
+    echo Troubleshooting:
+    echo 1. Check Event Viewer: eventvwr.msc → Windows Logs → Application
+    echo 2. Try running Python script manually:
+    echo    "%PYTHON_PATH%" "%GREENMATRIX_DIR%\collect_all_metrics.py"
+    echo 3. Check if backend is accessible: curl http://localhost:8000/health
+    echo.
 ) else (
     call :print_status "Host metrics service started successfully"
 )
@@ -355,7 +364,13 @@ if errorlevel 1 (
 call :print_status "Starting hardware specs collection service..."
 sc start "GreenMatrix-Hardware-Specs"
 if errorlevel 1 (
-    call :print_warning "Failed to start hardware specs service automatically. You may need to start it manually."
+    call :print_warning "Failed to start hardware specs service automatically."
+    echo.
+    echo Troubleshooting:
+    echo 1. Check Event Viewer: eventvwr.msc → Windows Logs → Application
+    echo 2. Try running Python script manually:
+    echo    "%PYTHON_PATH%" "%GREENMATRIX_DIR%\collect_hardware_specs.py"
+    echo.
 ) else (
     call :print_status "Hardware specs service started successfully"
 )
