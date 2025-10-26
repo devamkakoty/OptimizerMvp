@@ -164,24 +164,18 @@ call :print_status "Database setup completed"
 REM Setup host metrics collection
 call :print_step "Setting up host metrics collection service..."
 
-REM Check if running as administrator (needed for service setup)
-net session >nul 2>&1
-if errorlevel 1 (
-    call :print_warning "Host metrics collection requires administrator access for service setup"
-    call :print_status "You can set this up later by running: setup-host-metrics.bat as Administrator"
-) else (
-    REM Call the dedicated setup-host-metrics.bat script
-    call :print_status "Running setup-host-metrics.bat..."
-    if exist "setup-host-metrics.bat" (
-        call setup-host-metrics.bat
-        if errorlevel 1 (
-            call :print_warning "Host metrics setup encountered issues. You can retry later with: setup-host-metrics.bat"
-        ) else (
-            call :print_status "✅ Host metrics collection setup completed successfully!"
-        )
+REM Call the dedicated setup-host-metrics.bat script (it will auto-elevate if needed)
+if exist "setup-host-metrics.bat" (
+    call :print_status "Running setup-host-metrics.bat (will request admin privileges if needed)..."
+    call setup-host-metrics.bat
+    if errorlevel 1 (
+        call :print_warning "Host metrics setup encountered issues. You can retry later with: setup-host-metrics.bat"
     ) else (
-        call :print_warning "setup-host-metrics.bat not found. Skipping host metrics setup."
+        call :print_status "✅ Host metrics collection setup completed successfully!"
     )
+) else (
+    call :print_warning "setup-host-metrics.bat not found. Skipping host metrics setup."
+    call :print_status "You can set this up later by running: setup-host-metrics.bat"
 )
 
 REM Final verification

@@ -2,6 +2,27 @@
 REM GreenMatrix Host Metrics Setup Script for Windows
 REM This script sets up host metrics collection service
 
+REM Auto-elevate to administrator if not already running as admin
+>nul 2>&1 "%SYSTEMROOT%\system32\cacls.exe" "%SYSTEMROOT%\system32\config\system"
+if '%errorlevel%' NEQ '0' (
+    echo Requesting administrator privileges...
+    goto :UACPrompt
+) else (
+    goto :gotAdmin
+)
+
+:UACPrompt
+    echo Set UAC = CreateObject^("Shell.Application"^) > "%temp%\getadmin.vbs"
+    echo UAC.ShellExecute "%~s0", "", "", "runas", 1 >> "%temp%\getadmin.vbs"
+    "%temp%\getadmin.vbs"
+    del "%temp%\getadmin.vbs"
+    exit /B
+
+:gotAdmin
+    if exist "%temp%\getadmin.vbs" ( del "%temp%\getadmin.vbs" )
+    pushd "%CD%"
+    CD /D "%~dp0"
+
 setlocal enabledelayedexpansion
 
 echo.
@@ -20,37 +41,63 @@ set "NC=%ESC%[0m"
 
 REM Function to print colored output
 call :print_status "Setting up host metrics collection service..."
-
-REM Check if running as administrator (needed for service setup)
-call :print_status "Checking administrator privileges..."
-net session >nul 2>&1
-if errorlevel 1 (
-    echo.
-    call :print_error "This script requires administrator privileges to create Windows services."
-    echo.
-    echo Please do one of the following:
-    echo   1. Close this window
-    echo   2. Right-click on setup-host-metrics.bat
-    echo   3. Select "Run as Administrator"
-    echo.
-    pause
-    exit /b 1
-)
 call :print_status "Running with administrator privileges - OK"
 
-REM Check if Python is installed
-call :print_status "Checking for Python installation..."
+REM Check if Python is installed and find it
+call :print_status "Searching for Python installation..."
+set PYTHON_PATH=
+set PYTHON_CMD=
+
+REM Try standard python command first
 python --version >nul 2>&1
-if errorlevel 1 (
-    echo.
-    call :print_error "Python is not installed. Please install Python 3.8 or higher first."
-    echo Visit: https://www.python.org/downloads/
-    echo.
-    pause
-    exit /b 1
+if not errorlevel 1 (
+    set PYTHON_CMD=python
+    for /f "tokens=*" %%i in ('where python 2^>nul') do set PYTHON_PATH=%%i
+    goto :python_found
 )
-python --version
-call :print_status "Python is installed - OK"
+
+REM Try py launcher
+py --version >nul 2>&1
+if not errorlevel 1 (
+    set PYTHON_CMD=py
+    for /f "tokens=*" %%i in ('where py 2^>nul') do set PYTHON_PATH=%%i
+    goto :python_found
+)
+
+REM Search common Python installation locations
+call :print_status "Python not in PATH, searching system..."
+for %%d in (
+    "%LOCALAPPDATA%\Programs\Python\Python*"
+    "C:\Python*"
+    "%PROGRAMFILES%\Python*"
+    "%PROGRAMFILES(X86)%\Python*"
+    "C:\Users\%USERNAME%\AppData\Local\Programs\Python\Python*"
+) do (
+    for /d %%p in (%%d) do (
+        if exist "%%p\python.exe" (
+            set "PYTHON_PATH=%%p\python.exe"
+            set "PYTHON_CMD=%%p\python.exe"
+            goto :python_found
+        )
+    )
+)
+
+REM Python not found anywhere
+echo.
+call :print_error "Python is not installed or could not be found."
+echo.
+echo Please install Python 3.8 or higher from: https://www.python.org/downloads/
+echo IMPORTANT: During installation, check the box "Add Python to PATH"
+echo.
+call :print_warning "Alternative: Run this command to install Python via winget:"
+echo   winget install Python.Python.3.11
+echo.
+pause
+exit /b 1
+
+:python_found
+%PYTHON_CMD% --version
+call :print_status "Python found: %PYTHON_PATH%"
 
 REM Check if GreenMatrix is running (optional - continue even if not detected)
 call :print_status "Checking for GreenMatrix backend service..."
@@ -79,21 +126,21 @@ REM Install Python dependencies for host metrics collection
 echo.
 call :print_step "Installing Python dependencies for host metrics..."
 echo Installing: pip (upgrade)
-python -m pip install --upgrade pip --quiet
+%PYTHON_CMD% -m pip install --upgrade pip --quiet
 echo Installing: psutil, requests, python-dateutil, py-cpuinfo
-python -m pip install psutil requests python-dateutil py-cpuinfo --quiet
+%PYTHON_CMD% -m pip install psutil requests python-dateutil py-cpuinfo --quiet
 call :print_status "Core dependencies installed"
 
 REM Install Windows-specific dependencies
 call :print_status "Installing Windows-specific dependencies (WMI)..."
-python -m pip install wmi --quiet
+%PYTHON_CMD% -m pip install wmi --quiet
 call :print_status "WMI installed"
 
 REM Install NVIDIA monitoring if GPU present
 wmic path win32_VideoController get name 2>nul | findstr /i nvidia >nul 2>&1
 if not errorlevel 1 (
     call :print_status "NVIDIA GPU detected, installing pynvml..."
-    python -m pip install pynvml --quiet
+    %PYTHON_CMD% -m pip install pynvml --quiet
     call :print_status "pynvml installed"
 ) else (
     call :print_status "No NVIDIA GPU detected (skipping pynvml)"
@@ -111,23 +158,37 @@ if not exist "%GREENMATRIX_DIR%" (
     call :print_status "Directory already exists: %GREENMATRIX_DIR%"
 )
 
-REM Copy metrics collection scripts to system location
+REM Find and copy metrics collection scripts
 echo.
-call :print_step "Copying metrics collection scripts..."
-if not exist "collect_all_metrics.py" (
-    call :print_error "collect_all_metrics.py not found in current directory!"
-    echo Please run this script from the GreenMatrix root directory.
+call :print_step "Locating metrics collection scripts..."
+
+REM Script is running from its own directory due to CD /D "%~dp0" at line 24
+set SCRIPT_DIR=%~dp0
+set SOURCE_DIR=%SCRIPT_DIR%
+
+REM Verify files exist in script directory
+if not exist "%SOURCE_DIR%collect_all_metrics.py" (
+    call :print_error "collect_all_metrics.py not found in %SOURCE_DIR%"
+    echo.
+    echo This script must be run from the GreenMatrix repository root directory
+    echo containing collect_all_metrics.py and collect_hardware_specs.py
+    echo.
     pause
     exit /b 1
 )
-copy "collect_all_metrics.py" "%GREENMATRIX_DIR%\" >nul
+
+call :print_status "Found scripts in: %SOURCE_DIR%"
+
+REM Copy scripts to system location
+call :print_step "Copying metrics collection scripts..."
+copy "%SOURCE_DIR%collect_all_metrics.py" "%GREENMATRIX_DIR%\" >nul
 call :print_status "Copied: collect_all_metrics.py"
 
-copy "collect_hardware_specs.py" "%GREENMATRIX_DIR%\" >nul
+copy "%SOURCE_DIR%collect_hardware_specs.py" "%GREENMATRIX_DIR%\" >nul
 call :print_status "Copied: collect_hardware_specs.py"
 
-if exist "config.ini" (
-    copy "config.ini" "%GREENMATRIX_DIR%\" >nul
+if exist "%SOURCE_DIR%config.ini" (
+    copy "%SOURCE_DIR%config.ini" "%GREENMATRIX_DIR%\" >nul
     call :print_status "Copied: config.ini"
 ) else (
     call :print_warning "config.ini not found (will use default settings)"
@@ -183,8 +244,7 @@ if not errorlevel 1 (
     timeout /t 3 /nobreak >nul
 )
 
-REM Get Python executable path
-for /f "tokens=*" %%i in ('where python') do set PYTHON_PATH=%%i
+REM Python path already set from detection above
 
 REM Create the host metrics service
 call :print_status "Creating host metrics service..."
