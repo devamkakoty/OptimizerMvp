@@ -368,23 +368,23 @@ if not errorlevel 1 (
 REM Windows services don't work with Python scripts - use scheduled tasks instead
 call :print_step "Creating scheduled tasks to run metrics collectors..."
 
-REM Create batch wrappers that can be run as background tasks
-echo @echo off > "%GREENMATRIX_DIR%\run_metrics.bat"
-echo start /B "GreenMatrix-Metrics" "%PYTHON_PATH%" "%GREENMATRIX_DIR%\collect_all_metrics.py" >> "%GREENMATRIX_DIR%\run_metrics.bat"
+REM Create VBS scripts to run Python processes invisibly (no console window)
+echo Set objShell = CreateObject("WScript.Shell") > "%GREENMATRIX_DIR%\run_metrics.vbs"
+echo objShell.Run """%PYTHON_PATH%"" ""%GREENMATRIX_DIR%\collect_all_metrics.py""", 0, False >> "%GREENMATRIX_DIR%\run_metrics.vbs"
 
-echo @echo off > "%GREENMATRIX_DIR%\run_hardware.bat"
-echo start /B "GreenMatrix-Hardware" "%PYTHON_PATH%" "%GREENMATRIX_DIR%\collect_hardware_specs.py" >> "%GREENMATRIX_DIR%\run_hardware.bat"
+echo Set objShell = CreateObject("WScript.Shell") > "%GREENMATRIX_DIR%\run_hardware.vbs"
+echo objShell.Run """%PYTHON_PATH%"" ""%GREENMATRIX_DIR%\collect_hardware_specs.py""", 0, False >> "%GREENMATRIX_DIR%\run_hardware.vbs"
 
-REM Create scheduled tasks that run at startup using batch wrappers
-schtasks /create /tn "GreenMatrix-Host-Metrics" /tr "\"%GREENMATRIX_DIR%\run_metrics.bat\"" /sc onstart /ru "SYSTEM" /rl HIGHEST /f >nul 2>&1
-schtasks /create /tn "GreenMatrix-Hardware-Specs" /tr "\"%GREENMATRIX_DIR%\run_hardware.bat\"" /sc onstart /ru "SYSTEM" /rl HIGHEST /f >nul 2>&1
+REM Create scheduled tasks that run at startup using VBS wrappers (invisible execution)
+schtasks /create /tn "GreenMatrix-Host-Metrics" /tr "wscript.exe \"%GREENMATRIX_DIR%\run_metrics.vbs\"" /sc onstart /ru "SYSTEM" /rl HIGHEST /f >nul 2>&1
+schtasks /create /tn "GreenMatrix-Hardware-Specs" /tr "wscript.exe \"%GREENMATRIX_DIR%\run_hardware.vbs\"" /sc onstart /ru "SYSTEM" /rl HIGHEST /f >nul 2>&1
 
 call :print_status "Scheduled tasks created successfully"
 
-REM Start the collectors immediately using the batch wrappers
-call :print_status "Starting metrics collectors now..."
-call "%GREENMATRIX_DIR%\run_metrics.bat"
-call "%GREENMATRIX_DIR%\run_hardware.bat"
+REM Start the collectors immediately using VBS wrappers (invisible - no console window)
+call :print_status "Starting metrics collectors in background..."
+wscript.exe "%GREENMATRIX_DIR%\run_metrics.vbs"
+wscript.exe "%GREENMATRIX_DIR%\run_hardware.vbs"
 
 REM Wait for processes to start
 timeout /t 3 /nobreak >nul
