@@ -1668,6 +1668,12 @@ const AdminDashboardNew = ({
                     Memory
                   </th>
                   <th className="px-4 py-3 text-left text-[18px] font-medium dark:text-gray-300 text-gray-900">
+                    GPU Memory
+                  </th>
+                  <th className="px-4 py-3 text-left text-[18px] font-medium dark:text-gray-300 text-gray-900">
+                    GPU %
+                  </th>
+                  <th className="px-4 py-3 text-left text-[18px] font-medium dark:text-gray-300 text-gray-900">
                     Status
                   </th>
                 </tr>
@@ -1679,31 +1685,37 @@ const AdminDashboardNew = ({
                     onClick={() => handleProcessClick(process)}
                     className={
                       index % 2 === 1
-                        ? "bg-gray-50 cursor-pointer"
-                        : "bg-white cursor-pointer"
+                        ? "bg-gray-50 cursor-pointer dark:bg-gray-700"
+                        : "bg-white cursor-pointer dark:bg-gray-800"
                     }
                   >
-                    <td className="px-4 py-3 text-md text-gray-600">
+                    <td className="px-4 py-3 text-md text-gray-600 dark:text-gray-300">
                       {process['Process Name'] || 'Unknown'} PID: {process['Process ID']}
                     </td>
-                    <td className="px-4 py-3 text-md text-gray-600">
+                    <td className="px-4 py-3 text-md text-gray-600 dark:text-gray-300">
                       {process['Username'] || 'System'}
                     </td>
-                    <td className="px-4 py-3 text-md text-gray-600">
+                    <td className="px-4 py-3 text-md text-gray-600 dark:text-gray-300">
                       {(process['CPU Usage (%)'] || 0).toFixed(1)}%
                     </td>
-                    <td className="px-4 py-3 text-md text-gray-600">
+                    <td className="px-4 py-3 text-md text-gray-600 dark:text-gray-300">
                       {(process['Memory Usage (MB)'] || 0).toFixed(1)}MB,{" "}
                       {(process['Memory Usage (%)'] || 0).toFixed(1)}%
+                    </td>
+                    <td className="px-4 py-3 text-md text-gray-600 dark:text-gray-300">
+                      {(process['GPU Memory Usage (MB)'] || 0).toFixed(1)}MB
+                    </td>
+                    <td className="px-4 py-3 text-md text-gray-600 dark:text-gray-300">
+                      {(process['GPU Utilization (%)'] || 0).toFixed(1)}%
                     </td>
                     <td className="px-4 py-3 text-md font-medium">
                       <span
                         className={
                           process.Status === "Running"
-                            ? "text-green-600"
+                            ? "text-green-600 dark:text-green-400"
                             : process.Status === "Idle"
-                              ? "text-yellow-500"
-                              : "text-red-600"
+                              ? "text-yellow-500 dark:text-yellow-400"
+                              : "text-red-600 dark:text-red-400"
                         }
                       >
                         {process.Status || "Unknown"}
