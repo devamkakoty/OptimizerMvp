@@ -1,6 +1,15 @@
 import configparser, subprocess, json, datetime, os, time, requests, psutil, platform
+
+# Try to import pynvml for GPU monitoring (optional)
+PYNVML_AVAILABLE = False
 if platform.system() == 'Windows':
-    from pynvml import *
+    try:
+        from pynvml import *
+        PYNVML_AVAILABLE = True
+        print("pynvml loaded successfully - GPU metrics enabled")
+    except ImportError:
+        PYNVML_AVAILABLE = False
+        print("pynvml not available - GPU metrics will be skipped")
 
 # --- PID File Management ---
 # Cross-platform PID file path
@@ -49,7 +58,8 @@ def get_host_process_stats(interval=2.0):
     """
     def _get_gpu_stats():
         gpu_pid_mem, gpu_pid_util = {}, {}
-        if platform.system() != 'Windows': return gpu_pid_mem, gpu_pid_util
+        if platform.system() != 'Windows' or not PYNVML_AVAILABLE:
+            return gpu_pid_mem, gpu_pid_util
         try:
             nvmlInit()
             gpu_count = nvmlDeviceGetCount()
@@ -234,36 +244,36 @@ def get_overall_host_metrics():
             'host_disk_read_count': 0,
             'host_disk_write_count': 0
         })
-    if platform.system() == 'Windows':
+    if platform.system() == 'Windows' and PYNVML_AVAILABLE:
         try:
             nvmlInit()
             handle = nvmlDeviceGetHandleByIndex(0)
             util = nvmlDeviceGetUtilizationRates(handle)
-            
+
             # Get GPU power draw in watts
             try:
                 gpu_power_watts = nvmlDeviceGetPowerUsage(handle) / 1000.0  # Convert from mW to W
             except NVMLError:
                 gpu_power_watts = 0.0
-            
+
             metrics.update({
-                'host_gpu_utilization_percent': util.gpu, 
+                'host_gpu_utilization_percent': util.gpu,
                 'host_gpu_memory_utilization_percent': util.memory,
                 'host_gpu_temperature_celsius': nvmlDeviceGetTemperature(handle, NVML_TEMPERATURE_GPU),
                 'host_gpu_power_draw_watts': gpu_power_watts
             })
             nvmlShutdown()
-        except (NameError, NVMLError): 
+        except (NameError, NVMLError):
             metrics.update({
-                'host_gpu_utilization_percent': 0, 
-                'host_gpu_memory_utilization_percent': 0, 
+                'host_gpu_utilization_percent': 0,
+                'host_gpu_memory_utilization_percent': 0,
                 'host_gpu_temperature_celsius': 0,
                 'host_gpu_power_draw_watts': 0.0
             })
     else:
         metrics.update({
-            'host_gpu_utilization_percent': 0, 
-            'host_gpu_memory_utilization_percent': 0, 
+            'host_gpu_utilization_percent': 0,
+            'host_gpu_memory_utilization_percent': 0,
             'host_gpu_temperature_celsius': 0,
             'host_gpu_power_draw_watts': 0.0
         })
