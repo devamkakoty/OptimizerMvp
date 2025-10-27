@@ -29,13 +29,52 @@ echo %BLUE%[STEP]%NC% Checking environment...
 REM Check Python installation
 python --version >nul 2>&1
 if errorlevel 1 (
-    echo %RED%[ERROR]%NC% Python is not installed or not in PATH
-    echo Please install Python 3.8+ from https://python.org
-    pause
-    exit /b 1
+    echo %YELLOW%[WARNING]%NC% Python is not installed
+    echo %GREEN%[INFO]%NC% Downloading and installing Python 3.11...
+
+    REM Create temp directory
+    if not exist "%TEMP%\greenmatrix" mkdir "%TEMP%\greenmatrix"
+
+    REM Download Python installer
+    echo %GREEN%[INFO]%NC% Downloading Python installer...
+    powershell -Command "& {[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe' -OutFile '%TEMP%\greenmatrix\python-installer.exe'}"
+
+    if errorlevel 1 (
+        echo %RED%[ERROR]%NC% Failed to download Python installer
+        echo Please manually install Python 3.8+ from https://python.org
+        pause
+        exit /b 1
+    )
+
+    REM Install Python silently
+    echo %GREEN%[INFO]%NC% Installing Python (this may take a few minutes)...
+    "%TEMP%\greenmatrix\python-installer.exe" /quiet InstallAllUsers=1 PrependPath=1 Include_test=0
+
+    REM Wait for installation to complete
+    timeout /t 10 /nobreak >nul
+
+    REM Refresh PATH by reloading environment variables
+    for /f "tokens=2*" %%a in ('reg query "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" /v Path 2^>nul') do set "SystemPath=%%b"
+    for /f "tokens=2*" %%a in ('reg query "HKCU\Environment" /v Path 2^>nul') do set "UserPath=%%b"
+    set "PATH=%SystemPath%;%UserPath%"
+
+    REM Verify Python installation
+    python --version >nul 2>&1
+    if errorlevel 1 (
+        echo %RED%[ERROR]%NC% Python installation failed
+        echo Please manually install Python 3.8+ from https://python.org and re-run this script
+        pause
+        exit /b 1
+    )
+
+    echo %GREEN%[INFO]%NC% ✅ Python installed successfully
+
+    REM Clean up installer
+    del "%TEMP%\greenmatrix\python-installer.exe"
+) else (
+    echo %GREEN%[INFO]%NC% ✅ Python found
 )
 
-echo %GREEN%[INFO]%NC% ✅ Python found
 echo.
 
 echo %BLUE%[STEP]%NC% Setting up VM agent environment...
@@ -53,8 +92,7 @@ echo %GREEN%[INFO]%NC% Installing Python dependencies...
 "%AGENT_DIR%\venv\Scripts\pip.exe" install psutil>=5.9.0 requests>=2.28.0 netifaces>=0.11.0 pynvml>=11.4.1
 
 REM Copy VM agent files
-copy "vm_agent.py" "%AGENT_DIR%\"
-copy "vm_agent.ini.example" "%AGENT_DIR%\vm_agent.ini"
+copy "simple_vm_agent.py" "%AGENT_DIR%\"
 
 echo %GREEN%[INFO]%NC% ✅ VM agent environment set up
 echo.
@@ -117,7 +155,7 @@ REM Create service wrapper script
 (
 echo @echo off
 echo cd /d "%AGENT_DIR%"
-echo "%AGENT_DIR%\venv\Scripts\python.exe" "%AGENT_DIR%\vm_agent.py"
+echo "%AGENT_DIR%\venv\Scripts\python.exe" "%AGENT_DIR%\simple_vm_agent.py"
 ) > "%AGENT_DIR%\run_agent.bat"
 
 REM Create service installation script

@@ -1,0 +1,36 @@
+[DEFAULT]
+# VM Agent Configuration for GreenMatrix
+# This file configures how the VM agent connects to GreenMatrix backend
+# and collects metrics from the virtual machine
+
+[api]
+# Backend API Configuration
+# IMPORTANT: Use the host machine's IP address, NOT localhost!
+# - For VMs on same host: Use host's network IP (e.g., http://10.25.41.86:8000)
+# - For LXD containers: Use LXD bridge IP (typically http://10.0.3.1:8000)
+# - For Docker containers: Use Docker bridge IP (typically http://172.17.0.1:8000)
+# - For remote VMs: Use GreenMatrix server's public IP
+backend_url = http://<HOST_IP>:8000
+api_timeout = 30
+retry_attempts = 3
+retry_delay = 5
+
+[collection]
+# Data Collection Configuration
+interval_seconds = 2
+vm_name = <VM_NAME>
+collect_gpu_metrics = true
+collect_disk_metrics = true
+
+[logging]
+# Logging Configuration
+log_level = INFO
+log_file = /var/log/greenmatrix-vm-agent.log
+log_max_size = 10485760
+log_backup_count = 5
+
+[security]
+# Security Configuration (Optional)
+# Leave api_key empty if not using authentication
+api_key =
+verify_ssl = false
