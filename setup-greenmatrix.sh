@@ -71,19 +71,24 @@ check_prerequisites() {
         print_error "Docker is not installed. Please install Docker first."
         exit 1
     fi
-    
+
     # Check Docker Compose
     if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/null; then
         print_error "Docker Compose is not installed. Please install Docker Compose first."
         exit 1
     fi
-    
+
     # Check if Docker is running
     if ! docker info &> /dev/null; then
         print_error "Docker is not running. Please start Docker first."
         exit 1
     fi
-    
+
+    # Check Python (optional - used for host metrics collection)
+    if ! command -v python3 &> /dev/null; then
+        print_warning "Python3 not found - will install during host metrics setup"
+    fi
+
     print_status "✅ Prerequisites check passed"
 }
 
@@ -199,24 +204,32 @@ setup_databases() {
 setup_host_metrics_collection() {
     print_step "Setting up host metrics collection service..."
 
-    # Check if running as root (needed for systemd service)
-    if [ "$EUID" -ne 0 ]; then
-        print_warning "Host metrics collection requires root access for systemd service setup"
-        print_status "You can set this up later by running: sudo ./setup-host-metrics.sh"
-        return 0
-    fi
-
     # Call the dedicated setup-host-metrics.sh script
     if [ -f "./setup-host-metrics.sh" ]; then
-        print_status "Running setup-host-metrics.sh..."
-        bash ./setup-host-metrics.sh
-        if [ $? -eq 0 ]; then
-            print_status "✅ Host metrics collection setup completed successfully!"
+        print_status "Running setup-host-metrics.sh (will request sudo if needed)..."
+
+        # Make script executable
+        chmod +x ./setup-host-metrics.sh
+
+        # Run with sudo if not already root
+        if [ "$EUID" -ne 0 ]; then
+            print_status "Requesting sudo privileges for host metrics setup..."
+            if sudo bash ./setup-host-metrics.sh; then
+                print_status "✅ Host metrics collection setup completed successfully!"
+            else
+                print_warning "Host metrics setup encountered issues. You can retry later with: sudo ./setup-host-metrics.sh"
+            fi
         else
-            print_warning "Host metrics setup encountered issues. You can retry later with: sudo ./setup-host-metrics.sh"
+            # Already root, run directly
+            if bash ./setup-host-metrics.sh; then
+                print_status "✅ Host metrics collection setup completed successfully!"
+            else
+                print_warning "Host metrics setup encountered issues. You can retry later with: sudo ./setup-host-metrics.sh"
+            fi
         fi
     else
         print_warning "setup-host-metrics.sh not found. Skipping host metrics setup."
+        print_status "You can set this up later by running: sudo ./setup-host-metrics.sh"
     fi
 }
 
@@ -356,10 +369,15 @@ main() {
     # Install dependencies
     print_status "Installing dependencies..."
     if command -v apt >/dev/null 2>&1; then
-        apt update && apt install -y python3 python3-pip curl
-        pip3 install psutil requests python-dateutil
+        apt update && apt install -y python3 python3-pip curl pciutils
+        # Handle PEP 668 externally-managed environment (Ubuntu 24.04+)
+        # Try system packages first, fallback to pip with --break-system-packages
+        if ! dpkg -l | grep -q python3-psutil; then
+            apt install -y python3-psutil python3-requests python3-dateutil 2>/dev/null || \
+            pip3 install --break-system-packages psutil requests python-dateutil
+        fi
     elif command -v yum >/dev/null 2>&1; then
-        yum install -y python3 python3-pip curl
+        yum install -y python3 python3-pip curl pciutils
         pip3 install psutil requests python-dateutil
     else
         print_error "Package manager not supported. Please install python3, pip3, and curl manually."
@@ -539,43 +557,57 @@ configure_airflow() {
 # Health check
 health_check() {
     print_step "Performing health checks..."
-    
+
+    print_status "Waiting for services to be ready (60 seconds)..."
+    sleep 60
+
     local services=(
-        "http://localhost:3000:Frontend"
+        "http://localhost:3000:Frontend Dashboard"
         "http://localhost:8000/health:Backend API"
         "http://localhost:8080:Airflow UI"
     )
-    
+
+    echo ""
     for service in "${services[@]}"; do
-        local url=$(echo $service | cut -d: -f1)
-        local name=$(echo $service | cut -d: -f2)
-        
-        if curl -f $url &> /dev/null; then
+        local url=$(echo $service | cut -d: -f1-3)
+        local name=$(echo $service | cut -d: -f4-)
+
+        if curl -f -s --connect-timeout 10 "$url" > /dev/null 2>&1; then
             print_status "✅ $name is healthy"
         else
-            print_warning "⚠️ $name may not be ready yet"
+            print_warning "⚠️  $name may not be ready yet (will be available shortly)"
         fi
     done
-    
+    echo ""
+
     # Check Docker services
     print_status "Docker services status:"
     docker-compose ps
+    echo ""
 }
 
 # Display information
 display_info() {
     echo ""
+    echo "================================================"
     echo "🎉 GreenMatrix Setup Complete!"
-    echo "==============================="
+    echo "================================================"
     echo ""
     echo "📊 Application URLs:"
     echo "  Frontend Dashboard:    http://localhost:3000"
-    echo "  Backend API:          http://localhost:8000"
-    echo "  API Documentation:    http://localhost:8000/docs"
-    echo "  Airflow UI:           http://localhost:8080"
+    echo "  Backend API:           http://localhost:8000"
+    echo "  API Documentation:     http://localhost:8000/docs"
+    echo "  Airflow UI:            http://localhost:8080"
     echo ""
     echo "🔐 Default Credentials:"
-    echo "  Airflow UI:           airflow / airflow"
+    echo "  Airflow UI:            airflow / airflow"
+    echo ""
+    echo "📈 Host Metrics Collection:"
+    echo "  If running with sudo, host metrics are automatically set up"
+    echo "  Services: greenmatrix-host-metrics, greenmatrix-hardware-specs"
+    echo "  Manual setup:          sudo ./setup-host-metrics.sh"
+    echo "  Service status:        systemctl status greenmatrix-host-metrics"
+    echo "  View logs:             journalctl -u greenmatrix-host-metrics -f"
     echo ""
     echo "📈 Monitoring Features:"
     echo "  ✅ Host Metrics Collection (continuous, systemd service)"
@@ -659,8 +691,15 @@ main() {
     configure_airflow
     health_check
     display_info
-    
+
+    echo ""
+    echo "================================================"
     print_status "🎉 Setup completed successfully!"
+    echo "================================================"
+    echo ""
+    echo "👉 Open your browser and navigate to:"
+    echo "   http://localhost:3000"
+    echo ""
 }
 
 # Run main function
