@@ -3211,6 +3211,23 @@ const OptimizeTab = () => {
           <OptimizationResults results={optimizationResults} mode={optimizationMode} />
         )
       )}
+
+      {/* Documentation Link for Recommend Hardware Tab */}
+      {optimizationMode === 'pre-deployment' && (
+        <div className="mt-6 px-6 py-4 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
+          <p className="text-sm text-gray-700 dark:text-gray-300 text-center">
+            For more information on how the recommendation system works, please refer to our{' '}
+            <a
+              href="https://hpe.atlassian.net/wiki/spaces/PSGCC/pages/3804823599/Recommendation+Systems?atlOrigin=eyJpIjoiMGZhNjgwNDA3MTZlNGEwYjkxMWFkNTlmNzJhMWFlMzQiLCJwIjoiYyJ9"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[#01a982] hover:text-[#018f73] font-semibold underline decoration-2 underline-offset-2 transition-colors"
+            >
+              Recommendation Systems Documentation
+            </a>
+          </p>
+        </div>
+      )}
     </>
   );
 };
