@@ -1,0 +1,14 @@
+# GreenMatrix VM Agent - Python Dependencies
+# Install with: pip install -r requirements.txt
+
+# Core dependencies (required)
+psutil>=5.9.0        # System and process monitoring
+requests>=2.28.0     # HTTP client for API communication
+
+# Optional dependencies
+pynvml>=11.4.1       # NVIDIA GPU monitoring (Windows & Linux)
+                     # Only required if you have NVIDIA GPUs
+
+# Note: For AMD GPUs on Linux, install rocm-smi via system package manager:
+# Ubuntu: sudo apt-get install rocm-smi
+# CentOS: sudo yum install rocm-smi

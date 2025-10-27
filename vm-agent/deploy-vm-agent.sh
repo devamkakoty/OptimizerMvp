@@ -105,12 +105,11 @@ setup_vm_agent() {
     sudo "$agent_dir/venv/bin/pip" install psutil>=5.9.0 requests>=2.28.0 netifaces>=0.11.0
     
     # Copy VM agent files
-    sudo cp vm_agent.py "$agent_dir/"
-    sudo cp vm_agent.ini.example "$agent_dir/vm_agent.ini"
+    sudo cp simple_vm_agent.py "$agent_dir/"
     
     # Set permissions
     sudo chown -R root:root "$agent_dir"
-    sudo chmod +x "$agent_dir/vm_agent.py"
+    sudo chmod +x "$agent_dir/simple_vm_agent.py"
     
     print_status "✅ VM agent environment set up"
 }
@@ -190,7 +189,7 @@ Type=simple
 User=root
 Group=root
 WorkingDirectory=${agent_dir}
-ExecStart=${agent_dir}/venv/bin/python ${agent_dir}/vm_agent.py
+ExecStart=${agent_dir}/venv/bin/python ${agent_dir}/simple_vm_agent.py
 Restart=always
 RestartSec=10
 StandardOutput=journal

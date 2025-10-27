@@ -1,0 +1,80 @@
+================================================================================
+  GreenMatrix VM Agent - QUICK START
+================================================================================
+
+WHAT TO DO:
+
+  1. Copy this entire "vm-agent" folder to your VM
+  2. Run the installer:
+
+     Windows:  deploy-vm-agent.bat  (as Administrator)
+     Linux:    sudo bash deploy-vm-agent.sh
+
+  3. Done! The agent will auto-configure and start monitoring.
+
+================================================================================
+
+WHAT'S INCLUDED:
+
+  ✅ simple_vm_agent.py           - The monitoring agent
+  ✅ deploy-vm-agent.bat          - Windows automated installer
+  ✅ deploy-vm-agent.sh           - Linux automated installer
+  ✅ vm_agent_config.ini.template - Configuration template
+  ✅ requirements.txt             - Python dependencies
+  ✅ README.md                    - Detailed documentation
+
+================================================================================
+
+PREREQUISITES:
+
+  • Administrator/root access
+  • Network access to GreenMatrix host
+  • Python 3.8+ (will be auto-installed if internet available)
+
+================================================================================
+
+COPY METHODS:
+
+  Windows:  xcopy \\host\share\vm-agent C:\Temp\vm-agent /E /I
+  Linux:    scp -r vm-agent user@vm-ip:/tmp/
+  USB:      Just copy the folder to USB and plug into VM
+
+================================================================================
+
+WHAT THE INSTALLER DOES (AUTOMATICALLY):
+
+  ✅ Installs Python (if needed)
+  ✅ Detects GreenMatrix host IP
+  ✅ Installs required packages
+  ✅ Creates configuration file
+  ✅ Sets up auto-start service
+  ✅ Starts monitoring
+  ✅ Tests connectivity
+
+  Time: 3-7 minutes
+
+================================================================================
+
+VERIFICATION:
+
+  Check if running:
+    Windows: schtasks /query /tn "GreenMatrix VM Agent"
+    Linux:   sudo systemctl status greenmatrix-vm-agent
+
+  View logs:
+    Windows: type C:\GreenMatrix-VM-Agent\greenmatrix-vm-agent.log
+    Linux:   sudo journalctl -u greenmatrix-vm-agent -n 50
+
+  Check dashboard:
+    Open http://<GREENMATRIX_HOST>:3000
+    Look for your VM in "VM Instances" section
+
+================================================================================
+
+NEED HELP?
+
+  • See README.md for detailed instructions
+  • Troubleshooting guide included in README.md
+  • Full docs: docs/VM_Monitoring_Setup_Guide.md
+
+================================================================================

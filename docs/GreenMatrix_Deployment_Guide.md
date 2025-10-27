@@ -69,15 +69,25 @@ This guide covers three primary deployment approaches:
 #### Operating System Requirements
 
 **Supported Operating Systems:**
+
+**Linux:**
 - Ubuntu 20.04 LTS (Focal Fossa)
 - Ubuntu 22.04 LTS (Jammy Jellyfish)
 - Ubuntu 18.04 LTS (Bionic Beaver) - Limited support
+- Other Debian-based distributions (with manual configuration)
+
+**Windows:**
+- Windows 10 (Version 1809 or later)
+- Windows 11
+- Windows Server 2019
+- Windows Server 2022
 
 **Additional Requirements:**
-- Root or sudo access privileges
+- Root or sudo access privileges (Linux) / Administrator privileges (Windows)
 - Internet connectivity for package downloads
 - Firewall configuration permissions
-- Database administration capabilities
+- Database administration capabilities (for manual setup)
+- Docker Desktop (Windows) or Docker Engine (Linux) for containerized deployment
 
 ### Network Requirements
 
@@ -195,7 +205,130 @@ GreenMatrix employs a multi-tier architecture consisting of the following primar
 
 ---
 
-## Prerequisites Installation
+## Quick Start: Automated Deployment
+
+### Automated Setup Scripts (Recommended)
+
+GreenMatrix provides automated setup scripts that handle installation, configuration, and deployment in a single command. This is the **recommended method** for most users.
+
+#### Windows Automated Deployment
+
+**Prerequisites:**
+- Administrator privileges
+- Internet connection
+- Git for Windows (optional, for cloning repository)
+
+**Installation Steps:**
+
+```batch
+# 1. Clone or download GreenMatrix repository
+git clone https://github.com/your-org/greenmatrix.git
+cd greenmatrix
+
+# 2. Run automated setup script
+setup-greenmatrix.bat
+```
+
+The script will automatically:
+- Check and install Docker Desktop if needed
+- Configure Git line endings for Docker compatibility
+- Build and start all Docker containers (PostgreSQL, TimescaleDB, Backend, Frontend, Airflow)
+- Initialize databases with required schemas
+- Set up monitoring services
+- Configure host metrics collection
+
+**Host Metrics Setup (Optional but Recommended):**
+
+```batch
+# Run in administrator command prompt
+setup-host-metrics.bat
+```
+
+This will:
+- Auto-detect and install Python 3.11+ if needed
+- Install required Python packages (psutil, requests, etc.)
+- Create VBScript wrappers for background execution
+- Configure Windows scheduled tasks to run at startup
+- Set proper permissions for SYSTEM account
+- Start metrics collection immediately
+
+#### Linux Automated Deployment
+
+**Prerequisites:**
+- sudo access
+- Internet connection
+
+**Installation Steps:**
+
+```bash
+# 1. Clone repository
+git clone https://github.com/your-org/greenmatrix.git
+cd greenmatrix
+
+# 2. Make scripts executable
+chmod +x setup-greenmatrix.sh
+chmod +x setup-host-metrics.sh
+
+# 3. Run automated setup
+./setup-greenmatrix.sh
+```
+
+The script will automatically:
+- Install Docker and Docker Compose if needed
+- Fix shell script line endings
+- Build and start all containers
+- Initialize databases
+- Configure Airflow monitoring
+
+**Host Metrics Setup:**
+
+```bash
+# Run with sudo
+sudo ./setup-host-metrics.sh
+```
+
+This will:
+- Install Python dependencies
+- Create systemd services for metrics collection
+- Configure proper permissions
+- Start metrics collection services
+
+#### Post-Installation Verification
+
+After running the automated setup scripts:
+
+```bash
+# Check Docker containers
+docker-compose ps
+
+# Access the application
+# Frontend: http://localhost:3000
+# Backend API: http://localhost:8000
+# Airflow: http://localhost:8080
+
+# Verify host metrics collection
+# Windows: tasklist /fi "imagename eq python.exe"
+# Linux: systemctl status greenmatrix-host-metrics
+```
+
+#### Troubleshooting Automated Setup
+
+**Windows Issues:**
+
+- **Docker not starting:** Enable Hyper-V and WSL2 in Windows Features
+- **Permission errors:** Run Command Prompt as Administrator
+- **Python not found:** Script will auto-install via winget (Windows 10 1809+)
+- **Service Error 1053:** Check Windows Event Viewer for details
+
+**Linux Issues:**
+
+- **Docker permission denied:** Logout and login after installation
+- **Port conflicts:** Stop services using ports 3000, 8000, 5432, 5433
+- **systemd service fails:** Check logs with `journalctl -u greenmatrix-host-metrics -f`
+
+---
+
+## Prerequisites Installation (Manual Method)
 
 ### System Updates and Basic Tools
 
@@ -362,20 +495,21 @@ sudo -u postgres psql
 
 ```sql
 -- Create databases
-CREATE DATABASE "Model_Recommendation_DB";
-CREATE DATABASE "Metrics_db";
-CREATE DATABASE "vm_metrics_ts";
+CREATE DATABASE greenmatrix;           -- Main application database
+CREATE DATABASE greenmatrix_timescale; -- TimescaleDB for all metrics
+CREATE DATABASE airflow;                -- Airflow metadata database
 
 -- Create application user
 CREATE USER greenmatrix WITH PASSWORD 'secure_password_here';
 
 -- Grant privileges
-GRANT ALL PRIVILEGES ON DATABASE "Model_Recommendation_DB" TO greenmatrix;
-GRANT ALL PRIVILEGES ON DATABASE "Metrics_db" TO greenmatrix;
-GRANT ALL PRIVILEGES ON DATABASE "vm_metrics_ts" TO greenmatrix;
+GRANT ALL PRIVILEGES ON DATABASE greenmatrix TO greenmatrix;
+GRANT ALL PRIVILEGES ON DATABASE greenmatrix_timescale TO greenmatrix;
+GRANT ALL PRIVILEGES ON DATABASE airflow TO greenmatrix;
 
 -- Grant additional permissions
 ALTER USER greenmatrix CREATEDB;
+ALTER USER greenmatrix WITH SUPERUSER; -- Required for TimescaleDB extension
 
 -- Exit PostgreSQL shell
 \q
@@ -453,8 +587,8 @@ sudo systemctl restart postgresql
 Enable TimescaleDB extension in the time-series database:
 
 ```bash
-# Connect to vm_metrics_ts database
-sudo -u postgres psql -d vm_metrics_ts
+# Connect to greenmatrix_timescale database
+sudo -u postgres psql -d greenmatrix_timescale
 ```
 
 ```sql
@@ -464,9 +598,18 @@ CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;
 -- Verify extension installation
 SELECT * FROM pg_extension WHERE extname = 'timescaledb';
 
+-- Create hypertables for time-series data (automated by application)
+-- The application will automatically convert these tables to hypertables:
+-- - host_process_metrics
+-- - host_overall_metrics
+-- - vm_process_metrics
+-- - hardware_specs
+
 -- Exit
 \q
 ```
+
+**Note:** The automated setup scripts handle TimescaleDB configuration automatically. Manual setup is only required for custom deployments.
 
 ---
 
@@ -816,9 +959,116 @@ sudo systemctl start nginx
 
 ## Host Monitoring Configuration
 
-### Host Monitoring Agent Setup
+### Overview
 
-#### Monitoring Agent Installation
+GreenMatrix collects host-level metrics using platform-specific monitoring agents. The setup process differs between Windows and Linux systems.
+
+### Windows Host Monitoring Setup
+
+#### Automated Setup (Recommended)
+
+Use the automated setup script for Windows:
+
+```batch
+# Run as Administrator
+setup-host-metrics.bat
+```
+
+The script automatically:
+1. Detects or installs Python 3.11+
+2. Installs required packages (psutil, requests, WMI)
+3. Creates `C:\ProgramData\GreenMatrix` directory
+4. Grants SYSTEM account permissions
+5. Copies monitoring scripts
+6. Creates VBScript wrappers for background execution
+7. Configures Windows Scheduled Tasks
+8. Starts metrics collection immediately
+
+#### Manual Windows Setup
+
+If manual setup is required:
+
+```batch
+# 1. Install Python 3.11+ from python.org or via winget
+winget install -e --id Python.Python.3.11
+
+# 2. Install required packages
+pip install psutil requests python-dateutil py-cpuinfo WMI
+
+# 3. Create installation directory
+mkdir C:\ProgramData\GreenMatrix
+
+# 4. Grant SYSTEM account permissions
+icacls "C:\ProgramData\GreenMatrix" /grant "SYSTEM:(OI)(CI)F" /T
+
+# 5. Copy monitoring scripts
+copy collect_all_metrics.py C:\ProgramData\GreenMatrix\
+copy collect_hardware_specs.py C:\ProgramData\GreenMatrix\
+copy config.ini C:\ProgramData\GreenMatrix\
+
+# 6. Create VBScript wrapper for invisible execution
+echo Set objShell = CreateObject("WScript.Shell") > C:\ProgramData\GreenMatrix\run_metrics.vbs
+echo objShell.Run """C:\Python311\python.exe"" ""C:\ProgramData\GreenMatrix\collect_all_metrics.py""", 0, False >> C:\ProgramData\GreenMatrix\run_metrics.vbs
+
+# 7. Create scheduled task
+schtasks /create /tn "GreenMatrix-Host-Metrics" /tr "wscript.exe C:\ProgramData\GreenMatrix\run_metrics.vbs" /sc onstart /ru SYSTEM /rl HIGHEST /f
+
+# 8. Start task immediately
+wscript.exe C:\ProgramData\GreenMatrix\run_metrics.vbs
+```
+
+#### Windows Configuration File
+
+Edit `C:\ProgramData\GreenMatrix\config.ini`:
+
+```ini
+[backend]
+backend_api_url = http://localhost:8000
+
+[collection]
+interval_seconds = 1
+batch_size = 100
+
+[logging]
+log_level = INFO
+log_file = C:\ProgramData\GreenMatrix\metrics.log
+```
+
+#### Windows Troubleshooting
+
+**Common Issues:**
+
+1. **Service Error 1053 (Timeout):**
+   - Run script manually to check for errors: `python C:\ProgramData\GreenMatrix\collect_all_metrics.py`
+   - Check for missing Python packages
+   - Verify backend API is accessible
+
+2. **Permission Denied Errors:**
+   - Run Command Prompt as Administrator
+   - Grant SYSTEM account permissions: `icacls "C:\ProgramData\GreenMatrix" /grant "SYSTEM:(OI)(CI)F" /T`
+
+3. **Python Not Found:**
+   - Ensure Python is in PATH or use full path in VBScript
+   - Use `py -c "import sys; print(sys.executable)"` to find Python path
+
+4. **Task Not Running:**
+   - Check task status: `schtasks /query /tn "GreenMatrix-Host-Metrics" /v`
+   - View task history in Task Scheduler (taskschd.msc)
+   - Manually run: `wscript.exe C:\ProgramData\GreenMatrix\run_metrics.vbs`
+
+### Linux Host Monitoring Setup
+
+#### Automated Setup (Recommended)
+
+Use the automated setup script for Linux:
+
+```bash
+# Run with sudo
+sudo ./setup-host-metrics.sh
+```
+
+#### Manual Linux Setup
+
 Configure host-level process monitoring:
 
 ```bash
@@ -960,198 +1210,127 @@ sudo systemctl status greenmatrix-hardware-collector
 
 ## Virtual Machine Monitoring Setup
 
-### LXD Container Platform Setup
+### Overview
 
-#### LXD Installation and Initialization
-Install and configure LXD for virtual machine monitoring:
+GreenMatrix supports monitoring of virtual machines, containers, and cloud instances using a lightweight Python agent (`simple_vm_agent.py`). The agent runs **inside each VM/container** to collect process-level metrics and send them to the GreenMatrix backend.
 
-```bash
-# Install LXD via snap
-sudo apt install -y snapd
-sudo snap install lxd
+**📦 Quick Start Package:** All VM monitoring files are organized in the **`vm-agent/`** folder in the root directory.
 
-# Add user to lxd group
-sudo usermod -aG lxd $USER
+**To deploy VM monitoring:**
+1. Copy the `vm-agent/` folder to your VM
+2. Run the installer (`deploy-vm-agent.bat` for Windows, `deploy-vm-agent.sh` for Linux)
+3. Done! Monitoring is active in 3-7 minutes
 
-# Logout and login again for group membership
-# Or use: newgrp lxd
+**📖 For complete installation instructions, see: [`vm-agent/README.md`](../vm-agent/README.md)**
 
-# Initialize LXD
-sudo lxd init --auto
+**Key Features:**
+- ✅ Process-level monitoring (CPU, RAM, GPU, I/O per process)
+- ✅ VM-level metrics (total resource usage and availability)
+- ✅ Cross-platform support (Windows and Linux VMs)
+- ✅ GPU monitoring (NVIDIA via pynvml/nvidia-smi, AMD via rocm-smi)
+- ✅ Lightweight (<5% CPU, <50MB RAM overhead)
+- ✅ Automatic recovery and reconnection on failures
+- ✅ Automated deployment with Python auto-install
+- ✅ Auto-detects backend URL (no manual configuration)
+
+### VM Agent Architecture
+
+The VM monitoring agent (`simple_vm_agent.py`) is a standalone Python script that:
+- **Runs inside each VM/container** (not on the hypervisor/host)
+- Collects metrics from all processes in the VM
+- Sends JSON payloads to backend API: `POST /api/v1/metrics/vm-snapshot`
+- Uses configuration-based setup (no hardcoded values)
+- Runs as a system service (systemd on Linux, Scheduled Task on Windows)
+
+**Data Flow:**
+```
+VM Agent → GreenMatrix Backend API → TimescaleDB → Dashboard
 ```
 
-#### LXD Network Configuration
-Configure LXD networking for container communication:
+### Critical Network Requirement
 
-```bash
-# Create monitoring profile
-lxc profile create monitoring
+**⚠️ IMPORTANT:** VMs **cannot** use `http://localhost:8000` - they must use the **host machine's IP address**.
 
-# Configure monitoring profile
-lxc profile edit monitoring << EOF
-config:
-  security.nesting: "true"
-  security.privileged: "false"
-devices:
-  eth0:
-    name: eth0
-    network: lxdbr0
-    type: nic
-  root:
-    path: /
-    pool: default
-    type: disk
-description: Profile for GreenMatrix monitoring containers
-name: monitoring
-EOF
+The deployment scripts automatically detect the correct IP (default gateway), but you should understand:
+- VMs on same host → Use host's network IP (e.g., `10.25.41.86:8000`)
+- LXD containers → Use LXD bridge IP (e.g., `10.0.3.1:8000`)
+- Remote VMs → Use GreenMatrix server's public IP
+
+**📖 For detailed network architecture and scenarios, see:** [`vm-agent/README.md` - Network Configuration section](../vm-agent/README.md#network-configuration)
+
+### Deployment Steps
+
+**📖 For complete installation instructions, see:** [**`vm-agent/README.md`**](../vm-agent/README.md)
+
+**Quick summary:**
+1. Copy the `vm-agent/` folder to your VM
+2. Run the installer:
+   - **Windows:** `deploy-vm-agent.bat` (as Administrator)
+   - **Linux:** `sudo bash deploy-vm-agent.sh`
+3. Verify installation (agent starts automatically)
+
+**What the automated installer does:**
+- Auto-installs Python if missing (requires internet; see Prerequisites)
+- Installs dependencies (`psutil`, `requests`, `pynvml`)
+- Auto-detects host IP via default gateway
+- Creates configuration file
+- Sets up automatic startup (Windows Task / Linux systemd)
+- Tests connectivity
+
+### Configuration
+
+**Default config file locations:**
+- **Windows:** `C:\GreenMatrix-VM-Agent\vm_agent.ini`
+- **Linux:** `/opt/greenmatrix-vm-agent/vm_agent.ini`
+
+**Common configuration tasks:**
+- **Change collection interval:** Edit `interval_seconds` in config
+- **Change backend URL:** Edit `backend_url` in config (use host IP, not localhost)
+- **Enable/disable GPU monitoring:** Edit `collect_gpu_metrics` in config
+
+**📖 For detailed configuration options and examples, see:** [**`vm-agent/README.md`**](../vm-agent/README.md#-configuration-options)
+
+### Management Commands
+
+**Windows:**
+```batch
+schtasks /query /tn "GreenMatrix VM Agent"  # Check status
+type C:\GreenMatrix-VM-Agent\greenmatrix-vm-agent.log  # View logs
 ```
 
-### VM Container Template Creation
-
-#### Base Container Setup
-Create base container template for VM monitoring:
-
+**Linux:**
 ```bash
-# Launch Ubuntu container
-lxc launch ubuntu:20.04 vm-template -p monitoring
-
-# Wait for container initialization
-sleep 30
-
-# Update container packages
-lxc exec vm-template -- apt update
-lxc exec vm-template -- apt upgrade -y
-
-# Install required packages
-lxc exec vm-template -- apt install -y python3 python3-pip curl wget
+sudo systemctl status greenmatrix-vm-agent  # Check status
+sudo journalctl -u greenmatrix-vm-agent -f  # View logs
 ```
 
-#### Python Dependencies Installation
-Install Python dependencies within the container:
+**📖 For complete management commands, see:** [**`vm-agent/README.md`**](../vm-agent/README.md#-managing-the-agent)
 
-```bash
-# Create packages directory
-lxc exec vm-template -- mkdir -p /root/packages
+### Verification
 
-# Download Python packages on host (for offline installation)
-cd /tmp
-pip download psutil requests python-dateutil
+1. Check agent logs for successful startup
+2. Test backend connectivity: `curl http://<HOST_IP>:8000/health`
+3. Verify metrics in GreenMatrix Dashboard → VM Instances section
 
-# Copy packages to container
-lxc file push *.whl vm-template/root/packages/ 2>/dev/null || true
-lxc file push *.tar.gz vm-template/root/packages/ 2>/dev/null || true
+**📖 For detailed verification steps, see:** [**`vm-agent/README.md`**](../vm-agent/README.md#-verification)
 
-# Install packages in container
-lxc exec vm-template -- pip3 install /root/packages/*
+### Troubleshooting
 
-# Clean up host packages
-rm -f /tmp/*.whl /tmp/*.tar.gz
-```
+**Common issues:**
+- **Connection Refused:** Check backend URL in config, verify firewall allows port 8000
+- **Agent Not Starting:** Check Python installation, review agent logs
+- **GPU Metrics Missing:** Verify GPU drivers installed, check `collect_gpu_metrics = true` in config
 
-#### VM Monitoring Agent Deployment
-Deploy monitoring agent within the container template:
+**📖 For complete troubleshooting guide with solutions, see:** [**`vm-agent/README.md`**](../vm-agent/README.md#-troubleshooting)
 
-```bash
-# Copy VM agent to container
-lxc file push /opt/greenmatrix/simple_vm_agent.py vm-template/root/simple_vm_agent.py
+### Bulk Deployment
 
-# Create VM agent configuration
-lxc exec vm-template -- tee /root/vm_agent.conf << EOF
-[agent]
-backend_url = http://10.25.41.86:8000
-collection_interval = 2
-api_timeout = 30
-vm_name_suffix = -Linux
+For deploying to multiple VMs at scale, use automation tools:
+- **VMware vSphere:** PowerCLI
+- **Hyper-V:** PowerShell Direct
+- **Cloud (AWS/Azure/GCP):** cloud-init, Ansible, Terraform
 
-[logging]
-log_level = INFO
-enable_console_output = true
-EOF
-
-# Create systemd service for VM agent
-lxc exec vm-template -- tee /etc/systemd/system/vm-agent.service << EOF
-[Unit]
-Description=GreenMatrix VM Monitoring Agent
-After=network.target
-
-[Service]
-Type=simple
-User=root
-WorkingDirectory=/root
-ExecStart=/usr/bin/python3 /root/simple_vm_agent.py
-Restart=always
-RestartSec=10
-Environment=PYTHONUNBUFFERED=1
-StandardOutput=journal
-StandardError=journal
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-# Enable VM agent service
-lxc exec vm-template -- systemctl daemon-reload
-lxc exec vm-template -- systemctl enable vm-agent
-
-# Stop template container
-lxc stop vm-template
-```
-
-### VM Instance Deployment
-
-#### Multiple VM Instance Creation
-Create multiple VM instances from template:
-
-```bash
-# Function to create VM instance
-create_vm_instance() {
-    local instance_name="vm-instance-$1"
-    
-    echo "Creating $instance_name..."
-    lxc copy vm-template $instance_name
-    
-    # Start instance
-    lxc start $instance_name
-    
-    # Wait for startup
-    sleep 10
-    
-    # Start VM agent
-    lxc exec $instance_name -- systemctl start vm-agent
-    
-    echo "$instance_name created and monitoring started"
-}
-
-# Create multiple VM instances
-for i in {1..3}; do
-    create_vm_instance $i
-done
-
-# Verify instances
-lxc list
-```
-
-#### VM Instance Management
-Manage VM instances and monitoring agents:
-
-```bash
-# Check VM agent status in all instances
-for i in {1..3}; do
-    echo "=== VM Instance $i Status ==="
-    lxc exec vm-instance-$i -- systemctl status vm-agent --no-pager -l
-    echo
-done
-
-# View VM agent logs
-lxc exec vm-instance-1 -- journalctl -u vm-agent -f
-
-# Restart VM agent if needed
-lxc exec vm-instance-1 -- systemctl restart vm-agent
-
-# Stop and start VM instances
-lxc stop vm-instance-1
-lxc start vm-instance-1
-```
+**📖 For bulk deployment examples and scripts, see:** [**`vm-agent/README.md`**](../vm-agent/README.md#-bulk-deployment)
 
 ---
 
@@ -1772,25 +1951,113 @@ Complete list of supported environment variables:
 
 #### Common Issues and Solutions
 
+**Issue: Docker container fails to start (Linux)**
+- **Symptom:** Shell script execution error: "cannot execute: required file not found"
+- **Cause:** Shell scripts have Windows line endings (CRLF) instead of Unix line endings (LF)
+- **Solution:**
+  ```bash
+  # Fix line endings
+  find scripts -name "*.sh" -type f -exec dos2unix {} \;
+  # Or use setup script which auto-fixes
+  ./setup-greenmatrix.sh
+
+  # Prevent future issues
+  git config core.autocrlf input
+  ```
+
+**Issue: Windows Service Error 1053 (Service Timeout)**
+- **Symptom:** Host metrics service won't start, Error 1053 in Event Viewer
+- **Causes:**
+  1. Python script crashes immediately (missing packages)
+  2. Microsoft Store Python (WindowsApps wrapper) being used
+  3. Missing pynvml module on non-NVIDIA systems
+- **Solutions:**
+  ```batch
+  # Test script manually
+  python C:\ProgramData\GreenMatrix\collect_all_metrics.py
+
+  # Reinstall with proper Python
+  winget install -e --id Python.Python.3.11
+
+  # Re-run setup
+  setup-host-metrics.bat
+  ```
+
+**Issue: Windows Service Error 1920 (File Access Denied)**
+- **Symptom:** Service fails with "file cannot be accessed by the system"
+- **Cause:** Using Microsoft Store Python which is an app execution alias
+- **Solution:**
+  ```batch
+  # Find real Python path
+  py -c "import sys; print(sys.executable)"
+
+  # Re-run setup which will detect correct Python
+  setup-host-metrics.bat
+  ```
+
+**Issue: PID File Permission Denied (Windows)**
+- **Symptom:** "Permission denied: C:\ProgramData\GreenMatrix\metrics_collector.pid"
+- **Cause:** SYSTEM account doesn't have write permissions
+- **Solution:**
+  ```batch
+  # Grant SYSTEM account permissions
+  icacls "C:\ProgramData\GreenMatrix" /grant "SYSTEM:(OI)(CI)F" /T
+
+  # Or delete and re-run setup
+  rmdir /s /q "C:\ProgramData\GreenMatrix"
+  setup-host-metrics.bat
+  ```
+
+**Issue: Scheduled Task Shows "Queued" but Never Runs (Windows)**
+- **Symptom:** Task status shows "Queued" indefinitely
+- **Cause:** Task trigger is "onstart" which only runs at boot, not manually
+- **Solution:**
+  ```batch
+  # Run VBScript wrapper directly
+  wscript.exe C:\ProgramData\GreenMatrix\run_metrics.vbs
+
+  # Or reboot system to trigger onstart tasks
+  ```
+
 **Issue: Database connection failed**
-- Check PostgreSQL service status: `sudo systemctl status postgresql`
+- Check PostgreSQL service status: `sudo systemctl status postgresql` (Linux) / `sc query postgresql` (Windows)
 - Verify connection parameters in `.env` file
 - Test manual connection: `psql -h localhost -U greenmatrix -l`
+- Check TimescaleDB database: `psql -h localhost -U greenmatrix -d greenmatrix_timescale -c "SELECT version();"`
 
 **Issue: Backend API not responding**
-- Check service status: `sudo systemctl status greenmatrix-backend`
-- Review logs: `sudo journalctl -u greenmatrix-backend -f`
-- Verify port availability: `sudo netstat -tulpn | grep 8000`
+- Check service status: `sudo systemctl status greenmatrix-backend` (Linux)
+- Check Docker container: `docker-compose ps backend`
+- Review logs: `docker-compose logs backend -f`
+- Verify port availability: `netstat -ano | findstr 8000` (Windows) / `sudo netstat -tulpn | grep 8000` (Linux)
 
 **Issue: Frontend not loading**
-- Check Nginx status: `sudo systemctl status nginx`
-- Verify build files: `ls -la /opt/greenmatrix/frontend/build/`
-- Test Nginx configuration: `sudo nginx -t`
+- Check Nginx/frontend container: `docker-compose ps frontend`
+- Verify build files in container: `docker exec greenmatrix-frontend ls -la /usr/share/nginx/html/`
+- Test API proxy: `curl http://localhost:3000/api/health`
+- Check browser console for CORS errors
 
-**Issue: VM monitoring not working**
-- Check LXD status: `lxc list`
-- Verify container networking: `lxc exec vm-instance-1 -- ping 8.8.8.8`
-- Review VM agent logs: `lxc exec vm-instance-1 -- journalctl -u vm-agent -f`
+**Issue: VM agent not sending data**
+- Verify backend URL in agent config
+- Test connectivity: `curl http://backend-host:8000/api/health`
+- Check agent logs for errors
+- Verify Python packages: `pip list | grep psutil`
+- Ensure agent runs with root/SYSTEM privileges
+
+**Issue: Dashboard shows no data**
+- Verify host metrics collection is running:
+  - Windows: `tasklist /fi "imagename eq python.exe"`
+  - Linux: `systemctl status greenmatrix-host-metrics`
+- Check database for recent data:
+  ```sql
+  psql -h localhost -U greenmatrix -d greenmatrix_timescale -c "SELECT COUNT(*) FROM host_process_metrics WHERE timestamp > NOW() - INTERVAL '5 minutes';"
+  ```
+- Verify backend API returns data: `curl http://localhost:8000/api/dashboard/top-processes?limit=5`
+
+**Issue: Hyper-V VM metrics query timeout**
+- **Symptom:** Metrics collection hangs on Windows when querying Hyper-V VMs
+- **Cause:** PowerShell Get-VM command hangs without Hyper-V permissions
+- **Solution:** Already handled in code with 5-second timeout, metrics collection continues without VM data
 
 ### Appendix E: Security Best Practices
 
