@@ -136,7 +136,7 @@ create_directories() {
 # Build and start services
 start_services() {
     print_step "Building and starting GreenMatrix services..."
-    
+
     # Start core services first
     print_status "Starting database and core services..."
     docker-compose up -d postgres timescaledb redis
@@ -155,22 +155,33 @@ start_services() {
     # Start Airflow database
     print_status "Starting Airflow database..."
     docker-compose up -d airflow-postgres
-    
+
     # Wait for Airflow database to be ready
     print_status "Waiting for Airflow database to be ready..."
     while ! docker-compose exec -T airflow-postgres pg_isready -U airflow; do
         sleep 2
     done
-    
-    # Initialize Airflow (commented out due to image compatibility issues - not critical)
-    # print_status "Initializing Airflow..."
-    # docker-compose up airflow-init
-    
-    # Start all services
+
+    # Start core GreenMatrix services (backend, frontend, db-setup)
+    # Note: Airflow services are optional and will start if configured correctly
     print_status "Starting all services..."
-    docker-compose up -d
-    
-    print_status "✅ Services started"
+    if ! docker-compose up -d; then
+        print_warning "Some services failed to start (this may include optional Airflow services)"
+        print_status "Checking if core services are running..."
+
+        # Check if critical services are up
+        if docker-compose ps | grep -q "greenmatrix-backend.*Up" && \
+           docker-compose ps | grep -q "greenmatrix-frontend.*Up"; then
+            print_status "✅ Core services (backend, frontend) started successfully"
+            print_warning "⚠️  Airflow services may not be running - monitoring features will be limited"
+            print_status "   You can check Airflow logs with: docker-compose logs airflow-init"
+        else
+            print_error "Critical services failed to start!"
+            return 1
+        fi
+    else
+        print_status "✅ All services started successfully"
+    fi
 }
 
 # Setup databases
@@ -607,15 +618,29 @@ display_info() {
     echo ""
 }
 
-# Cleanup function
+# Cleanup function - only cleanup on critical failures
 cleanup() {
-    if [ $? -ne 0 ]; then
-        print_error "Setup failed. Cleaning up..."
-        docker-compose down
+    local exit_code=$?
+
+    # Only cleanup if there was a critical failure AND core services didn't start
+    if [ $exit_code -ne 0 ]; then
+        # Check if core services are actually running
+        if docker-compose ps 2>/dev/null | grep -q "greenmatrix-backend.*Up" && \
+           docker-compose ps 2>/dev/null | grep -q "greenmatrix-frontend.*Up"; then
+            # Core services are running, don't cleanup
+            print_warning "Setup completed with warnings - core services are running"
+            print_status "Note: Some optional services (like Airflow) may not be running"
+            exit 0
+        else
+            # Core services failed, do cleanup
+            print_error "Critical failure detected. Cleaning up..."
+            docker-compose down 2>/dev/null
+            exit $exit_code
+        fi
     fi
 }
 
-# Set trap for cleanup
+# Set trap for cleanup (only on critical failures)
 trap cleanup EXIT
 
 # Main execution
