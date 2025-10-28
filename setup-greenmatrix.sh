@@ -66,6 +66,18 @@ fix_line_endings() {
 check_prerequisites() {
     print_step "Checking prerequisites..."
 
+    # Check if essential files exist
+    if [ ! -f "docker-compose.yml" ]; then
+        print_error "docker-compose.yml not found! Are you in the GreenMatrix root directory?"
+        exit 1
+    fi
+
+    if [ ! -f ".env.example" ]; then
+        print_error ".env.example not found! Repository may be incomplete."
+        print_status "Try: git fetch --unshallow && git pull"
+        exit 1
+    fi
+
     # Check Docker
     if ! command -v docker &> /dev/null; then
         print_error "Docker is not installed. Please install Docker first."
@@ -84,12 +96,107 @@ check_prerequisites() {
         exit 1
     fi
 
+    # Check system resources
+    check_system_resources
+
+    # Check port conflicts
+    check_port_conflicts
+
     # Check Python (optional - used for host metrics collection)
     if ! command -v python3 &> /dev/null; then
         print_warning "Python3 not found - will install during host metrics setup"
     fi
 
+    # Check for existing GreenMatrix containers that might cause conflicts
+    if docker ps -a --format '{{.Names}}' | grep -q "greenmatrix-"; then
+        print_warning "Found existing GreenMatrix containers from previous installation"
+        print_status "These will be cleaned up automatically to prevent conflicts"
+    fi
+
     print_status "✅ Prerequisites check passed"
+}
+
+# Check port availability
+check_port_conflicts() {
+    local ports_services=(
+        "3000:Frontend Dashboard"
+        "5432:PostgreSQL"
+        "5433:TimescaleDB"
+        "6379:Redis"
+        "8000:Backend API"
+        "8080:Airflow Web UI"
+    )
+    local conflicts=false
+    local conflicting_ports=()
+
+    for port_info in "${ports_services[@]}"; do
+        local port=$(echo "$port_info" | cut -d: -f1)
+        local service=$(echo "$port_info" | cut -d: -f2-)
+
+        # Check if port is in use (works on both Linux and macOS)
+        if netstat -tuln 2>/dev/null | grep -q ":$port " || lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1 || ss -tuln 2>/dev/null | grep -q ":$port "; then
+            conflicting_ports+=("$port ($service)")
+            conflicts=true
+        fi
+    done
+
+    if [ "$conflicts" = true ]; then
+        print_warning "The following ports are already in use:"
+        for port in "${conflicting_ports[@]}"; do
+            print_status "  - $port"
+        done
+        print_status ""
+        print_status "Solutions:"
+        print_status "  1. Stop services using these ports"
+        print_status "  2. Or change ports in .env file (e.g., FRONTEND_PORT=3001)"
+        echo ""
+        read -p "Continue anyway? (y/N): " -n 1 -r
+        echo ""
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            print_error "Installation cancelled"
+            exit 1
+        fi
+    fi
+}
+
+# Check system resources
+check_system_resources() {
+    # Check available disk space
+    local available_gb=$(df -BG . 2>/dev/null | tail -1 | awk '{print $4}' | sed 's/G//' || echo "100")
+    if [ "$available_gb" -lt 10 ]; then
+        print_warning "Less than 10GB disk space available ($available_gb GB free)"
+        print_status "GreenMatrix requires at least 10GB for Docker volumes and logs"
+    fi
+
+    # Check CPU cores
+    local cpus=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo "2")
+    if [ "$cpus" -lt 2 ]; then
+        print_warning "Only $cpus CPU core(s) detected. 2+ cores recommended for optimal performance"
+    fi
+
+    # Check total RAM
+    local total_ram_mb=0
+    if [ -f /proc/meminfo ]; then
+        total_ram_mb=$(grep MemTotal /proc/meminfo | awk '{print int($2/1024)}')
+    elif command -v sysctl &>/dev/null; then
+        total_ram_mb=$(sysctl -n hw.memsize 2>/dev/null | awk '{print int($1/1024/1024)}' || echo "8192")
+    fi
+
+    if [ "$total_ram_mb" -gt 0 ] && [ "$total_ram_mb" -lt 4096 ]; then
+        print_warning "Only ${total_ram_mb}MB RAM detected. 4GB+ recommended"
+        print_status "Limited RAM may cause services to crash or perform poorly"
+    fi
+
+    # Check if running in WSL
+    if grep -qi microsoft /proc/version 2>/dev/null; then
+        print_status "WSL environment detected"
+        if ! docker info &>/dev/null; then
+            print_error "Cannot connect to Docker in WSL!"
+            print_status "1. Start Docker Desktop on Windows"
+            print_status "2. Settings → Resources → WSL Integration → Enable integration"
+            exit 1
+        fi
+    fi
 }
 
 # Setup environment
@@ -141,6 +248,14 @@ create_directories() {
 # Build and start services
 start_services() {
     print_step "Building and starting GreenMatrix services..."
+
+    # Clean up any existing networks to prevent configuration conflicts
+    print_status "Checking for existing Docker networks..."
+    if docker network ls | grep -q "greenmatrix-network"; then
+        print_warning "Removing existing greenmatrix-network to prevent configuration conflicts..."
+        docker-compose down --remove-orphans 2>/dev/null || true
+        docker network rm green-matrix_greenmatrix-network 2>/dev/null || true
+    fi
 
     # Start core services first
     print_status "Starting database and core services..."
