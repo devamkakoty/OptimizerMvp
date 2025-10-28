@@ -348,305 +348,58 @@ setup_host_metrics_collection() {
     fi
 }
 
-# Auto-configure VM agents
+# Inform about VM monitoring setup
 setup_vm_agents() {
-    print_step "Setting up VM monitoring agents with auto-discovery..."
-    
-    # Detect current host IP that containers can reach
+    print_step "VM Monitoring Agent Information"
+
+    # Detect current host IP that containers can reach for user convenience
     HOST_IP=$(docker network inspect greenmatrix_greenmatrix-network 2>/dev/null | grep -E "Gateway.*[0-9]" | grep -o -E '([0-9]{1,3}\.){3}[0-9]{1,3}' | head -n1)
     if [ -z "$HOST_IP" ]; then
-        HOST_IP=$(ip route get 8.8.8.8 | grep -oP 'src \K[0-9.]+' | head -n1)
+        HOST_IP=$(ip route get 8.8.8.8 2>/dev/null | grep -oP 'src \K[0-9.]+' | head -n1)
     fi
     if [ -z "$HOST_IP" ]; then
-        HOST_IP=$(hostname -I | awk '{print $1}')
+        HOST_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
     fi
-    
+
     BACKEND_URL="http://${HOST_IP}:8000"
-    print_status "Detected backend URL: $BACKEND_URL"
-    
+
+    # Verify vm-agent folder exists
+    if [ ! -d "vm-agent" ]; then
+        print_warning "⚠️  vm-agent folder not found in repository"
+        print_status "VM monitoring agents are optional and can be set up separately"
+        return 0
+    fi
+
     # Test if backend is reachable
-    if curl -s --connect-timeout 5 "$BACKEND_URL/health" > /dev/null; then
-        print_status "✅ Backend connectivity confirmed"
+    print_status "Checking backend connectivity..."
+    if curl -s --connect-timeout 5 "$BACKEND_URL/health" > /dev/null 2>&1; then
+        print_status "✅ Backend is reachable at $BACKEND_URL"
     else
-        print_warning "⚠️  Backend not reachable at $BACKEND_URL"
-        print_status "Will configure agents to auto-discover backend URL"
-        BACKEND_URL=""
+        print_warning "⚠️  Backend not reachable at $BACKEND_URL (this is normal during setup)"
+        BACKEND_URL="http://localhost:8000"
     fi
-    
-    # Create VM agent auto-configuration script
-    print_status "Creating auto-configuring VM agent..."
-    
-    # Copy the auto-config VM agent script
-    if [ -f "vm_agent_auto_config.py" ]; then
-        cp vm_agent_auto_config.py vm_agent.py
-    else
-        print_error "vm_agent_auto_config.py not found! Using simple VM agent..."
-        if [ -f "simple_vm_agent.py" ]; then
-            cp simple_vm_agent.py vm_agent.py
-            # Update the backend URL in simple script if detected
-            if [ -n "$BACKEND_URL" ]; then
-                sed -i "s|http://10.25.41.86:8000|$BACKEND_URL|g" vm_agent.py
-            fi
-        else
-            print_error "No VM agent script found!"
-            return 1
-        fi
-    fi
-    
-    # Create VM agent configuration file
-    cat > vm_agent_config.json << EOF
-{
-  "backend_url": "$BACKEND_URL",
-  "auto_discovery": true,
-  "collection_interval": 2,
-  "api_timeout": 30,
-  "environment": "auto_setup"
-}
-EOF
-    
-    # Create VM agent deployment script for end users
-    cat > deploy-vm-agent.sh << 'EOF'
-#!/bin/bash
 
-# GreenMatrix VM Agent Deployment Script
-# This script can be run on any VM/container to set up GreenMatrix monitoring
-
-print_status() {
-    echo "[INFO] $1"
-}
-
-print_error() {
-    echo "[ERROR] $1"
-}
-
-# Function to auto-discover backend URL
-discover_backend() {
-    echo "Auto-discovering GreenMatrix backend..."
-    
-    # Try environment variable first
-    if [ -n "$GREENMATRIX_BACKEND_URL" ]; then
-        echo "$GREENMATRIX_BACKEND_URL"
-        return
-    fi
-    
-    # Try configuration file
-    if [ -f "/etc/greenmatrix/config.json" ]; then
-        backend_url=$(cat /etc/greenmatrix/config.json 2>/dev/null | grep '"backend_url"' | cut -d'"' -f4)
-        if [ -n "$backend_url" ] && [ "$backend_url" != "" ]; then
-            echo "$backend_url"
-            return
-        fi
-    fi
-    
-    # Auto-discover through network
-    GATEWAY_IP=$(ip route | grep default | awk '{print $3}' | head -n1)
-    LOCAL_IP=$(ip route get 8.8.8.8 | grep -oP 'src \K[0-9.]+' | head -n1)
-    
-    # Test potential backends
-    for ip in "$GATEWAY_IP" "$LOCAL_IP" "172.17.0.1" "172.20.0.1" "10.0.0.1"; do
-        if [ -n "$ip" ]; then
-            backend_url="http://$ip:8000"
-            if curl -s --connect-timeout 3 "$backend_url/health" > /dev/null 2>&1; then
-                echo "Found backend at: $backend_url" >&2
-                echo "$backend_url"
-                return
-            fi
-        fi
-    done
-    
     echo ""
-}
+    print_status "📡 VM Monitoring Setup Instructions:"
+    print_status "   GreenMatrix can monitor VMs and containers running your applications"
+    print_status ""
+    print_status "   To monitor a VM/container:"
+    print_status "   1. Copy the 'vm-agent/' folder to your target VM/container"
+    print_status "   2. Run the appropriate deployment script:"
+    print_status "      • Linux/Mac:   cd vm-agent && ./deploy-vm-agent.sh $BACKEND_URL"
+    print_status "      • Windows:     cd vm-agent && deploy-vm-agent.bat $BACKEND_URL"
+    print_status ""
+    print_status "   The agent will automatically:"
+    print_status "   - Install required dependencies"
+    print_status "   - Configure the backend URL"
+    print_status "   - Set up metric collection service"
+    print_status "   - Start sending metrics to GreenMatrix"
+    print_status ""
+    print_status "   📚 See vm-agent/README.md for detailed instructions"
+    print_status "   🚀 See vm-agent/QUICK_START.txt for quick deployment guide"
+    echo ""
 
-# Main deployment
-main() {
-    print_status "Starting GreenMatrix VM Agent deployment..."
-    
-    # Check if running as root
-    if [ "$EUID" -ne 0 ]; then
-        print_error "Please run as root: sudo $0"
-        exit 1
-    fi
-    
-    # Discover backend
-    BACKEND_URL=$(discover_backend)
-    if [ -z "$BACKEND_URL" ]; then
-        echo -n "Please enter GreenMatrix backend URL (e.g., http://192.168.1.100:8000): "
-        read BACKEND_URL
-        
-        if [ -z "$BACKEND_URL" ]; then
-            print_error "Backend URL is required!"
-            exit 1
-        fi
-    fi
-    
-    print_status "Using backend URL: $BACKEND_URL"
-    
-    # Install dependencies
-    print_status "Installing dependencies..."
-    if command -v apt >/dev/null 2>&1; then
-        apt update && apt install -y python3 python3-pip curl pciutils
-        # Handle PEP 668 externally-managed environment (Ubuntu 24.04+)
-        # Try system packages first, fallback to pip with --break-system-packages
-        if ! dpkg -l | grep -q python3-psutil; then
-            apt install -y python3-psutil python3-requests python3-dateutil 2>/dev/null || \
-            pip3 install --break-system-packages psutil requests python-dateutil
-        fi
-    elif command -v yum >/dev/null 2>&1; then
-        yum install -y python3 python3-pip curl pciutils
-        pip3 install psutil requests python-dateutil
-    else
-        print_error "Package manager not supported. Please install python3, pip3, and curl manually."
-        exit 1
-    fi
-    
-    # Create directories
-    mkdir -p /opt/greenmatrix /etc/greenmatrix
-    
-    # Create configuration
-    cat > /etc/greenmatrix/config.json << INNER_EOF
-{
-  "backend_url": "$BACKEND_URL",
-  "collection_interval": 2,
-  "api_timeout": 30,
-  "auto_discovery": true,
-  "setup_timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-}
-INNER_EOF
-    
-    # Set environment variables
-    echo "GREENMATRIX_BACKEND_URL=$BACKEND_URL" >> /etc/environment
-    echo "GREENMATRIX_CONFIG_FILE=/etc/greenmatrix/config.json" >> /etc/environment
-    
-    # Download and install VM agent (this would be the auto-config script)
-    # For now, we'll create a basic version
-    cat > /opt/greenmatrix/vm_agent.py << 'INNER_EOF'
-import os, sys, time, json, socket, datetime, platform, requests, psutil, subprocess, re
-
-class AutoConfig:
-    def __init__(self):
-        self.vm_name = socket.gethostname() + "-Linux"
-        self.backend_url = self._discover_backend_url()
-        self.collection_interval = 2
-        self.api_timeout = 30
-        
-    def _discover_backend_url(self):
-        # Environment variable
-        backend_url = os.getenv('GREENMATRIX_BACKEND_URL')
-        if backend_url:
-            return backend_url
-            
-        # Config file
-        try:
-            with open('/etc/greenmatrix/config.json', 'r') as f:
-                config = json.load(f)
-                if 'backend_url' in config and config['backend_url']:
-                    return config['backend_url']
-        except:
-            pass
-            
-        # Auto-discovery
-        try:
-            gateway = subprocess.check_output(['ip', 'route', 'show', 'default'], text=True)
-            gateway_ip = re.search(r'via\s+(\d+\.\d+\.\d+\.\d+)', gateway)
-            if gateway_ip:
-                backend_url = f"http://{gateway_ip.group(1)}:8000"
-                if self._test_backend(backend_url):
-                    return backend_url
-        except:
-            pass
-            
-        # Fallback
-        return "http://localhost:8000"
-        
-    def _test_backend(self, url):
-        try:
-            response = requests.get(f"{url}/health", timeout=3)
-            return response.status_code == 200
-        except:
-            return False
-
-config = AutoConfig()
-print(f"VM Agent starting for {config.vm_name}")
-print(f"Backend URL: {config.backend_url}")
-
-# Main monitoring loop (simplified version)
-while True:
-    try:
-        processes = []
-        for proc in psutil.process_iter(['pid', 'name', 'username', 'cpu_percent', 'memory_info']):
-            try:
-                info = proc.info
-                processes.append({
-                    'timestamp': datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                    'process_name': info['name'],
-                    'process_id': info['pid'],
-                    'username': info.get('username', 'unknown'),
-                    'cpu_usage_percent': float(info.get('cpu_percent', 0) or 0),
-                    'memory_usage_mb': round((info.get('memory_info', {}).get('rss', 0) or 0) / 1024 / 1024, 2),
-                    'memory_usage_percent': 0.0,  # Will be calculated by backend
-                    'vm_name': config.vm_name
-                })
-            except:
-                continue
-        
-        payload = {
-            'timestamp': datetime.datetime.now(datetime.timezone.utc).isoformat(),
-            'vm_name': config.vm_name,
-            'process_metrics': processes,
-            'agent_version': '2.0.0',
-            'platform': platform.system(),
-            'metrics_count': len(processes)
-        }
-        
-        response = requests.post(f"{config.backend_url}/api/v1/metrics/vm-snapshot", json=payload, timeout=config.api_timeout)
-        print(f"Sent {len(processes)} processes - Response: {response.status_code}")
-        
-    except Exception as e:
-        print(f"Error: {e}")
-    
-    time.sleep(config.collection_interval)
-INNER_EOF
-    
-    # Create systemd service
-    cat > /etc/systemd/system/greenmatrix-vm-agent.service << INNER_EOF
-[Unit]
-Description=GreenMatrix VM Monitoring Agent
-After=network.target
-StartLimitIntervalSec=0
-
-[Service]
-Type=simple
-User=root
-WorkingDirectory=/opt/greenmatrix
-Environment=GREENMATRIX_BACKEND_URL=$BACKEND_URL
-Environment=PYTHONUNBUFFERED=1
-ExecStart=/usr/bin/python3 /opt/greenmatrix/vm_agent.py
-Restart=always
-RestartSec=10
-StandardOutput=journal
-StandardError=journal
-
-[Install]
-WantedBy=multi-user.target
-INNER_EOF
-    
-    # Enable and start service
-    systemctl daemon-reload
-    systemctl enable greenmatrix-vm-agent
-    systemctl start greenmatrix-vm-agent
-    
-    print_status "✅ GreenMatrix VM Agent installed and started!"
-    print_status "View logs with: journalctl -u greenmatrix-vm-agent -f"
-    print_status "Service status: systemctl status greenmatrix-vm-agent"
-}
-
-main "$@"
-EOF
-    
-    chmod +x deploy-vm-agent.sh
-    
-    print_status "✅ VM agent deployment script created: deploy-vm-agent.sh"
-    print_status "📋 To deploy on any VM/container, run: sudo ./deploy-vm-agent.sh"
+    print_status "✅ VM monitoring information displayed"
 }
 
 # Configure Airflow
@@ -739,15 +492,14 @@ display_info() {
     echo "  Airflow DAGs:         airflow/dags/"
     echo "  Airflow Logs:         airflow/logs/"
     echo "  Application Logs:     logs/"
-    echo "  VM Agent Script:      deploy-vm-agent.sh"
-    echo "  VM Agent Config:      vm_agent_config.json"
+    echo "  VM Agent Folder:      vm-agent/"
     echo ""
     echo "🛠️ Management Commands:"
     echo "  View logs:            docker-compose logs -f [service]"
     echo "  Stop services:        docker-compose down"
     echo "  Restart services:     docker-compose restart"
     echo "  Update services:      docker-compose pull && docker-compose up -d"
-    echo "  Deploy VM agents:     sudo ./deploy-vm-agent.sh (on any VM/container)"
+    echo "  Deploy VM agents:     Copy vm-agent/ to target VM and run deploy script"
     echo "  Host metrics logs:    journalctl -u greenmatrix-host-metrics -f"
     echo "  Host metrics status:  systemctl status greenmatrix-host-metrics"
     echo ""
