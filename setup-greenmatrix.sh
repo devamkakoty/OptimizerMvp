@@ -146,15 +146,70 @@ check_port_conflicts() {
             print_status "  - $port"
         done
         print_status ""
+
+        # Show which processes are using the ports
+        print_status "Checking what's using these ports..."
+        for port_info in "${ports_services[@]}"; do
+            local port=$(echo "$port_info" | cut -d: -f1)
+            local service=$(echo "$port_info" | cut -d: -f2-)
+
+            # Try to find what's using the port
+            local process_info=""
+            if command -v ss >/dev/null 2>&1; then
+                process_info=$(ss -tulpn 2>/dev/null | grep ":$port " | head -n1)
+            elif command -v lsof >/dev/null 2>&1; then
+                process_info=$(lsof -Pi :$port -sTCP:LISTEN 2>/dev/null | tail -n1)
+            fi
+
+            if [ -n "$process_info" ]; then
+                print_status "  Port $port: $process_info"
+            fi
+        done
+
+        echo ""
         print_status "Solutions:"
-        print_status "  1. Stop services using these ports"
-        print_status "  2. Or change ports in .env file (e.g., FRONTEND_PORT=3001)"
+        print_status "  1. Let script automatically stop Docker containers on these ports (recommended)"
+        print_status "  2. Change GreenMatrix ports in .env file, then retry"
+        print_status "  3. Cancel and manually stop the services"
         echo ""
-        read -p "Continue anyway? (y/N): " -n 1 -r
+
+        read -p "Stop all Docker containers using these ports? (y/N): " -n 1 -r
         echo ""
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            print_error "Installation cancelled"
-            exit 1
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            print_status "Stopping Docker containers on conflicting ports..."
+
+            # Stop containers using the conflicting ports
+            for port_info in "${ports_services[@]}"; do
+                local port=$(echo "$port_info" | cut -d: -f1)
+
+                # Find containers using this port
+                local containers=$(docker ps --format '{{.ID}}' --filter "publish=$port" 2>/dev/null)
+                if [ -n "$containers" ]; then
+                    print_status "Stopping containers on port $port..."
+                    echo "$containers" | xargs -r docker stop 2>/dev/null || true
+                fi
+            done
+
+            sleep 2
+            print_status "✅ Conflicting containers stopped, continuing installation..."
+        else
+            echo ""
+            print_status "To change ports manually:"
+            print_status "  Edit .env and modify these variables:"
+            print_status "    FRONTEND_PORT=3000    → FRONTEND_PORT=3001"
+            print_status "    BACKEND_PORT=8000     → BACKEND_PORT=8001"
+            print_status "    POSTGRES_PORT=5432    → POSTGRES_PORT=5434"
+            print_status "    TIMESCALEDB_PORT=5433 → TIMESCALEDB_PORT=5435"
+            print_status "    REDIS_PORT=6379       → REDIS_PORT=6380"
+            print_status "    AIRFLOW_WEBSERVER_PORT=8080 → AIRFLOW_WEBSERVER_PORT=8081"
+            echo ""
+
+            read -p "Continue anyway? (y/N): " -n 1 -r
+            echo ""
+            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                print_error "Installation cancelled"
+                exit 1
+            fi
         fi
     fi
 }
@@ -202,7 +257,7 @@ check_system_resources() {
 # Setup environment
 setup_environment() {
     print_step "Setting up environment configuration..."
-    
+
     if [ ! -f ".env" ]; then
         if [ -f ".env.example" ]; then
             cp .env.example .env
@@ -214,12 +269,23 @@ setup_environment() {
         fi
     else
         print_status "Using existing .env file"
+
+        # Check if .env was recently modified (within last 5 minutes)
+        if [ -n "$(find .env -mmin -5 2>/dev/null)" ]; then
+            print_warning ".env file was recently modified"
+            print_status "Note: If you changed ports, containers will be recreated with new ports"
+            print_status "Old containers on old ports will be stopped and removed"
+        fi
     fi
-    
+
     # Set appropriate permissions for Airflow
     export AIRFLOW_UID=$(id -u)
-    echo "AIRFLOW_UID=$AIRFLOW_UID" >> .env
-    
+
+    # Only add AIRFLOW_UID if not already in .env
+    if ! grep -q "^AIRFLOW_UID=" .env 2>/dev/null; then
+        echo "AIRFLOW_UID=$AIRFLOW_UID" >> .env
+    fi
+
     print_status "✅ Environment setup completed"
 }
 
@@ -249,17 +315,36 @@ create_directories() {
 start_services() {
     print_step "Building and starting GreenMatrix services..."
 
-    # Clean up any existing networks to prevent configuration conflicts
-    print_status "Checking for existing Docker networks..."
-    if docker network ls | grep -q "greenmatrix-network"; then
-        print_warning "Removing existing greenmatrix-network to prevent configuration conflicts..."
+    # Clean up any existing GreenMatrix containers and networks FIRST
+    print_status "Checking for existing GreenMatrix containers and networks..."
+
+    # Stop and remove all GreenMatrix containers
+    if docker ps -a --format '{{.Names}}' | grep -q "greenmatrix-\|green-matrix"; then
+        print_warning "Stopping and removing existing GreenMatrix containers..."
         docker-compose down --remove-orphans 2>/dev/null || true
-        docker network rm green-matrix_greenmatrix-network 2>/dev/null || true
+        sleep 2
     fi
 
+    # Remove the network if it exists (with all possible name variations)
+    for network_name in "green-matrix_greenmatrix-network" "greenmatrix_greenmatrix-network" "greenmatrix-network"; do
+        if docker network ls --format '{{.Name}}' | grep -q "^${network_name}$"; then
+            print_warning "Removing existing network: $network_name"
+            docker network rm "$network_name" 2>/dev/null || true
+        fi
+    done
+
+    # Prune unused networks to ensure clean slate
+    print_status "Pruning unused Docker networks..."
+    docker network prune -f >/dev/null 2>&1 || true
+
+    # Wait a moment for Docker to fully clean up
+    sleep 2
+    print_status "✅ Cleanup complete, starting fresh deployment"
+
     # Start core services first
+    # Use --force-recreate to ensure .env changes take effect
     print_status "Starting database and core services..."
-    docker-compose up -d postgres timescaledb redis
+    docker-compose up -d --force-recreate postgres timescaledb redis
 
     # Wait for databases to be ready
     print_status "Waiting for PostgreSQL to be ready..."
@@ -274,7 +359,7 @@ start_services() {
 
     # Start Airflow database
     print_status "Starting Airflow database..."
-    docker-compose up -d airflow-postgres
+    docker-compose up -d --force-recreate airflow-postgres
 
     # Wait for Airflow database to be ready
     print_status "Waiting for Airflow database to be ready..."
@@ -284,8 +369,9 @@ start_services() {
 
     # Start core GreenMatrix services (backend, frontend, db-setup)
     # Note: Airflow services are optional and will start if configured correctly
+    # Use --force-recreate to apply any .env port changes
     print_status "Starting all services..."
-    if ! docker-compose up -d; then
+    if ! docker-compose up -d --force-recreate; then
         print_warning "Some services failed to start (this may include optional Airflow services)"
         print_status "Checking if core services are running..."
 
